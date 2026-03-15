@@ -11,19 +11,23 @@ from pathlib import Path
 from statistics import median
 
 # Universal fields hardcoded — these live at product top level, not in attributes
-UNIVERSAL_FIELDS = ["sku", "name", "url", "price", "currency", "scraped_at"]
-UNIVERSAL_FIELDS_NO_PRICE = ["sku", "name", "url", "scraped_at"]
+UNIVERSAL_FIELDS = ["sku", "name", "url", "price", "currency", "brand", "scraped_at"]
+UNIVERSAL_FIELDS_NO_PRICE = ["sku", "name", "url", "brand", "scraped_at"]
 
+# 12 checks with weights summing to 100
 CHECKS = {
-    "attribute_coverage":      {"weight": 20, "threshold": 0.90},
-    "duplicate_detection":     {"weight": 15, "threshold": 0.99},
-    "price_sanity":            {"weight": 10, "threshold": 1.0},
-    "schema_conformance":      {"weight": 10, "threshold": 1.0},
-    "data_freshness":          {"weight": 10, "threshold": 1.0},
-    "field_level_regression":  {"weight": 10, "threshold": 0.50},
-    "pagination_completeness": {"weight": 10, "threshold": 0.70},
-    "category_diversity":      {"weight":  5, "threshold": 0.50},
-    "row_count_trend":         {"weight": 10, "threshold": 0.80},
+    "core_attribute_coverage":     {"weight": 20, "threshold": 0.90},
+    "extended_attribute_coverage": {"weight":  5, "threshold": 0.50},
+    "pagination_completeness":     {"weight": 10, "threshold": 0.70},
+    "category_diversity":          {"weight":  5, "threshold": 0.50},
+    "category_classification":     {"weight": 10, "threshold": 0.95},
+    "price_sanity":                {"weight": 10, "threshold": 1.00},
+    "data_freshness":              {"weight":  5, "threshold": 1.00},
+    "schema_conformance":          {"weight":  5, "threshold": 1.00},
+    "row_count_trend":             {"weight":  5, "threshold": 0.80},
+    "duplicate_detection":         {"weight": 10, "threshold": 0.99},
+    "field_level_regression":      {"weight": 10, "threshold": 0.50},
+    "extra_attributes_ratio":      {"weight":  5, "threshold": 0.50},
 }
 
 
@@ -45,7 +49,8 @@ def load_config(config_path: Path) -> dict:
         sys.exit(1)
     config = json.loads(config_path.read_text())
     required = ["company_slug", "expected_product_count", "expected_top_level_categories",
-                "core_attributes", "type_map", "enum_attributes", "has_prices"]
+                "core_attributes", "extended_attributes", "type_map", "enum_attributes",
+                "has_prices"]
     missing = [k for k in required if k not in config]
     if missing:
         print(f"Error: config missing required fields: {missing}", file=sys.stderr)
@@ -81,7 +86,7 @@ def load_json(path: Path) -> dict | list | None:
 # ---------------------------------------------------------------------------
 
 
-def check_attribute_coverage(products: list[dict], config: dict) -> float:
+def check_core_attribute_coverage(products: list[dict], config: dict) -> float:
     """Fraction of products with >80% of core attributes populated."""
     if not products:
         return 0.0
@@ -97,12 +102,30 @@ def check_attribute_coverage(products: list[dict], config: dict) -> float:
             val = product.get(field)
             if val is not None and val != "" and val != []:
                 populated += 1
-        attrs = product.get("attributes", {})
+        attrs = product.get("core_attributes", {})
         for field in core_nested:
             val = attrs.get(field)
             if val is not None and val != "" and val != []:
                 populated += 1
         if populated / total_core > 0.80:
+            passing += 1
+    return passing / len(products)
+
+
+def check_extended_attribute_coverage(
+    products: list[dict], config: dict
+) -> float | None:
+    """Fraction of products with >50% of extended attributes populated."""
+    extended_attrs = config.get("extended_attributes", [])
+    if not extended_attrs:
+        return None
+    if not products:
+        return 0.0
+    passing = 0
+    for product in products:
+        ext = product.get("extended_attributes", {})
+        populated = sum(1 for a in extended_attrs if ext.get(a) not in (None, "", []))
+        if populated / len(extended_attrs) > 0.50:
             passing += 1
     return passing / len(products)
 
@@ -138,7 +161,11 @@ def check_schema_conformance(products: list[dict], config: dict) -> float:
     enum_attrs = config.get("enum_attributes", {})
     total, conforming = 0, 0
     for product in products:
-        attrs = product.get("attributes", {})
+        attrs = {
+            **product.get("core_attributes", {}),
+            **product.get("extended_attributes", {}),
+            **product.get("extra_attributes", {}),
+        }
         for attr_name, attr_val in attrs.items():
             if attr_name not in type_map:
                 continue
@@ -207,7 +234,7 @@ def check_field_level_regression(
             if attr in UNIVERSAL_FIELDS:
                 val = product.get(attr)
             else:
-                val = product.get("attributes", {}).get(attr)
+                val = product.get("core_attributes", {}).get(attr)
             if val is not None and val != "" and val != []:
                 filled += 1
         current_rates[attr] = filled / len(products)
@@ -258,6 +285,23 @@ def check_category_diversity(
     return len(expected & actual) / len(expected)
 
 
+def check_category_classification(
+    products: list[dict], is_limited: bool
+) -> float | None:
+    """Fraction of products with a valid product_category. Skipped on limited runs."""
+    if is_limited:
+        return None
+    if not products:
+        return 0.0
+    classified = sum(
+        1 for p in products
+        if p.get("product_category")
+        and p["product_category"] != "_unclassified"
+        and "." in p["product_category"]
+    )
+    return classified / len(products)
+
+
 def check_row_count_trend(
     products_found: int, is_limited: bool, history: list[dict]
 ) -> float | None:
@@ -273,6 +317,23 @@ def check_row_count_trend(
     if prev_count == 0:
         return None
     return products_found / prev_count
+
+
+def check_extra_attributes_ratio(products: list[dict]) -> float | None:
+    """Average of 1 - (extra_count / (core_count + extended_count))."""
+    if not products:
+        return 0.0
+    ratios = []
+    for product in products:
+        core_count = len(product.get("core_attributes", {}))
+        extended_count = len(product.get("extended_attributes", {}))
+        extra_count = len(product.get("extra_attributes", {}))
+        mapped = core_count + extended_count
+        if mapped == 0:
+            continue
+        ratio = max(0.0, 1 - (extra_count / mapped))
+        ratios.append(ratio)
+    return sum(ratios) / len(ratios) if ratios else 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -291,15 +352,18 @@ def compute_results(
     is_limited = summary.get("limited", False)
 
     raw_values = {
-        "attribute_coverage": check_attribute_coverage(products, config),
-        "duplicate_detection": check_duplicate_detection(products),
-        "price_sanity": check_price_sanity(products, config),
-        "schema_conformance": check_schema_conformance(products, config),
-        "data_freshness": check_data_freshness(products),
-        "field_level_regression": check_field_level_regression(products, config, baseline),
+        "core_attribute_coverage": check_core_attribute_coverage(products, config),
+        "extended_attribute_coverage": check_extended_attribute_coverage(products, config),
         "pagination_completeness": check_pagination_completeness(products_found, config, is_limited),
         "category_diversity": check_category_diversity(products, config, is_limited),
+        "category_classification": check_category_classification(products, is_limited),
+        "price_sanity": check_price_sanity(products, config),
+        "data_freshness": check_data_freshness(products),
+        "schema_conformance": check_schema_conformance(products, config),
         "row_count_trend": check_row_count_trend(products_found, is_limited, history),
+        "duplicate_detection": check_duplicate_detection(products),
+        "field_level_regression": check_field_level_regression(products, config, baseline),
+        "extra_attributes_ratio": check_extra_attributes_ratio(products),
     }
 
     # Weight redistribution
@@ -376,7 +440,7 @@ def compute_fill_rates(products: list[dict], config: dict) -> dict[str, float]:
             if attr in UNIVERSAL_FIELDS:
                 val = product.get(attr)
             else:
-                val = product.get("attributes", {}).get(attr)
+                val = product.get("core_attributes", {}).get(attr)
             if val is not None and val != "" and val != []:
                 filled += 1
         rates[attr] = round(filled / len(products), 4)

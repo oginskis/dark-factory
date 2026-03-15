@@ -315,6 +315,7 @@ Every agent file follows this structure. The sections are in order — do not re
 | — Capabilities, not tools | Say "search the web" not "use WebSearch tool" |
 | — Logical file references, not paths | Say "the company report" not `docs/product-classifier/festool.md` |
 | **Every step that can stop or escalate must reference the decision by name** | Prevents orphaned decisions that nothing points to |
+| **Sub-steps use letter suffixes** | Complex steps can split into `## Step 1b:` when a parent step has logically distinct phases. Main step numbers remain sequential. |
 | **Report templates include both success and stop variants** | Stop cases must produce a minimal report, not leave gaps |
 | **Strict format rules table after each report template** | Correct/Wrong columns prevent common formatting errors |
 | **Self-verification step with numbered quality gates** | Agent must check its own output before completing |

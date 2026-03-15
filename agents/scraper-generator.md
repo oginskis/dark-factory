@@ -73,11 +73,6 @@ Read the SKU schema for each subcategory the company covers.
 
 If no SKU schema exists for any of the company's subcategories, check the product taxonomy categories file to verify the subcategory exists — see the `no_sku_schema` decision. Repeat for each missing schema before proceeding.
 
-**Backward compatibility for company reports:** The scraper-generator must handle both old and new company report formats:
-- **Old format:** `Primary` and `Secondary` rows with `Category > Subcategory` display names
-- **New format:** `Subcategories` and `Primary` rows with taxonomy IDs (e.g., `machinery.power_tools`)
-- **Detection:** If the report has a `Subcategories` row, use the new format; otherwise fall back to the old format.
-
 ---
 
 ## Step 2a: Map Attributes to Schema
@@ -137,7 +132,7 @@ The generated scraper must:
    - `price` — numeric price (float, no currency symbols), or `null` if unavailable
    - `currency` — ISO 4217 currency code, or `null` if unavailable
    - `brand` — the product's brand name (promoted to top-level, not inside attribute buckets)
-   - `product_category` — the taxonomy ID for the product's subcategory (e.g., `machinery.power_tools`). For multi-subcategory companies, determine from the URL-based category mapping built in Step 1b. For single-subcategory companies, use the company's primary taxonomy ID. For old-format reports without taxonomy IDs, derive the ID from the `Category > Subcategory` display name.
+   - `product_category` — the taxonomy ID for the product's subcategory (e.g., `machinery.power_tools`). For multi-subcategory companies, determine from the URL-based category mapping built in Step 1b. For single-subcategory companies, use the company's primary taxonomy ID.
    - `scraped_at` — ISO 8601 timestamp of when this product was extracted
 
 2. **Extract category-specific attributes** as defined in the SKU schema and route them into the correct bucket per Step 2a. Map site elements to schema attributes using the descriptions and example values in the schema as guidance. Not every attribute will be present on every site — extract what is available, skip what is not.
@@ -379,7 +374,7 @@ After the scraper passes its `--limit 20` test, analyze the test output for pote
 1. **Collect** all unique attribute keys from `extra_attributes` across all test products.
 2. **Evaluate significance** — for each extra attribute, count how many products include it. If an attribute appears on >80% of test products, it is a candidate for schema addition.
 3. **Check schema coverage** — verify the candidate is not already in the schema under a different name (synonym check).
-4. **Trigger taxonomy update** — if there are significant candidates, invoke `/product-taxonomy` in evolution mode for the company's subcategory. Pass the candidate attribute names and example values. The taxonomy skill evaluates whether they are genuinely significant for the subcategory (researches other companies, not just this one).
+4. **Trigger taxonomy update** — if there are significant candidates, trigger schema enrichment for the company's subcategory in evolution mode. Pass the candidate attribute names and example values. The enrichment process evaluates whether they are genuinely significant for the subcategory (researches other companies, not just this one).
 5. **Log** — report which attributes were proposed to the taxonomy. The feedback does NOT re-map the current scraper's output. Newly added attributes take effect when this or another company's scraper is regenerated in the future.
 
 ### File locking for concurrency
@@ -389,7 +384,7 @@ Before modifying any schema file, the feedback step must acquire a file lock:
   - Example: `power-tools-drills-saws-sanders.md.lock`
 - If the lock file exists and is less than 10 minutes old: skip the feedback step, log a warning ("Another agent is updating this schema, skipping feedback")
 - If the lock file exists but is older than 10 minutes: consider it stale, delete it, and proceed (the holding agent likely crashed)
-- Create the lock file before invoking `/product-taxonomy`
+- Create the lock file before triggering schema enrichment
 - Delete the lock file after the taxonomy update completes (or fails)
 
 ### When to skip

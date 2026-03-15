@@ -245,18 +245,26 @@ def check_agent_file(skill_name, content, issues):
     if "**Output:**" not in content:
         issues.append(Issue("moderate", check, "Missing **Output:** field"))
 
-    # Steps
-    steps = re.findall(r"^## Step (\d+):", content, re.MULTILINE)
-    if not steps:
+    # Steps (main + sub-steps like 1b, 2a)
+    all_steps = re.findall(r"^## Step (\d+[a-z]?):", content, re.MULTILINE)
+    main_steps = [s for s in all_steps if s.isdigit()]
+    if not all_steps:
         issues.append(Issue("critical", check, "No numbered steps found"))
-    elif len(steps) < 2:
-        issues.append(Issue("moderate", check, f"Only {len(steps)} step(s) found — expected at least 2"))
+    elif len(all_steps) < 2:
+        issues.append(Issue("moderate", check, f"Only {len(all_steps)} step(s) found — expected at least 2"))
 
-    # Step numbering is sequential
-    for i, step_num in enumerate(steps):
+    # Main step numbering is sequential
+    for i, step_num in enumerate(main_steps):
         if int(step_num) != i + 1:
             issues.append(Issue("moderate", check, f"Step numbering gap: expected Step {i+1}, found Step {step_num}"))
             break
+
+    # Sub-steps must have a parent main step
+    for step in all_steps:
+        if not step.isdigit():
+            parent = re.match(r"(\d+)", step).group(1)
+            if parent not in main_steps:
+                issues.append(Issue("moderate", check, f"Sub-step {step} has no parent Step {parent}"))
 
     # Self-verification
     if "Self-Verification" not in content and "Self-verification" not in content:
@@ -307,6 +315,13 @@ def check_agent_file(skill_name, content, issues):
             if not line.strip().startswith("|"):
                 issues.append(Issue("critical", check, f"Agent contains hardcoded path: '{match.group()}' — use logical resource names"))
                 break  # Report only first occurrence
+
+    # Skill name references (e.g., `/product-taxonomy`) — must use capability-based language
+    # Require at least one hyphen to distinguish skill names from URL path segments like `/products`
+    for match in re.finditer(r'`/([a-z][a-z0-9]+-[a-z][a-z0-9-]*)`', content):
+        if not is_inside_code_block(content, match.start()):
+            issues.append(Issue("moderate", check,
+                f"Agent references skill name '/{match.group(1)}' — use capability-based language instead"))
 
     # Taxonomy reference consistency
     if "taxonomy file" in content.lower() and "product taxonomy categories file" not in content:

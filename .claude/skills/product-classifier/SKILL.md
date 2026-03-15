@@ -39,5 +39,4 @@ Read and follow the agent instructions in `agents/product-classifier.md`.
 
 ## Notes
 
-- File-driven skill — no database or external services required.
-- The agent outputs taxonomy IDs (e.g., `machinery.power_tools`) from `categories.md` rather than display names. The report's Business Classification table uses `Subcategories` (all taxonomy IDs) and `Primary` (one taxonomy ID) rows instead of the old `Primary`/`Secondary` display-name rows.
+File-driven skill — no database or external services required.

@@ -125,7 +125,7 @@ If the site is JS-rendered but an API endpoint or JSON-LD provides complete prod
 Assess the difficulty of automated access:
 - **None detected:** Standard HTTP responses, no challenges
 - **Light:** Rate limiting, basic user-agent checks (manageable with respectful delays and proper headers)
-- **Moderate:** Cookie-based bot detection, JavaScript challenges that require a headless browser to resolve. Since the pipeline does not use headless browsers, this is equivalent to severe for our purposes — stop. See the `requires_headless_browser` decision.
+- **Moderate:** Cookie-based bot detection, JavaScript challenges that require a headless browser to resolve. Since the pipeline cannot use headless browsers, this is a stop condition — see the `requires_headless_browser` decision.
 - **Severe:** CAPTCHA walls, Cloudflare Under Attack mode, DataDome, PerimeterX, or similar commercial bot protection that actively blocks automated access. This is a stop condition — see the `anti_bot_severe` decision.
 
 ---

@@ -68,7 +68,7 @@ If the company's relationship to physical goods is unclear, escalate — see the
 
 Read the product taxonomy categories file. This file is the single source of truth for all category and subcategory values. Every value used in classification must appear in this file verbatim -- no paraphrasing, no invented categories, no abbreviations.
 
-Each subcategory line in the taxonomy file has a display name and a taxonomy ID in backticks. Extract taxonomy IDs using this regex pattern: `re.match(r'^- (.+?) \x60([a-z][a-z0-9_.]+)\x60$', line.strip())` — group 1 is the display name, group 2 is the taxonomy ID (e.g., `machinery.power_tools`).
+Each subcategory line in the product taxonomy categories file has a display name and a taxonomy ID in backticks. Extract taxonomy IDs using this regex pattern: `re.match(r'^- (.+?) \x60([a-z][a-z0-9_.]+)\x60$', line.strip())` — group 1 is the display name, group 2 is the taxonomy ID (e.g., `machinery.power_tools`).
 
 **Unlimited subcategories.** A company gets one **Primary** subcategory and may have additional subcategories listed in **Subcategories**. There is no hard limit on the number of subcategories. Add every subcategory that genuinely describes a distinct product line the company offers — but do not pad the list with marginal matches or subcategories that merely overlap with the primary.
 
