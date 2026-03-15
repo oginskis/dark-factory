@@ -5,19 +5,19 @@ Product discovery pipeline: give it a company name or URL, get back a production
 ## How It Works
 
 ```
-Company URL  -->  [Classify]  -->  [Detect Catalog]  -->  [Generate Scraper]  -->  [Generate Eval]
-                   Stage 1           Stage 2                Stage 3                 Stage 4
-                   (LLM, once)       (LLM, once)            (LLM, once)             (LLM, once)
+Expensive tier (LLM, runs once per company):
 
-                                                            scraper.py              eval.py
-                                                            runs daily              monitors quality
-                                                            (no LLM)                (no LLM)
+  Company URL  -->  [Classify]  -->  [Detect Catalog]  -->  [Generate Scraper]  -->  [Generate Eval]
+                     Stage 1           Stage 2                Stage 3                 Stage 4
+
+Cheap tier (no LLM, runs daily):
+
+  scraper.py  -->  products.jsonl  -->  eval.py  -->  eval_result.json
+                                                       |
+                                                       +--> quality degrades? --> re-run expensive tier
 ```
 
-The pipeline has two cost tiers:
-
-- **Expensive tier** — LLM agents run once per company to classify, detect catalogs, generate scrapers and evals. Re-runs only on quality degradation.
-- **Cheap tier** — The generated Python scripts (`scraper.py` + `eval.py`) run as daily K8s CronJobs with zero LLM involvement.
+The generated scripts are standalone Python — run them on any scheduler (cron, Airflow, K8s CronJobs, etc.) with zero LLM involvement. The expensive tier only re-runs when the eval detects quality degradation.
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ This runs all four stages sequentially:
 1. **Classify** — researches the company and classifies it into the product taxonomy
 2. **Detect catalog** — finds the product catalog, analyzes its structure, and picks a scraping strategy
 3. **Generate scraper** — writes a standalone Python scraper, probes live pages, and runs a test
-4. **Generate eval** — writes a quality validation script with six weighted checks
+4. **Generate eval** — writes a quality validation script with seven weighted checks
 
 Each stage can stop the pipeline if it hits a blocker (no physical products, no public catalog, anti-bot protection, etc.). You'll be told what happened and why.
 
@@ -85,7 +85,7 @@ uv run docs/eval-generator/{slug}/eval.py
 
 | File | Contents |
 |------|----------|
-| `eval_result.json` | Quality report with six weighted checks, a degradation score (0-100), and a pass/degraded/fail status |
+| `eval_result.json` | Quality report with seven weighted checks, a degradation score (0-100), and a pass/degraded/fail status |
 | `eval_history.json` | Append-only log of all eval runs, used to detect trends |
 
 **Eval status meanings:**
