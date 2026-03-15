@@ -38,7 +38,7 @@ Read and follow the agent instructions in `agents/scraper-generator.md`.
 ### Slug derivation
 
 - **`{slug}`** — the company slug from `$ARGUMENTS` (e.g., `topwoodtimber`).
-- **`{category-slug}`** — derived from the **subcategory** in the company report's Primary classification. Take the part after ` > `, lowercase it, replace spaces with hyphens, drop special characters. Example: `Wood Products & Lumber > Softwood & Hardwood Lumber` → `softwood-hardwood-lumber`.
+- **`{category-slug}`** — derived from the subcategory display name corresponding to the company's Primary taxonomy ID. Look up the taxonomy ID in `categories.md` to find the display name, then slugify: lowercase, replace spaces with hyphens, drop special characters (`&`, `/`, `(`, `)`, `,`). Example: taxonomy ID `wood.softwood_hardwood_lumber` → display name "Softwood & Hardwood Lumber" → slug `softwood-hardwood-lumber`.
 - **`{platform-slug}`** — the platform name from the catalog assessment, lowercased. Example: WooCommerce → `woocommerce`, Shopify → `shopify`. If platform is `unknown` or `custom`, there is no knowledgebase file — skip it.
 
 ## Claude Code wiring
@@ -69,7 +69,7 @@ Scrapers output the **three-bucket format** (`_format: 2`):
 - **`extra_attributes`** — everything else (snake_case keys, primitive values only)
 
 The `config.json` includes:
-- `category_mapping` (dict) — maps site category paths to taxonomy IDs; must include at least a `"default"` key
+- `category_mapping` (dict) — maps URL path prefixes to taxonomy IDs (e.g., `"/Head-Protection/": "safety.head_protection"`)
 - `default_category` (string) — the company's primary taxonomy ID, used as fallback `product_category`
 
 ## Notes

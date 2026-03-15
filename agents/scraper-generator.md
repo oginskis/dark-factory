@@ -16,7 +16,7 @@ This agent generates a production-ready Python scraper that extracts structured 
 Read the company report. Extract:
 
 - **Site URL** — where to start
-- **Primary and secondary classifications** — what the company sells
+- **Subcategory taxonomy IDs** — what the company sells
 - **Business model** — B2B, B2C, etc.
 
 Read the catalog assessment. Extract:
@@ -423,7 +423,7 @@ Produce config metadata for the scraper:
 ```json
 {
   "company_slug": "{slug}",
-  "category": "{Category > Subcategory}",
+  "category": "{taxonomy_id}",
   "sku_schema": "{category-slug}",
   "scraping_strategy": "static_html",
   "expected_product_count": 1200,
@@ -438,7 +438,7 @@ Produce config metadata for the scraper:
 }
 ```
 
-- `category` — the exact classification from the company report
+- `category` — the primary taxonomy ID from the company report (e.g., `machinery.power_tools`)
 - `sku_schema` — the slug of the SKU schema file that was used (for single-subcategory companies). For multi-subcategory companies, this is the primary subcategory's schema slug.
 - `scraping_strategy` — the strategy the scraper implements
 - `expected_product_count` — from the catalog assessment estimate, updated with the actual count found during testing if it is higher
@@ -524,7 +524,7 @@ If all 18 pass, the scraper is complete.
 **Context:** No SKU schema file exists for the company's product category.
 **Autonomous resolution:** Verify that the subcategory from the company report exists in the product taxonomy categories file. If it does, the schema simply hasn't been created yet — trigger SKU schema generation for that subcategory. Once the schema is available, return to Step 2 and continue.
 **Escalate when:** The subcategory from the company report does not appear in the product taxonomy categories file. This indicates a taxonomy integrity issue that must be resolved before the pipeline can continue.
-**Escalation payload:** Company slug, the full `Category > Subcategory` value from the company report, confirmation that the subcategory was not found in the taxonomy.
+**Escalation payload:** Company slug, the taxonomy ID from the company report, confirmation that the subcategory was not found in the taxonomy.
 
 ### Decision: probe_extraction_failed
 

@@ -82,6 +82,7 @@ This stage generates a standalone Python scraper based on the catalog assessment
 **Stop the pipeline if:**
 - No catalog assessment exists for the company (defensive — Stage 2 ensures this)
 - The company's subcategory is not found in the product taxonomy categories file (taxonomy integrity issue — should not happen if Stage 1 validated against the taxonomy)
+- A URL prefix cannot be mapped to any taxonomy subcategory (unmapped_url_prefix escalation)
 - Probe extraction fails after 5 fix cycles (extraction logic cannot match the live site)
 - The scraper fails testing twice after adjustment
 

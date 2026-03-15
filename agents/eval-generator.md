@@ -223,7 +223,7 @@ If the eval runs successfully and all 12 checks appear in the result, the config
 **Context:** No SKU schema file exists for the company's product category. The config cannot meaningfully define `core_attributes`, `type_map`, or `enum_attributes` without knowing which attributes are expected.
 **Autonomous resolution:** Verify that the subcategory from the company report exists in the product taxonomy categories file. If it does, the schema simply hasn't been created yet — trigger SKU schema generation for that subcategory. Once the schema is available, return to Step 3 and continue.
 **Escalate when:** The subcategory from the company report does not appear in the product taxonomy categories file. This indicates a taxonomy integrity issue.
-**Escalation payload:** Company slug, the full `Category > Subcategory` value from the company report, confirmation that the subcategory was not found in the taxonomy.
+**Escalation payload:** Company slug, the taxonomy ID from the company report, confirmation that the subcategory was not found in the taxonomy.
 
 ### Decision: scraper_output_format_unclear
 

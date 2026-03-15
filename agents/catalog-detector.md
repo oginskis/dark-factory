@@ -9,7 +9,7 @@
 
 Read the company report to understand:
 - The company's website URL
-- Primary and secondary product categories
+- Subcategory taxonomy IDs and classifications
 - Business model (B2C, B2B, marketplace, etc.)
 - Any notes about the company's online presence from the classification stage
 

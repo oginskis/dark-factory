@@ -139,7 +139,7 @@ These are about *what* the agent thinks and decides — pure reasoning, independ
 | Add/modify strict format rules | "Prices must not have currency symbols" |
 | Change investigation steps | "Also check robots.txt" |
 | Add/modify escalation decisions | "Escalate when no taxonomy match is found" |
-| Change classification rules | "Allow at most one secondary category" |
+| Change classification rules | "Change subcategory cardinality rules" |
 | Add/modify boundaries | "This agent does not generate scrapers" |
 
 **Abstraction level for agent files:** Write as if the agent has no idea what harness runs it. Say "search the web for" not "use WebSearch tool." Say "read the company report" not "read `docs/product-classifier/festool.md`." Say "escalate" not "ask the user." The agent describes *what to do and decide*, never *how to interact or which tools to call*.
@@ -386,7 +386,7 @@ Use `##` for all top-level sections within the report. The agent's template defi
 
 ### Classification values
 
-Primary and Secondary classification values must be verbatim `Category > Subcategory` pairs from the product taxonomy categories file. Joined with ` > ` (space, greater-than, space). One primary (required), at most one secondary (optional, or "None").
+Classification values use taxonomy IDs from `categories.md` (e.g., `machinery.power_tools`). The company report has a `Subcategories` row listing all relevant taxonomy IDs (unlimited) and a `Primary` row with the single most representative ID. Display names appear in parentheses for readability.
 
 ---
 

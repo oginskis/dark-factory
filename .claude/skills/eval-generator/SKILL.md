@@ -36,6 +36,11 @@ Read and follow the agent instructions in `agents/eval-generator.md`.
 | Eval history (output) | `docs/eval-generator/{slug}/output/eval_history.json` |
 | Eval baseline (output) | `docs/eval-generator/{slug}/output/baseline.json` |
 
+### Slug derivation
+
+- **`{slug}`** — the company slug from `$ARGUMENTS` (e.g., `festool`).
+- **`{category-slug}`** — derived from the subcategory display name corresponding to the company's Primary taxonomy ID. Look up the taxonomy ID in `categories.md` to find the display name, then slugify: lowercase, replace spaces with hyphens, drop special characters (`&`, `/`, `(`, `)`, `,`). Example: taxonomy ID `wood.softwood_hardwood_lumber` → display name "Softwood & Hardwood Lumber" → slug `softwood-hardwood-lumber`.
+
 ## Claude Code wiring
 
 - Provide the file paths from the table above when the agent references logical resources (e.g., "the scraper source", "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the scrape output file", "the scrape run summary", "the shared eval script", "the eval config file", "the eval result file", "the eval history file", "the eval baseline file").
