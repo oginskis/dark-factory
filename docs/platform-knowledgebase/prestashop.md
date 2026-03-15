@@ -12,7 +12,7 @@ No JSON-LD Product schema observed on product pages (PATA Timber). Product data 
 | Product price | `.price` (first occurrence) | Multiple `.price` elements may exist — use first for primary price |
 | Product name | `h1` | Standard heading |
 | Breadcrumb | `.pata-breadcrumbs a` | Site-specific class; standard PrestaShop may use `nav.breadcrumb` or `ol.breadcrumb` |
-| Product attributes | `dl > dt` / `dl > dd` pairs | Definition list format with Latvian labels |
+| Product attributes | `table tr` with exactly 2 `td` cells | Label in first cell, value in second. NOT `dl/dt/dd` — PATA uses 2-column table rows in tab panels |
 | Subcategory links | `a[href]` matching `/{parent-id}-{parent-slug}/{child-id}-{child-slug}` pattern | Numeric ID prefix on all category URLs |
 
 ## Pagination
@@ -36,4 +36,4 @@ No JSON-LD Product schema observed on product pages (PATA Timber). Product data 
 
 | Company | Slug | Date | Notes |
 |---------|------|------|-------|
-| PATA Timber | pata | 2026-03-15 | Latvian timber retailer. No JSON-LD, no sitemap. Custom breadcrumb class `.pata-breadcrumbs`. All labels in Latvian. |
+| PATA Timber | pata | 2026-03-16 | Latvian timber retailer. No JSON-LD, no sitemap. Custom breadcrumb class `.pata-breadcrumbs`. All labels in Latvian. Product attributes in 2-column table rows (not dl/dt/dd). Category numeric IDs may differ from navigation links — verify via BFS discovery. Tabs: Informācija, Detalizēta informācija, Tehniskais apraksts, Kvalitātes apraksts. Specs in Detalizēta informācija tab. |

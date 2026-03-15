@@ -139,6 +139,8 @@ When all four stages complete successfully, present a structured summary to the 
 - {Eval checks skipped and why — e.g., "Price sanity check skipped (no prices in output). Pagination completeness check skipped (limited test run)."}
 - {Catalog scope surprises — e.g., "Sitemap contains 7,887 URLs vs. ~1,000 estimate — includes spare parts and accessories beyond the main product catalog."}
 - {Regional or access limitations — e.g., "Geo-restricted content detected. Some categories may vary by region."}
+- {Uncovered product lines — when the company sells products that were not scraped because no matching taxonomy category exists. For each uncovered line, suggest a taxonomy category and provide the exact command to add it. Format:}
+  - {"**Uncovered:** {Product line description} at `{catalog URL path}` — no matching taxonomy category. To add coverage, create a new subcategory in `docs/product-taxonomy/categories.md` (e.g., `{suggested_parent}.{suggested_id}`) and re-run: `/product-discovery {company URL}`"}
 - {Any other facts that would surprise or confuse someone reading the output without pipeline context}
 
 {If nothing noteworthy, write "No operational caveats." Do not omit this section.}
