@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Sporting Goods, Toys & Recreation
+**Taxonomy ID:** `sports.board_games_puzzles`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,21 +14,22 @@
 | URL | text | Direct link to the product page | https://example.com/product/catan-5th-edition |
 | Price | number | Numeric retail price excluding currency symbol | 9.99, 14.99, 44.99, 139.99 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, JPY, CAD |
-| Brand/Publisher | text | Company that produces or publishes the product | Hasbro, Ravensburger, Wizards of the Coast, The Pokemon Company, Asmodee, Fantasy Flight Games |
 | Product Type | enum | Primary product category | Board Game, Jigsaw Puzzle, Trading Card Game, Card Game, Party Game, Strategy Game, Dice Game, Expansion |
+| Game Category | text (list) | Thematic or genre classification of the game | Strategy, Family, Party, Cooperative, Economic, Fantasy, Sci-Fi, Educational |
+| Puzzle Material | text | Material the puzzle is made from | Cardboard, Wood, Foam, Acrylic |
+| Country of Origin | text | Country where the product is manufactured | USA, Germany, China, Poland, Japan |
 | Player Count Minimum | number | Minimum number of players required | 1, 2, 3 |
-| Player Count Maximum | number | Maximum number of players supported | 4, 6, 8, 10, Unlimited |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
+| Brand/Publisher | text | Company that produces or publishes the product | Hasbro, Ravensburger, Wizards of the Coast, The Pokemon Company, Asmodee, Fantasy Flight Games |
 | Age Recommendation | text | Recommended minimum age printed on packaging | 3+, 6+, 8+, 10+, 13+, 14+ |
 | Playing Time | text (minutes) | Estimated time to complete one game session. May be a range | 15, 30-45, 60-120, 90-180 |
 | Game Mechanic | text (list) | Core gameplay mechanisms used in the game | Dice Rolling, Tile Placement, Deck Building, Worker Placement, Area Control, Trading, Drafting |
-| Game Category | text (list) | Thematic or genre classification of the game | Strategy, Family, Party, Cooperative, Economic, Fantasy, Sci-Fi, Educational |
-| Complexity Weight | number | Community-rated complexity on a 1-5 scale where 1 is lightest | 1.0, 1.8, 2.5, 3.5, 4.5 |
-| Puzzle Piece Count | number | Total number of pieces in a jigsaw puzzle | 100, 300, 500, 1000, 2000, 5000 |
-| Puzzle Finished Size | text (inches) | Dimensions of the completed puzzle | 19.5 x 14.25, 27 x 20, 38.5 x 29.5 |
 | Puzzle Piece Thickness | number (mm) | Thickness of individual puzzle pieces | 1.8, 2.0, 2.2 |
-| Puzzle Material | text | Material the puzzle is made from | Cardboard, Wood, Foam, Acrylic |
 | Card Dimensions | text (mm) | Physical size of individual trading or game cards | 63 x 88, 63.5 x 88, 57 x 87 |
-| Card Count | number | Number of cards in a deck, booster pack, or box | 10, 15, 36, 60, 200 |
 | TCG Set Name | text | Named set or expansion within a trading card game | Scarlet and Violet, Modern Horizons 3, Prismatic Evolutions |
 | TCG Rarity Levels | text (list) | Rarity tiers present in the product | Common, Uncommon, Rare, Ultra Rare, Secret Rare, Holo Rare |
 | Pack Configuration | text | How trading card products are packaged and sold | Booster Pack, Elite Trainer Box, Booster Box (36 packs), Theme Deck, Bundle |
@@ -35,14 +38,11 @@
 | Language | text (list) | Languages supported by the rulebook and game components | English, German, French, Spanish, Japanese, Multi-Language |
 | Edition/Version | text | Specific edition or version of the product | 5th Edition, Revised, Anniversary Edition, Collector Edition, Travel Edition |
 | Package Dimensions (L x W x H) | text (inches) | Outer box dimensions | 10.75 x 10.75 x 3, 15.5 x 10 x 2.5, 6 x 4 x 3 |
-| Product Weight | number (lbs) | Total weight including packaging | 0.5, 1.2, 2.8, 4.5 |
 | Expansion/Standalone | enum | Whether the product requires a base game or is playable alone | Standalone, Expansion, Standalone Expansion |
-| Safety Certification | text (list) | Applicable toy safety standards and markings | ASTM F963, EN 71, CE, CPSIA |
-| Country of Origin | text | Country where the product is manufactured | USA, Germany, China, Poland, Japan |
-| UPC/EAN | text | Universal Product Code or European Article Number | 029877030712, 4005556152711 |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 33 attributes from 4 sources plus BoardGameGeek data model and EN 71 toy safety standards | [Best Buy Games](https://www.bestbuy.com/site/toys-games-collectibles/board-games-puzzles-cards/pcmcat274200050008.c), [Ravensburger](https://www.ravensburger.us/), [BoardGameGeek](https://boardgamegeek.com/), [TCGplayer](https://www.tcgplayer.com/) |

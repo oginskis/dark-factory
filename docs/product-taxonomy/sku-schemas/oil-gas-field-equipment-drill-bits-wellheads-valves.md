@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Energy Equipment & Storage
+**Taxonomy ID:** `energy.oil_gas_field_equipment`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,38 +14,35 @@
 | URL | text | Direct link to the product page | https://example.com/product/fc-gate-valve-2916 |
 | Price | number | Numeric unit price excluding currency symbol | 3450.00, 12500.00, 850.00 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, CNY |
-| Brand/Manufacturer | text | Equipment manufacturer or brand name | SLB (Cameron), Baker Hughes, Weatherford, Halliburton, NOV, Dombor |
 | Equipment Type | enum | High-level product category | Drill Bit, Gate Valve, Wellhead Assembly, Choke Valve, Christmas Tree, Casing Head, Tubing Head Spool |
-| Bore Size | text (in) | Nominal bore or passage diameter, typically in inches per API standards | 1-13/16, 2-1/16, 2-9/16, 3-1/16, 4-1/16, 7-1/16 |
+| Performance Requirement Level | enum | API 6A performance requirement level for testing validation | PR 1, PR 2 |
+| Material Class | enum | API 6A material class designation | AA, BB, CC, DD, EE, FF, HH |
+| Body Material | text | Primary material of the valve or equipment body | Low-Alloy Steel, Carbon Steel, Stainless Steel, Duplex Stainless Steel, Inconel 718 |
+| Connection Type | text | End connection or flange type | Flanged (API 6BX), Studded, Threaded, Weco Union, Clamp Hub |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
+| Bit Type | enum | Drill bit design classification | PDC, Tricone (Roller Cone), Diamond Impregnated, Hybrid |
+| Body Type | enum | Bit body construction material (for drill bits) | Matrix, Steel |
+| Seal Type | text | Primary sealing mechanism | Metal-to-Metal, Soft Seat, Resilient Seat, Lip Seal, Ring Gasket (BX, RX, R) |
+| Stem Type | enum | Valve stem design | Rising Stem, Non-Rising Stem |
+| Country of Origin | text | Country where the product was manufactured | USA, China, United Kingdom, India |
 | Working Pressure | number (PSI) | Rated working pressure per API 6A | 2000, 3000, 5000, 10000, 15000, 20000 |
 | API Standard | text (list) | Applicable API specification numbers | API 6A, API 16A, API 16C, API 7-1 |
 | Product Specification Level | enum | API 6A product specification level indicating quality and testing requirements | PSL 1, PSL 2, PSL 3, PSL 3G, PSL 4 |
-| Performance Requirement Level | enum | API 6A performance requirement level for testing validation | PR 1, PR 2 |
 | Temperature Rating | enum | API 6A temperature class designating the rated operating range | K (-60 to 82 C), L (-46 to 82 C), P (-29 to 82 C), R (ambient), S (-18 to 121 C), T (-18 to 180 C), U (-18 to 121 C), V (2 to 121 C) |
-| Material Class | enum | API 6A material class designation | AA, BB, CC, DD, EE, FF, HH |
-| Body Material | text | Primary material of the valve or equipment body | Low-Alloy Steel, Carbon Steel, Stainless Steel, Duplex Stainless Steel, Inconel 718 |
 | NACE Compliance | enum | Sour service compliance per NACE MR-0175/ISO 15156 | Compliant, Non-Compliant |
-| Connection Type | text | End connection or flange type | Flanged (API 6BX), Studded, Threaded, Weco Union, Clamp Hub |
-| Bit Diameter | number (in) | Outer diameter of drill bits | 6, 6-1/2, 8-1/2, 12-1/4, 17-1/2, 26 |
-| Bit Type | enum | Drill bit design classification | PDC, Tricone (Roller Cone), Diamond Impregnated, Hybrid |
 | IADC Code | text | International Association of Drilling Contractors classification code | M432, S223, 517, 637 |
 | Number of Blades/Cones | number | Number of cutting blades (PDC) or roller cones (tricone) | 3, 4, 5, 6, 7, 8 |
-| Cutter Size | number (mm) | Diameter of PDC cutters or insert size | 13, 16, 19, 22 |
-| Body Type | enum | Bit body construction material (for drill bits) | Matrix, Steel |
-| Thread Connection | text | Pin or box thread type for downhole tools | API REG, API IF, NC 50, 6-5/8 REG |
 | Actuation Method | enum | How the valve or device is operated | Manual (Handwheel), Hydraulic, Pneumatic, Ball Screw, Spring Return |
-| Seal Type | text | Primary sealing mechanism | Metal-to-Metal, Soft Seat, Resilient Seat, Lip Seal, Ring Gasket (BX, RX, R) |
 | Flow Direction | enum | Whether the valve seals in one or both directions | Unidirectional, Bi-directional |
-| Stem Type | enum | Valve stem design | Rising Stem, Non-Rising Stem |
 | Overall Dimensions (L x W x H) | text (mm) | External envelope dimensions of the equipment | 450 x 350 x 600, 1200 x 800 x 900 |
-| Weight | number (kg) | Dry weight of the product | 45, 120, 650, 2500 |
-| Country of Origin | text | Country where the product was manufactured | USA, China, United Kingdom, India |
-| Certification | text (list) | Quality and compliance certifications held | ISO 9001, ISO 14001, API Monogram, PED, CE, ATEX |
-| Warranty Period | text | Manufacturer warranty duration | 12 months, 24 months |
-| Lead Time | text | Typical manufacturing or delivery lead time | 4-6 weeks, 8-12 weeks, In Stock |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 30 attributes from 4 companies plus industry standards (API 6A, IADC bit classification, NACE MR-0175) | [SLB Cameron](https://www.slb.com/valves/api-spec-6a-technologies/api-spec-6a-gate-valves), [AQE Machinery](https://www.aqemachinery.com/product-list-wellhead-equipment.html), [Baker Hughes Drill Bits](https://dam.bakerhughes.com/m/70246e3a57c19fcf/original/Baker-Hughes-Drill-Bits-Catalog.pdf), [Rockpecker IADC Guide](https://www.rockpecker.com/drilling-news/2023/11/6/understanding-iadc-codes-a-guide-to-picking-the-right-tricone-and-pdc-drill-bit) |

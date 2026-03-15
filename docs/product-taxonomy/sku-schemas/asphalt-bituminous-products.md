@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Petroleum & Coal Products
+**Taxonomy ID:** `petroleum.asphalt_bituminous`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,12 +14,21 @@
 | URL | text | Direct link to the product data sheet or listing page | https://example.com/product/pg-64-22-asphalt |
 | Price | number | Numeric price per ton or gallon, excluding currency symbol | 450.00, 625.00, 3.25 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Manufacturer | text | Refiner or producer name | Marathon Petroleum, Ergon Asphalt, Calumet, Nynas, Shell Bitumen, Tiger Bitumen |
 | Product Type | enum | Primary bituminous product classification | Paving Grade Asphalt, Asphalt Emulsion, Cutback Asphalt, Oxidized (Blown) Bitumen, Roofing Flux, Polymer Modified Binder, Crumb Rubber Modified Binder |
-| Grading System | enum | Classification system used | Performance Grade (PG), Penetration Grade, Viscosity Grade (AC), Emulsion Grade |
 | Performance Grade | text | Superpave PG designation — high and low temperature capability in degrees C | PG 46-28, PG 58-28, PG 64-22, PG 67-22, PG 76-22 |
 | Penetration Grade | text | Penetration value range at 25 degrees C in tenths of mm per ASTM D5 | 20/30, 40/50, 60/70, 80/100, 100/150, 160/220 |
 | Viscosity Grade | text | Absolute viscosity grading per ASTM D3381 | AC-5, AC-10, AC-20, AC-30, AC-40 |
+| Cutback Solvent Type | text | Diluent used in cutback asphalts | Naphtha (Rapid Cure), Kerosene (Medium Cure), Fuel Oil (Slow Cure) |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
+| Cutback Grade | text | Viscosity-based grade designation for cutback asphalts | RC-70, RC-250, MC-30, MC-250, MC-800, SC-250, SC-800 |
+| Hazmat Class | text | DOT or UN hazardous materials classification | UN1999 Class 3, UN3257 Class 9, Not Regulated (emulsions) |
+| Country of Origin | text | Country where the product was refined or produced | USA, Canada, Mexico, Iran, Singapore |
+| Manufacturer | text | Refiner or producer name | Marathon Petroleum, Ergon Asphalt, Calumet, Nynas, Shell Bitumen, Tiger Bitumen |
+| Grading System | enum | Classification system used | Performance Grade (PG), Penetration Grade, Viscosity Grade (AC), Emulsion Grade |
 | Softening Point | number (deg C) | Ring-and-Ball softening point per ASTM D36 | 45, 48, 52, 60, 95 |
 | Penetration at 25C | number (dmm) | Needle penetration depth in decimillimetres at 25 degrees C per ASTM D5 | 25, 50, 65, 85, 150 |
 | Absolute Viscosity at 60C | number (Pa.s) | Viscosity at 60 degrees C per ASTM D2171 | 100, 200, 400, 800 |
@@ -28,18 +39,10 @@
 | Specific Gravity at 25C | number | Density relative to water at 25 degrees C | 1.00, 1.01, 1.03, 1.05 |
 | Polymer Modifier | text | Type of polymer used in modified binders | SBS, SBR, EVA, Crumb Rubber, None |
 | Emulsion Charge | enum | Electrical charge of emulsion droplets | Anionic, Cationic, Nonionic |
-| Emulsion Setting Rate | enum | Speed at which the emulsion breaks and sets | Rapid Setting (RS/CRS), Medium Setting (MS/CMS), Slow Setting (SS/CSS), Quick Setting (QS/CQS) |
-| Residue Content | number (%) | Percentage of asphalt residue after emulsion water evaporation | 57, 60, 65, 67 |
-| Cutback Solvent Type | text | Diluent used in cutback asphalts | Naphtha (Rapid Cure), Kerosene (Medium Cure), Fuel Oil (Slow Cure) |
-| Cutback Grade | text | Viscosity-based grade designation for cutback asphalts | RC-70, RC-250, MC-30, MC-250, MC-800, SC-250, SC-800 |
-| Application | text (list) | Primary intended uses | Hot Mix Asphalt, Chip Seal, Tack Coat, Prime Coat, Fog Seal, Roofing, Waterproofing, Patching |
-| Applicable Standard | text (list) | Specification standards the product meets | ASTM D6373, AASHTO M 320, ASTM D946, ASTM D977, ASTM D2397, EN 12591 |
-| Delivery Method | enum | How the product is supplied | Heated Tank Truck, Rail Car, Drum, Tote |
-| Hazmat Class | text | DOT or UN hazardous materials classification | UN1999 Class 3, UN3257 Class 9, Not Regulated (emulsions) |
-| Country of Origin | text | Country where the product was refined or produced | USA, Canada, Mexico, Iran, Singapore |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 30 attributes from 4 companies plus ASTM D6373, AASHTO M 320, and Asphalt Institute specifications | [Marathon Petroleum Asphalt](https://www.mpcasphalt.com/Products/), [Petronaft Bitumen Grades](https://www.petronaftco.com/different-grades-of-bitumen/), [Asphalt Institute](https://www.asphaltinstitute.org/engineering/specification-databases/), [Pavement Interactive Superpave](https://pavementinteractive.org/reference-desk/materials/asphalt/superpave-performance-grading/) |

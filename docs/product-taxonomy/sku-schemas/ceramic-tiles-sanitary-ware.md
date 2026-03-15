@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Construction Materials & Glass/Ceramics
+**Taxonomy ID:** `construction.ceramic_tiles_sanitary`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,12 +14,18 @@
 | URL | text | Direct link to the product page | https://example.com/product/marble-polished-60x120 |
 | Price | number | Numeric price per square metre or per piece, excluding currency symbol | 8.50, 15.99, 32.00, 55.00 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, INR, SAR, AED |
-| Brand | text | Manufacturer or brand name | RAK Ceramics, Daltile, Somany, Saudi Ceramics, Porcelanosa, Marazzi, Villeroy and Boch, Roca, TOTO, Duravit, Kohler |
 | Product Category | enum | Whether the product is a tile or sanitary ware item | Floor Tile, Wall Tile, Decorative Tile, Mosaic, Trim/Bullnose, Toilet/WC, Wash Basin, Bidet, Urinal, Bathtub, Shower Tray, Pedestal |
 | Tile Material | enum | Primary material composition (tiles only) | Ceramic, Porcelain, Full-Body Porcelain, Glazed Porcelain, Vitrified, Glass Mosaic |
+| Sanitary Ware Material | text | Body material for sanitary ware items | Vitreous China, Fine Fireclay, Glazed Stoneware, Solid Surface, Cast Mineral, Acrylic |
+| Flush Type | text | Flushing mechanism for toilets and WCs | Dual Flush, Rimless, Washdown, Siphonic, Tornado Flush |
+| Country of Origin | text | Country where the product was manufactured | UAE, USA, Spain, Italy, India, Saudi Arabia, Germany, China, Turkey, Brazil |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
 | Design Effect | text | Visual aesthetic the tile is designed to replicate | Marble-Look, Wood-Look, Stone-Look, Concrete-Look, Fabric-Look, Metallic-Look, Terrazzo-Look, Solid Color |
 | Tile Width | number (mm) | Face width of the tile | 50, 75, 100, 150, 200, 300, 450, 600, 750, 900, 1200 |
-| Tile Length | number (mm) | Face length of the tile | 50, 100, 200, 300, 450, 600, 750, 900, 1200, 1500, 1800, 2400 |
 | Tile Thickness | number (mm) | Thickness of the tile body | 6, 7, 8, 9, 10, 11, 12, 14, 20 |
 | Tile Shape | text | Geometric shape of the tile | Square, Rectangle/Plank, Hexagon, Arabesque, Chevron, Penny Round, Picket, Brick |
 | Surface Finish | enum | Surface texture and sheen of the tile | Glossy, Matte, Satin, Polished, Honed, Lappato, Structured, Textured, Anti-Slip |
@@ -31,18 +39,10 @@
 | Frost Resistant | boolean | Whether the tile is rated frost-proof per ISO 10545-12 | true, false |
 | Chemical Resistance | text | Chemical resistance classification per ISO 10545-13 | Class AA, Class A, Class B, Class C |
 | Application Area | text (list) | Recommended installation locations | Floor, Wall, Countertop, Backsplash, Exterior, Pool, Shower, Wet Room, Facade |
-| Sanitary Ware Material | text | Body material for sanitary ware items | Vitreous China, Fine Fireclay, Glazed Stoneware, Solid Surface, Cast Mineral, Acrylic |
-| Flush Type | text | Flushing mechanism for toilets and WCs | Dual Flush, Rimless, Washdown, Siphonic, Tornado Flush |
-| Mounting Style | text | Installation method for sanitary ware | Wall-Hung, Floor-Standing, Back-to-Wall, Countertop, Semi-Recessed, Inset, Freestanding |
-| Sanitary Ware Dimensions | text (mm) | Overall dimensions (LxWxH) of the sanitary ware piece | 550x365x400, 600x450x200, 700x420x380, 1700x700x420 |
-| Pieces per Box | number | Number of tiles per carton | 3, 4, 5, 6, 8, 10, 11, 17, 25 |
-| Coverage per Box | number (m2) | Area covered per carton of tiles | 0.72, 1.08, 1.44, 1.80, 2.16, 3.24 |
-| Weight per Box | number (kg) | Shipping weight per carton of tiles | 12, 18, 22, 26, 32, 38 |
-| Certification | text (list) | Product and sustainability certifications | CE, ISO 13006, LEED, GREENGUARD, Porcelain Tile Certification Agency (PTCA), Green Label Plus |
-| Country of Origin | text | Country where the product was manufactured | UAE, USA, Spain, Italy, India, Saudi Arabia, Germany, China, Turkey, Brazil |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 33 attributes from 4 companies plus industry standards (ANSI A137.1, ISO 10545, ANSI A326.3) | [RAK Ceramics](https://onlineshop.rakceramics.com/), [Daltile](https://www.daltile.com/tile-product-category), [Somany Ceramics](https://www.somanyceramics.com/catalogues), [Standard Tile NJ](https://standardtilenj.com/blogs/blog/understanding-tile-ratings-pei-cof-and-more) |

@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Textiles, Fabrics & Leather
+**Taxonomy ID:** `textiles.knit_fabrics`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,13 +14,17 @@
 | URL | text | Direct link to the product page | https://example.com/product/cotton-jersey-knit-180gsm |
 | Price | number | Numeric price per unit (typically per yard or per metre), excluding currency symbol | 7.99, 14.50, 24.95 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Brand/Manufacturer | text | Fabric brand, mill, or supplier name | Pine Crest Fabrics, Mood Fabrics, Telio, Robert Kaufman |
 | Knit Type | enum | Primary knit construction category | Jersey, Interlock, Rib Knit, French Terry, Ponte, Sweater Knit, Double Knit, Tricot |
+| Weight Class | enum | General weight classification | Lightweight, Medium Weight, Heavyweight |
+| Country of Origin | text | Country where the fabric was manufactured | China, South Korea, Turkey, India, USA, Pakistan |
+| Fabric Weight | number (GSM) | Mass per unit area in grams per square metre | 120, 180, 245, 440 |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
 | Fiber Content | text | Full fiber composition with percentages | 95% Cotton 5% Spandex, 100% Polyester, 66% Polyester 33% Rayon 1% Spandex |
 | Primary Fiber | text | Dominant fiber in the composition | Cotton, Polyester, Rayon, Nylon, Bamboo, Modal, Wool |
-| Fabric Weight | number (GSM) | Mass per unit area in grams per square metre | 120, 180, 245, 440 |
-| Fabric Weight Oz | number (oz/yd2) | Mass per unit area in ounces per square yard | 4.0, 5.3, 7.2, 12.9 |
-| Weight Class | enum | General weight classification | Lightweight, Medium Weight, Heavyweight |
 | Width | number (in) | Usable fabric width in inches | 48, 58, 60, 62, 70 |
 | Stretch Direction | enum | Direction in which the fabric stretches | 2-Way Stretch, 4-Way Stretch, Mechanical Stretch, No Stretch |
 | Stretch Percentage | number (%) | Maximum stretch as a percentage of relaxed length | 25, 50, 75, 100 |
@@ -32,17 +38,10 @@
 | Opacity | enum | Light-blocking characteristic of the fabric | Opaque, Semi-Opaque, Semi-Sheer, Sheer |
 | Hand Feel | text | Tactile quality of the fabric surface | Soft, Silky, Crisp, Plush, Smooth |
 | Pilling Resistance | enum | Resistance to surface pilling per ISO 12945 (1 = severe, 5 = none) | 1, 2, 3, 4, 5 |
-| Colorfastness to Washing | enum | Color retention after washing per ISO 105-C06 (1 = poor, 5 = excellent) | 3, 4, 4-5, 5 |
-| Shrinkage | number (%) | Expected dimensional change after washing | 2, 3, 5, 8 |
-| Application | text (list) | Intended end-use categories for the fabric | T-Shirts, Activewear, Loungewear, Dresses, Leggings, Underwear, Baby Apparel |
-| Certification | text (list) | Sustainability and safety certifications | OEKO-TEX Standard 100, GOTS, GRS, bluesign |
-| Country of Origin | text | Country where the fabric was manufactured | China, South Korea, Turkey, India, USA, Pakistan |
-| Minimum Order Quantity | number | Minimum purchase quantity in yards or metres | 1, 10, 15, 50 |
-| Selling Unit | enum | Unit of measure for pricing and ordering | Yard, Metre, Roll, Kilogram |
-| Roll Length | number (yd) | Standard length per roll or bolt | 25, 50, 80, 100 |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 32 attributes from 4 companies plus industry standards (ISO 12945, ISO 105) | [Fabric Wholesale Direct](https://fabricwholesaledirect.com/collections/interlock-knit-fabric), [Pine Crest Fabrics](https://pinecrestfabrics.com/product-category/wholesale-fabric-supplier/stocked-fabrics/interlock-knit-fabric/), [Mood Fabrics](https://www.moodfabrics.com/collections/interlock-knit-fashion-fabrics), [Rockywoods Fabrics](https://rockywoods.com/products/heavyweight-nylon-spandex-jersey-in-team-colors) |

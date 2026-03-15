@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Packaging Materials
+**Taxonomy ID:** `packaging.rigid_plastic`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,20 +14,21 @@
 | URL | text | Direct link to the product page | https://example.com/bottles/hdpe-12oz-cylinder |
 | Price | number | Numeric price per unit or per case, excluding currency symbol | 0.22, 0.85, 45.00, 120.00 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Brand/Manufacturer | text | Company producing or distributing the plastic packaging | TricorBraun, Alpha Packaging, VisiPak, Indepak, Berry Global, Graham Packaging |
 | Container Type | enum | Broad format classification of the plastic package | Bottle, Jar, Tub, Clamshell, Blister Pack, Tray, Vial, Canister, Jug |
 | Resin Type | enum | Primary plastic resin used in manufacturing | PET (1), HDPE (2), PVC (3), LDPE (4), PP (5), PS (6), Other (7) |
-| Capacity | number (mL) | Nominal volume capacity of the container | 30, 60, 120, 250, 355, 473, 946, 3785 |
-| Overflow Capacity | number (mL) | Maximum volume the container can physically hold | 35, 68, 132, 270, 380, 500, 1000, 4000 |
-| Neck Finish | text | GPI/SPI standard neck finish code specifying thread diameter and style | 18-400, 20-410, 24-410, 28-400, 33-400, 38-400, 45-400, 53-400, 63-400, 89-400, 110-400 |
 | Neck Finish Type | enum | Thread configuration of the bottle opening | Continuous Thread (CT), Lug, Snap-On, Press-On, Twist-Off (T/O), Child-Resistant (CR) |
+| Country of Origin | text | Country where the container is manufactured | USA, Canada, China, Mexico, India |
+| Capacity | number (mL) | Nominal volume capacity of the container | 30, 60, 120, 250, 355, 473, 946, 3785 |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
+| Neck Finish | text | GPI/SPI standard neck finish code specifying thread diameter and style | 18-400, 20-410, 24-410, 28-400, 33-400, 38-400, 45-400, 53-400, 63-400, 89-400, 110-400 |
 | Body Shape | enum | Geometric profile of the container body | Round, Boston Round, Cylinder, Square, Oblong, Oval, Packer, Bullet, French Square, Custom |
 | Height | number (mm) | Overall height of the container from base to top of finish | 50, 89, 127, 165, 200, 254, 305 |
-| Diameter | number (mm) | Maximum body diameter for round containers | 25, 38, 51, 64, 76, 89, 102, 127 |
-| Length | number (mm) | Body length for non-round containers (clamshells, trays) | 76, 102, 152, 203, 254, 305 |
 | Width | number (mm) | Body width for non-round containers | 51, 76, 102, 127, 152, 203 |
 | Wall Thickness | number (mm) | Average wall thickness of the container body | 0.25, 0.38, 0.51, 0.76, 1.0, 1.5 |
-| Weight | number (g) | Empty container weight (gram weight) | 8, 15, 22, 30, 45, 60, 120 |
 | Color | text | Container body color | Natural, White, Amber, Clear, Blue, Green, Black, Custom |
 | Opacity | enum | Light transmission characteristic of the container | Transparent, Translucent, Opaque |
 | Manufacturing Process | enum | Primary forming process used to create the container | Injection Blow Molding (IBM), Extrusion Blow Molding (EBM), Injection Stretch Blow Molding (ISBM), Thermoforming, Injection Molding |
@@ -36,10 +39,10 @@
 | Recycled Content | number (%) | Percentage of post-consumer recycled (PCR) resin in the container | 0, 15, 25, 50, 100 |
 | Certification | text (list) | Regulatory and quality certifications | FDA, cGMP, ISO 9001, SQF, BRC, Kosher |
 | Case Pack Quantity | number | Number of containers per case or carton | 12, 24, 48, 72, 120, 250, 500 |
-| Country of Origin | text | Country where the container is manufactured | USA, Canada, China, Mexico, India |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 30 attributes from 4 manufacturers plus industry standards (GPI/SPI neck finish codes, ASTM D7611 resin identification, FDA 21 CFR) | [TricorBraun Bottles](https://www.tricorbraun.com/12-oz-natural-hdpe-plastic-cylinder-round-bottle-38-400-neck-finish-027123.html), [VisiPak Clamshells](https://www.visipak.com/clamshell-packaging/), [Indepak Rigid Packaging](https://indepak.com/rigid-packaging-materials-options/), [Alpha Packaging HDPE Catalog](https://www.pretiumpkg.com/wp-content/uploads/2021/04/Alpha_HDPE_PP_Stock_Product_Catalog.pdf) |

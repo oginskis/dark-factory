@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Wood Products & Lumber
+**Taxonomy ID:** `wood.millwork`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,13 +14,19 @@
 | URL | text | Direct link to the product page | https://example.com/product/primed-mdf-baseboard-4-25 |
 | Price | number | Numeric price per linear foot or per piece excluding currency symbol | 1.81, 3.49, 12.99 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Brand/Manufacturer | text | Millwork manufacturer or brand name | Metrie, Woodgrain, Mouldings One, Builders FirstSource, Horner Millwork |
 | Product Category | enum | Primary millwork product type | Baseboard, Casing, Crown Molding, Chair Rail, Panel Mold, Handrail, Stair Tread, Stair Riser, Baluster, Newel Post, Door Stop, Shoe Molding, Window Sill, Plinth Block |
 | Material | enum | Primary material the product is made from | Solid Wood, MDF, Finger-Joint Pine, PVC, Polyurethane, Polystyrene, HDF |
+| Joint Type | text | How pieces connect at corners or ends | Miter, Cope, Butt, Scarf |
+| Formaldehyde Compliance | text | Emission standard compliance for composite materials | CARB Phase 2, EPA TSCA Title VI, E1 |
+| Country of Origin | text | Country where the product was manufactured | USA, Canada, Chile, China, Brazil |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
 | Species | text | Wood species for solid wood products | Poplar, Oak, Maple, Cherry, Walnut, Mahogany, Pine, Cedar, Hemlock, Douglas Fir |
 | Thickness | text (in) | Product thickness (depth from wall) | 1/2, 9/16, 11/16, 3/4, 1 |
 | Width | text (in) | Product face width or height | 2-1/4, 3-1/2, 4-1/4, 5-1/4, 7-1/4 |
-| Length | number (ft) | Standard length per piece | 7, 8, 10, 12, 14, 16 |
 | Profile Pattern | text | Manufacturer profile number or pattern name | Colonial, Craftsman, Modern, M0620X, WM327, WM49, WM163 |
 | Finish | enum | Surface finish state of the product | Primed, Unfinished, Stain-Grade, Paint-Grade, Pre-Finished, Raw |
 | Edge Detail | text | Specific edge or face profile design | Ogee, Cove, Bead, Stepped, Flat, Beveled, Radius |
@@ -28,16 +36,13 @@
 | Interior/Exterior | enum | Intended installation environment | Interior, Exterior, Both |
 | Architectural Style | text (list) | Design styles the profile complements | Colonial, Craftsman, Modern, Victorian, Transitional, Traditional |
 | Installation Method | text (list) | Recommended attachment methods | Nail, Glue, Brad Nail, Screw, Snap-Fit |
-| Joint Type | text | How pieces connect at corners or ends | Miter, Cope, Butt, Scarf |
 | Fire Rating | text | Fire performance classification where applicable | Class A, Class 1, ASTM E84 Class A |
-| Formaldehyde Compliance | text | Emission standard compliance for composite materials | CARB Phase 2, EPA TSCA Title VI, E1 |
 | Pack Quantity | number | Number of pieces per pack or bundle | 1, 6, 10, 20 |
-| Weight per Linear Foot | number (oz) | Weight per linear foot of product | 3.2, 6.5, 12.0, 18.0 |
 | Certification | text (list) | Environmental and quality certifications | FSC, SFI, GreenGuard, PEFC |
-| Country of Origin | text | Country where the product was manufactured | USA, Canada, Chile, China, Brazil |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 27 attributes from 4 companies plus industry standards (WM pattern numbering, ASTM E84, CARB Phase 2) | [Mouldings One](https://www.mouldingsone.com/shop-mouldings/), [Metrie](https://www.metrie.com/products/moulding), [Builders FirstSource](https://www.bldr.com/products/moulding-millwork), [Horner Millwork](https://hornermillwork.com/products/mouldings-and-millwork/) |

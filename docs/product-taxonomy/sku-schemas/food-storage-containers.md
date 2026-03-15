@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Kitchenware, Tableware & Housewares
+**Taxonomy ID:** `kitchen.food_storage_containers`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,21 +14,22 @@
 | URL | text | Direct link to the product page or listing on the manufacturer or retailer website | https://www.rubbermaidcommercial.com/foodservice/food-storage/round-storage-containers/ |
 | Price | number | Unit price of the container or set, excluding tax and shipping | 8.29, 13.00, 24.00, 11.99, 27.49 |
 | Currency | text | ISO 4217 currency code for the listed price | USD, EUR, GBP, CAD |
-| Brand | text | Manufacturer or brand name | Cambro, Rubbermaid Commercial, Tupperware, OXO, Pyrex, IKEA |
-| Product Line | text | Named product series or collection within the brand | CamSquare Classic, Simply Store, One Touch Fresh, POP, IKEA 365+, Modular Mates, Voila Glass |
-| Container Material | text | Primary material of the container body | Polycarbonate, Polypropylene, Polyethylene, Tempered glass, Borosilicate glass, Stainless steel, Tritan |
 | Lid Material | text | Material of the lid or cover, if included or sold separately | Polypropylene, Silicone rubber, BPA-free plastic, Polycarbonate |
-| Shape | enum | Geometric shape of the container | Round, Square, Rectangular |
-| Capacity | text | Volume the container holds, expressed in common units | 4 qt, 12 cup, 2.85 L, 34 oz, 1.4 L, 6.0 qt |
-| Length | number (in) | Outer length of the container | 7.25, 8.25, 9.0 |
-| Width | number (in) | Outer width of the container | 7.25, 6.0, 4.72 |
-| Height | number (in) | Outer height of the container | 7.4, 2.25, 14.0 |
-| Weight | number (oz) | Weight of the container without contents | 8, 12.5, 24.6 |
-| Color | text | Color of the container body or lid | Clear, White, Translucent, Red lid, Yellow lid, Green |
 | Lid Type | text | Closure mechanism or style of the lid | Snap-lock, Push-button airtight, Silicone vacuum, Screw-on, Sliding |
 | Seal Type | enum | Type of seal provided by the lid | Airtight, Leak-proof, Vacuum, Standard, Splash-proof |
+| Country of Origin | text | Country where the product is manufactured | USA, China, France, Belgium |
+| Capacity | text | Volume the container holds, expressed in common units | 4 qt, 12 cup, 2.85 L, 34 oz, 1.4 L, 6.0 qt |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
+| Product Line | text | Named product series or collection within the brand | CamSquare Classic, Simply Store, One Touch Fresh, POP, IKEA 365+, Modular Mates, Voila Glass |
+| Shape | enum | Geometric shape of the container | Round, Square, Rectangular |
+| Width | number (in) | Outer width of the container | 7.25, 6.0, 4.72 |
+| Height | number (in) | Outer height of the container | 7.4, 2.25, 14.0 |
+| Color | text | Color of the container body or lid | Clear, White, Translucent, Red lid, Yellow lid, Green |
 | Lid Included | boolean | Whether a lid is sold with the container or must be purchased separately | true, false |
-| Set Size | number | Number of individual containers or total pieces in a set | 1, 4, 6, 12, 17 |
 | Microwave Safe | boolean | Whether the container is safe for use in a microwave oven | true, false |
 | Freezer Safe | boolean | Whether the container is safe for freezer storage | true, false |
 | Dishwasher Safe | boolean | Whether the container is safe for dishwasher cleaning | true, false |
@@ -36,15 +39,10 @@
 | BPA Free | boolean | Whether the product is certified free of bisphenol A | true, false |
 | Graduation Markings | boolean | Whether the container has measurement markings for portioning | true, false |
 | Stackable | boolean | Whether containers can be stacked on top of each other for space-efficient storage | true, false |
-| Nestable | boolean | Whether empty containers nest inside each other for compact storage | true, false |
-| Country of Origin | text | Country where the product is manufactured | USA, China, France, Belgium |
-| UPC | text | Universal Product Code barcode identifier | 10099511315472 |
-| NSF Certified | boolean | Whether the container meets NSF International food safety standards for commercial food equipment | true, false |
-| Intended Use | enum | Primary use environment for which the container is designed | Commercial, Residential, Both |
-| Warranty | text | Duration and type of manufacturer warranty | 2-year limited, Lifetime limited |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 33 attributes from 5 companies spanning manufacturer, distributor, and retail sources | [Tupperware](https://www.tupperware.com/collections/food-storage), [Rubbermaid Commercial](https://www.rubbermaidcommercial.com/foodservice/food-storage/), [Cambro via WebstaurantStore](https://www.webstaurantstore.com/cambro-4sfscw135-4-qt-clear-square-polycarbonate-food-storage-container-with-winter-rose-gradations/2144SFSCW.html), [IKEA](https://www.ikea.com/us/en/cat/food-storage-organizing-15937/), [Pyrex](https://pyrexhome.com/products/pyrex-simply-store-6-piece-glass-storage-set) |

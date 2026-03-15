@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Construction Materials & Glass/Ceramics
+**Taxonomy ID:** `construction.glass_containers`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,19 +14,21 @@
 | URL | text | Direct link to the product page | https://example.com/product/16oz-french-square |
 | Price | number | Numeric price per unit or per case, excluding currency symbol | 0.35, 0.72, 1.50, 52.00 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, CNY |
-| Brand | text | Manufacturer or supplier name | O-I Glass, Ardagh Group, Berlin Packaging, Anchor Glass, Vetropack, Stolzle, Verallia, Saverglass |
 | Container Type | enum | General shape category of the glass container | Bottle, Jar, Vial, Jug, Carboy, Growler, Flask, Ampoule |
-| Shape | text | Specific shape or silhouette of the container | Boston Round, French Square, Packer, Bordeaux, Burgundy, Long Neck, Flagon, Mason, Wide Mouth, Cylinder |
-| Capacity | number (ml) | Nominal liquid volume capacity | 5, 15, 30, 60, 120, 250, 375, 500, 750, 1000, 1500, 4000 |
-| Overflow Capacity | number (ml) | Total internal volume filled to the brim | 18, 35, 65, 135, 265, 530, 785, 1050 |
-| Color | enum | Glass color or tint | Flint (Clear), Amber, Green, Cobalt Blue, Dead Leaf Green, Antique Green, Frosted, Opaque White |
 | Glass Type | text | Glass material classification | Type I Borosilicate, Type II Treated Soda-Lime, Type III Soda-Lime |
-| Neck Finish | text | Standardized neck thread specification (GPI/SPI standard) | 28-400, 33-400, 38-400, 43-400, 48-400, 53-400, 70-400, 63-2030 Lug, 26mm Crown |
 | Closure Type | text | Type of cap or closure compatible with the container | Screw Cap, Lug Cap, Crown Cap, Cork, ROPP (Roll-On Pilfer-Proof), Swing Top, Snap-On, Pump, Sprayer |
+| Country of Origin | text | Country where the container was manufactured | USA, Mexico, France, Germany, Italy, China, India |
+| Capacity | number (ml) | Nominal liquid volume capacity | 5, 15, 30, 60, 120, 250, 375, 500, 750, 1000, 1500, 4000 |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
+| Shape | text | Specific shape or silhouette of the container | Boston Round, French Square, Packer, Bordeaux, Burgundy, Long Neck, Flagon, Mason, Wide Mouth, Cylinder |
+| Color | enum | Glass color or tint | Flint (Clear), Amber, Green, Cobalt Blue, Dead Leaf Green, Antique Green, Frosted, Opaque White |
+| Neck Finish | text | Standardized neck thread specification (GPI/SPI standard) | 28-400, 33-400, 38-400, 43-400, 48-400, 53-400, 70-400, 63-2030 Lug, 26mm Crown |
 | Height | number (mm) | Overall height of the container from base to top of finish | 42, 68, 102, 148, 168, 225, 292, 338 |
-| Body Diameter | number (mm) | Maximum external diameter of the container body | 22, 35, 48, 60, 70, 86, 95, 108 |
 | Body Width | number (mm) | External width for non-round containers (square, oval) | 40, 52, 60, 69, 86, 95 |
-| Weight | number (g) | Empty container weight | 28, 55, 90, 150, 200, 290, 350, 520, 900 |
 | Wall Thickness | number (mm) | Nominal wall thickness of the container | 1.5, 2.0, 2.5, 3.0, 4.0, 5.0 |
 | Label Panel Height | number (mm) | Height of the label-friendly panel area | 25, 38, 50, 75, 95, 110 |
 | Label Panel Width | number (mm) | Width or circumference of the label panel area | 30, 46, 55, 80, 100, 150, 200 |
@@ -35,11 +39,10 @@
 | Market Segment | text (list) | Primary end-use markets for the container | Food, Beverage, Beer, Wine, Spirits, Pharmaceutical, Cosmetic, Essential Oil, Candle |
 | Minimum Order Quantity | number | Minimum purchase quantity from the manufacturer | 1, 12, 144, 1000, 5000, 100000 |
 | Decoration Options | text (list) | Available decoration or branding methods | Screen Print, Decal, Embossing, Debossing, Sleeve Label, Spray Coating, Acid Etch, Organic Coating |
-| Applicable Standard | text (list) | Industry standards the container conforms to | ASTM E438, USP Type I/II/III, ISO 4802, EP 3.2.1, GPI Finish Standards |
-| Country of Origin | text | Country where the container was manufactured | USA, Mexico, France, Germany, Italy, China, India |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 30 attributes from 4 companies plus GPI finish standards and ASTM E438 | [Berlin Packaging](https://www.berlinpackaging.com/4225b11-b-16-oz-clear-glass-french-square-bottles-cap-not-included/), [Ardagh Group](https://northamerica.ardaghproducts.com/), [O-I Glass](https://glass-catalog.com/eu-en/catalog), [Container and Packaging](https://www.containerandpackaging.com/catalog/glass-containers) |

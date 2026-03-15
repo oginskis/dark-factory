@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Consumer Goods (Personal Care & Household)
+**Taxonomy ID:** `consumer.art_craft_supplies`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,34 +14,35 @@
 | URL | text | Direct link to the product page | https://example.com/product/heavy-body-acrylic-cadmium-yellow |
 | Price | number | Numeric price per unit or set, excluding currency symbol | 3.49, 8.99, 74.99 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Brand | text | Manufacturer or product brand name | Liquitex, Winsor and Newton, Golden, Faber-Castell, Prismacolor, Caran dAche, Blick |
 | Product Category | enum | Primary product type | Acrylic Paint, Oil Paint, Watercolor, Colored Pencils, Pastels, Brushes, Canvas, Paper, Ink, Clay, Markers, Drawing Pencils |
-| Product Line | text | Sub-brand or product series name | Heavy Body, Basics, Professional Watercolour, Polychromos, Artists Oil Colour |
 | Grade | enum | Quality tier indicating pigment load and binder quality | Student, Studio, Artist, Professional |
+| Medium Type | text | Specific medium or vehicle used in the product | Linseed Oil, Safflower Oil, Acrylic Polymer Emulsion, Gum Arabic, Wax |
+| Brush Hair Type | text | Bristle material for brush products | Synthetic, Hog Bristle, Sable, Taklon, Squirrel |
+| Country of Origin | text | Country where the product is manufactured | USA, UK, France, Germany, Japan, Switzerland |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
+| Product Line | text | Sub-brand or product series name | Heavy Body, Basics, Professional Watercolour, Polychromos, Artists Oil Colour |
 | Color Name | text | Manufacturer-specified color name | Cadmium Yellow Medium, Burnt Sienna, Ultramarine Blue, Titanium White |
 | Color Index Name | text | International Color Index designation identifying the pigment used | PY35, PBr7, PB29, PW6 |
 | Pigment Number | text | Manufacturer pigment or color number | 161, 074, 263, 644 |
 | Series Number | number | Price series number indicating pigment cost tier (higher = more expensive) | 1, 2, 3, 4, 5 |
 | Lightfastness Rating | text | Permanence rating per ASTM D4303 or manufacturer scale | ASTM I (Excellent), ASTM II (Very Good), ASTM III (Fair), Permanent, Moderately Durable |
 | Opacity | enum | Transparency classification of the color | Transparent, Semi-Transparent, Semi-Opaque, Opaque |
-| Volume/Size | text | Container size or product dimensions | 22mL, 37mL, 59mL, 118mL, 200mL, 5mL tube, 12 x 16 in pad |
-| Medium Type | text | Specific medium or vehicle used in the product | Linseed Oil, Safflower Oil, Acrylic Polymer Emulsion, Gum Arabic, Wax |
 | Viscosity | enum | Flow consistency for paints | Heavy Body, Soft Body, Fluid, Ink, Super Heavy, Spray |
 | Finish | enum | Dried surface finish characteristic | Matte, Satin, Gloss, Semi-Gloss |
-| Set Size | number | Number of items in a set or kit | 6, 12, 24, 36, 48, 60, 72, 120 |
 | Surface Compatibility | text (list) | Recommended surfaces for the product | Canvas, Paper, Wood, Metal, Fabric, Glass, Ceramic |
 | Brush Shape | text | Shape of brush head for brush products | Round, Flat, Filbert, Fan, Liner, Bright, Mop |
-| Brush Hair Type | text | Bristle material for brush products | Synthetic, Hog Bristle, Sable, Taklon, Squirrel |
-| Paper Weight | text (gsm) | Paper weight for pads and sheets | 90 gsm, 140 gsm, 185 gsm, 300 gsm, 640 gsm |
 | Paper Texture | enum | Surface texture for paper products | Hot Press (Smooth), Cold Press (Medium), Rough |
 | Acid Free | boolean | Whether the product is acid-free for archival quality | true, false |
 | Non-Toxic | boolean | Whether the product carries an AP (Approved Product) non-toxic seal | true, false |
 | Certifications | text (list) | Safety or quality certifications | ACMI AP Seal, ASTM D4236 Compliant, CE, FSC |
-| Country of Origin | text | Country where the product is manufactured | USA, UK, France, Germany, Japan, Switzerland |
-| UPC | text | Universal Product Code barcode number | 094376922189, 884955043516 |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 30 attributes from 4 companies plus ASTM D4303 lightfastness standard and Color Index International system | [Liquitex](https://www.liquitex.com/us/products/basics/range/colors/), [Blick Art Materials](https://www.dickblick.com/products/blick-artists-acrylic/), [Winsor and Newton](https://www.winsornewton.com/na/education/composition-permanence/terms-explained/), [United Art and Education](https://www.unitednow.com/art-catalog) |

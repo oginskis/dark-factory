@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Construction Materials & Glass/Ceramics
+**Taxonomy ID:** `construction.abrasives`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,33 +14,35 @@
 | URL | text | Direct link to the product page | https://example.com/product/flap-disc-4-5-60-zirconia |
 | Price | number | Numeric price per unit or per pack excluding currency symbol | 4.99, 12.50, 89.00 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Brand/Manufacturer | text | Abrasive product manufacturer | 3M, Norton/Saint-Gobain, United Abrasives/SAIT, Benchmark Abrasives, CGW |
 | Product Type | enum | Primary abrasive product category | Grinding Wheel, Cut-Off Wheel, Flap Disc, Fiber Disc, Sanding Belt, Sanding Disc, Sanding Sheet, Wire Brush, Mounted Point, Diamond Blade |
 | Abrasive Grain Type | enum | Type of abrasive mineral used | Aluminum Oxide, Zirconia Alumina, Ceramic Alumina, Silicon Carbide, Diamond, CBN, Precision Shaped Ceramic |
-| Grit Size | text | Coarseness rating of the abrasive grain | 24, 36, 60, 80, 120, 220, 400 |
 | Grit Classification | enum | Coarseness category | Extra Coarse, Coarse, Medium, Fine, Very Fine, Ultra Fine |
-| Wheel/Disc Diameter | number (in) | Outer diameter of the abrasive product | 2, 4.5, 5, 7, 9, 14 |
-| Thickness | number (in) | Thickness of the wheel or disc | 0.045, 0.090, 0.25, 0.50, 1.0 |
-| Arbor Size | text (in) | Size of the center mounting hole | 7/8, 5/8-11, 1, 1-1/4, 1-1/2 |
-| Maximum RPM | number | Maximum safe operating speed in revolutions per minute | 4140, 8600, 13300, 15200 |
 | Wheel Type/Shape | text | ANSI/ISO shape designation | Type 1, Type 27, Type 28, Type 29, Type 41, Type 42 |
 | Bond Type | enum | Bonding material holding the abrasive grains | Resinoid, Vitrified, Rubber, Metal, Electroplated |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
 | Backing Material | text | Substrate material for coated abrasives | Fiber, Paper, Cloth, Polyester Film, Fiberglass, Plastic, Vulcanized |
 | Coating Type | enum | How abrasive grain is distributed on the backing | Open Coat, Closed Coat, Semi-Open |
-| Attachment Method | enum | How the product mounts to the tool | Arbor Hole, Quick-Change (SAIT-LOK), Hook and Loop, PSA, Snap-On, Threaded Hub |
 | Application Material | text (list) | Materials the abrasive is designed to work on | Steel, Stainless Steel, Aluminum, Cast Iron, Concrete, Wood, Non-Ferrous Metals |
 | Application Type | text (list) | Intended operations | Grinding, Cutting, Blending, Deburring, Surface Conditioning, Polishing, Weld Removal |
-| Density | enum | Grain density for flap discs and non-woven products | Regular, High Density |
 | Wheel Hardness Grade | text | Hardness of the bond in bonded abrasives (A=soft to Z=hard) | F, H, J, M, P, R, T |
+| Country of Origin | text | Country where the product was manufactured | USA, Germany, Italy, China, Brazil |
+| Thickness | number (in) | Thickness of the wheel or disc | 0.045, 0.090, 0.25, 0.50, 1.0 |
+| Maximum RPM | number | Maximum safe operating speed in revolutions per minute | 4140, 8600, 13300, 15200 |
+| Attachment Method | enum | How the product mounts to the tool | Arbor Hole, Quick-Change (SAIT-LOK), Hook and Loop, PSA, Snap-On, Threaded Hub |
+| Density | enum | Grain density for flap discs and non-woven products | Regular, High Density |
 | Structure Number | text | Grain spacing in bonded abrasives (1=dense to 15=open) | 5, 7, 8, 10, 12 |
 | Pack Quantity | number | Number of pieces per retail package or box | 1, 5, 10, 25, 50 |
-| Weight per Unit | number (g) | Weight of a single abrasive product | 85, 210, 450, 1200 |
 | Safety Standard | text (list) | Safety certifications and compliance standards | ANSI B7.1, EN 12413, oSa, OSHA |
 | Shelf Life | text | Maximum recommended storage period | 3 years from manufacture date |
-| Country of Origin | text | Country where the product was manufactured | USA, Germany, Italy, China, Brazil |
+| Grit Size | text | Coarseness rating of the abrasive grain | 24, 36, 60, 80, 120, 220, 400 |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 28 attributes from 4 companies plus industry standards (ANSI B7.1, EN 12413, FEPA grit standards) | [United Abrasives/SAIT](https://www.unitedabrasives.com/), [3M Abrasives](https://www.3m.com/3M/en_US/metalworking-us/products/grinding-wheels/), [Benchmark Abrasives](https://benchmarkabrasives.com/), [Norton Abrasives](https://www.nortonabrasives.com/en-us/grinding-wheel-basics) |

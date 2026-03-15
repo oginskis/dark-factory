@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Petroleum & Coal Products
+**Taxonomy ID:** `petroleum.diesel_heating_oil`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,11 +14,17 @@
 | URL | text | Direct link to the product data sheet or listing page | https://example.com/fuels/ulsd-no2 |
 | Price | number | Numeric price per gallon or litre at time of listing, excluding currency symbol | 3.49, 3.89, 4.29 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Brand | text | Fuel brand or refiner name | CITGO, Marathon, Shell, ExxonMobil, Phillips 66, Valero, Chevron |
 | Fuel Type | enum | Primary fuel classification | No. 1-D Diesel, No. 2-D Diesel, No. 4-D Diesel, No. 1 Fuel Oil (Kerosene), No. 2 Fuel Oil (Heating Oil), No. 4 Fuel Oil, No. 6 Fuel Oil (Bunker), Biodiesel Blend |
 | ASTM Grade | text | Grade designation per ASTM D975 (diesel) or ASTM D396 (fuel oil) | No. 1-D S15, No. 2-D S500, No. 2-D S5000, No. 2 Oil |
-| Sulfur Content | number (ppm) | Maximum sulfur content in parts per million | 15, 500, 5000 |
 | Sulfur Classification | enum | Sulfur tier designation | Ultra-Low Sulfur (S15), Low Sulfur (S500), High Sulfur (S5000) |
+| Hazmat Class | text | DOT or UN hazardous materials classification | UN1202 Class 3 Flammable Liquid |
+| Country of Origin | text | Country where the fuel was refined | USA, Canada, UK, Netherlands, Saudi Arabia |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
+| Sulfur Content | number (ppm) | Maximum sulfur content in parts per million | 15, 500, 5000 |
 | Cetane Number | number | Ignition quality rating — higher values mean easier ignition | 40, 45, 48, 55 |
 | Cetane Index | number | Calculated cetane value from density and distillation data | 40, 42, 46 |
 | Flash Point | number (deg C) | Minimum temperature at which fuel vapors will ignite | 38, 52, 55, 66 |
@@ -31,16 +39,10 @@
 | Lubricity (HFRR) | number (micron) | High-Frequency Reciprocating Rig wear scar diameter per ASTM D6079 | 460, 520 |
 | Carbon Residue | number (%) | Residue after evaporation per ASTM D524 | 0.15, 0.35 |
 | Water and Sediment | number (% vol) | Maximum water and sediment content | 0.02, 0.05, 0.50 |
-| Ash Content | number (% mass) | Maximum ash residue after combustion | 0.001, 0.01, 0.10 |
-| Copper Corrosion | text | Corrosion rating per ASTM D130 copper strip test | No. 1, No. 3 |
-| Applicable Standard | text | Primary specification standard | ASTM D975, ASTM D396, EN 590, ISO 8217 |
-| Volume Unit | enum | Unit of sale | Gallon, Litre, Barrel (42 gal), Metric Ton |
-| Delivery Method | enum | How the product is supplied | Bulk Terminal, Tank Truck, Pipeline, Rail Car, Barge |
-| Hazmat Class | text | DOT or UN hazardous materials classification | UN1202 Class 3 Flammable Liquid |
-| Country of Origin | text | Country where the fuel was refined | USA, Canada, UK, Netherlands, Saudi Arabia |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 30 attributes from 4 companies plus ASTM D975 and ASTM D396 standards | [CITGO Diesel TDS](https://www.docs.citgo.com/msds_pi/ag1df.pdf), [Crown Oil Fuel Specs](https://www.crownoil.co.uk/guides/fuel-specifications-guide/), [ANSI Blog ASTM D975](https://blog.ansi.org/ansi/astm-d975-diesel-fuel-standard-specification/), [EIA Heating Oil](https://www.eia.gov/energyexplained/gasoline/octane-in-depth.php) |

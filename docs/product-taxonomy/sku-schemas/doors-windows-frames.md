@@ -2,8 +2,10 @@
 
 **Last updated:** 2026-03-15
 **Parent category:** Construction Materials & Glass/Ceramics
+**Taxonomy ID:** `construction.doors_windows_frames`
 
-## Attributes
+
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -12,13 +14,18 @@
 | URL | text | Direct link to the product page | https://example.com/product/400-series-double-hung |
 | Price | number | Numeric price per unit, excluding currency symbol | 285.00, 549.99, 1250.00 |
 | Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Brand | text | Manufacturer or brand name | Andersen, Pella, Marvin, JELD-WEN, Milgard, Velux, Harvey |
 | Product Category | enum | Whether the product is a door, window, or frame | Window, Exterior Door, Interior Door, Patio Door, Skylight, Frame |
 | Operation Type | enum | How the product opens and closes | Double-Hung, Single-Hung, Casement, Awning, Gliding, Fixed/Picture, Bay, Bow, Pivot, Swing, Sliding, Folding, Tilt-Turn |
 | Frame Material | enum | Primary material of the frame or sash | Vinyl, Wood, Fiberglass, Aluminum, Clad Wood, Composite, Steel |
+| Glass Type | text | Glazing unit construction and coating description | Double-Pane Low-E, Triple-Pane Low-E Argon, Tempered, Laminated, Impact-Rated |
+| Country of Origin | text | Country where the product was manufactured | USA, Canada, Denmark, Germany, Poland |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
 | Exterior Cladding | text | Material cladding the exterior face of the frame | Aluminum, Fiberglass, PVC, None |
 | Interior Finish | text | Interior frame finish or species | Primed Pine, Stainable Wood, White Vinyl, Prefinished |
-| Glass Type | text | Glazing unit construction and coating description | Double-Pane Low-E, Triple-Pane Low-E Argon, Tempered, Laminated, Impact-Rated |
 | U-Factor | number | NFRC-rated thermal transmittance of the entire unit (lower is better) | 0.17, 0.25, 0.30, 0.42, 1.10 |
 | Solar Heat Gain Coefficient | number | NFRC-rated fraction of solar radiation admitted (0 to 1) | 0.17, 0.21, 0.25, 0.35, 0.44 |
 | Visible Transmittance | number | NFRC-rated fraction of visible light transmitted (0 to 1) | 0.32, 0.41, 0.51, 0.62 |
@@ -32,15 +39,10 @@
 | Frame Depth | number (mm) | Depth of the frame from interior to exterior face | 83, 105, 114, 130, 165 |
 | Grid Pattern | text | Muntin or grid configuration | Colonial, Prairie, None, Custom, SDL, GBG |
 | Exterior Color | text | Color of the exterior frame surface | White, Black, Dark Bronze, Sandtone, Terratone, Forest Green, Custom |
-| Hardware Finish | text | Color or finish of operating hardware | Satin Nickel, Oil-Rubbed Bronze, Polished Chrome, Antique Brass |
-| Energy Star Zone | text (list) | ENERGY STAR climate zones the product qualifies for | Northern, North-Central, South-Central, Southern, Most Efficient |
-| Screen Included | boolean | Whether a screen is included with the unit | true, false |
-| Certification | text (list) | Performance and safety certifications | NFRC, ENERGY STAR, AAMA, WDMA, Miami-Dade NOA, CSA |
-| Country of Origin | text | Country where the product was manufactured | USA, Canada, Denmark, Germany, Poland |
-| Weight | number (kg) | Shipping or installed weight of the unit | 12, 25, 38, 55, 85 |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
+| 2026-03-15 | Migrated to core/extended format | Migration script |
 | 2026-03-15 | Initial schema — 31 attributes from 4 companies plus NFRC rating standards | [Andersen](https://www.andersenwindows.com/windows/), [Pella](https://www.pella.com/support/performance-information/), [Marvin](https://www.marvin.com/windows), [Lowes Windows and Doors](https://www.lowes.com/c/Windows-doors) |
