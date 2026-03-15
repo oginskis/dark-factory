@@ -6,7 +6,7 @@ Product discovery pipeline that takes a company name or URL and produces continu
 
 Two-tier cost model:
 - **Expensive tier** — LLM agents classify companies, detect catalogs, generate scrapers and evals. Runs once per company and on degradation.
-- **Cheap tier** — Generated Python scripts (scraper.py + eval.py) run as daily K8s CronJobs. No LLM involved.
+- **Cheap tier** — Generated Python scripts (scraper.py) + eval configs (eval_config.json) run as daily K8s CronJobs via the shared eval script. No LLM involved.
 
 Pipeline stages: product-classifier → catalog-detector → scraper-generator → eval-generator.
 
@@ -20,6 +20,8 @@ Pipeline stages: product-classifier → catalog-detector → scraper-generator �
 - `docs/scraper-generator/` — Scraper artifacts (scraper.py, config.json, output/)
 - `eval/` — Shared eval script (quality validation for scrapers)
 - `docs/eval-generator/` — Eval artifacts (eval_config.json, output/)
+- `scripts/` — Utility scripts (schema verification, migrations)
+
 ## Skills-First Approach
 
 **When a skill matches the task, use it.** This project relies heavily on skills to encode domain knowledge, enforce conventions, and maintain consistency across the pipeline. Do not improvise workflows that a skill already covers — invoke the skill and follow its instructions.
@@ -58,8 +60,9 @@ Per-company pipeline output under `docs/` is gitignored — only shared knowledg
 
 ## Conventions
 
+- **After every change to any skill or agent file**, run `/skill-creator-local deep review` to verify convention compliance. This is not optional.
 - Skill wrappers and agent files are a paired two-file pattern. See `/skill-creator-local` for the full convention spec.
 - Run `uv run python .claude/skills/skill-creator-local/scripts/verify_skill.py --all` to check convention compliance.
-- Taxonomy values (Category > Subcategory) must be verbatim from `docs/product-taxonomy/categories.md`.
+- Taxonomy IDs (e.g., `machinery.power_tools`) are the canonical identifiers — always from `docs/product-taxonomy/categories.md`.
 - Agent files must be harness-agnostic: no tool names, no file paths, no user-facing language.
 - The product taxonomy categories file is read-only for all skills except product-taxonomy.

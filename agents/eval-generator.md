@@ -43,10 +43,12 @@ If the catalog assessment does not contain an estimated product count, handle gr
 
 ## Step 3: Load the SKU Schema
 
-Read the SKU schema for the company's category. Extract:
+Read the SKU schema for the company's primary subcategory. For multi-subcategory companies, read ALL subcategory schemas and use the **union** of their core/extended Key lists — this ensures the eval config covers attributes from every subcategory the scraper handles. The schema tables have 5 columns: Attribute, **Key**, Data Type, Description, Example Values. The **Key** column contains the exact snake_case identifier that scrapers use in their output — use these Key values (not the display names) everywhere in the eval config.
 
-- Core attributes — category-specific attributes that every product must have populated, living inside `core_attributes`. Do not include universal fields (`sku`, `name`, `url`, `price`, `currency`, `scraped_at`) — those are hardcoded in the shared eval script.
-- Extended attributes — additional category-specific attributes that are useful but not mandatory, living inside `extended_attributes`.
+Extract:
+
+- Core attributes — the **Key** values from the schema's Core Attributes table (excluding universal keys: `sku`, `product_name`, `url`, `price`, `currency`). Do not include universal fields (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) — those are hardcoded in the shared eval script.
+- Extended attributes — the **Key** values from the schema's Extended Attributes table.
 - All attributes the scraper extracts (core, extended, and extra) with their expected types
 - Enum constraints — attributes with a known set of allowed values
 
@@ -78,11 +80,24 @@ Produce the eval config file with all 8 required fields:
 | `company_slug` | Company report | The slug from the company report |
 | `expected_product_count` | Catalog assessment | The estimated product count. If missing, see the `missing_product_count_estimate` decision. |
 | `expected_top_level_categories` | Catalog assessment | The top-level category names from the category structure section. These are the catalog's own category names (e.g., "Riga Wood"), not taxonomy categories. |
-| `core_attributes` | SKU schema + scraper source | Category-specific attributes that every product must have populated. These come from the `core_attributes` bucket in the scraper output. Only include attributes the scraper actually extracts. Universal fields (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) are handled by the shared eval script — do not include them here. |
-| `extended_attributes` | SKU schema + scraper source | Additional category-specific attributes that are useful but not mandatory. These come from the `extended_attributes` bucket in the scraper output. |
-| `type_map` | SKU schema + scraper source | Maps every attribute name (across core, extended, and extra) to its expected type: `"str"`, `"number"`, `"list"`, or `"bool"`. Covers all attributes the scraper extracts. |
+| `core_attributes` | SKU schema + scraper source | **Key** values from the schema's Core Attributes table (excluding universal keys `sku`, `product_name`, `url`, `price`, `currency`). Only include keys the scraper actually extracts. Universal fields (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) are handled by the shared eval script — do not include them here. |
+| `extended_attributes` | SKU schema + scraper source | **Key** values from the schema's Extended Attributes table. Only include keys the scraper actually extracts. |
+| `type_map` | SKU schema + scraper source | Maps every attribute **Key** (across core, extended, and extra) to its expected eval type: `"str"`, `"number"`, `"list"`, or `"bool"`. Use the Key values as dict keys (e.g., `"charging_power_kw"`, not `"Charging Power (kW)"`). Covers all attributes the scraper extracts. |
 | `enum_attributes` | SKU schema + scraper source | Maps attributes that have a closed set of allowed values to their value arrays. Only include attributes where the allowed values are known from the SKU schema or clearly enumerable from the scraper logic. Use an empty object `{}` when no enum constraints apply. |
 | `has_prices` | Catalog assessment + scraper source | `true` if the catalog has prices and the scraper extracts them, `false` otherwise. When `false`, the shared eval script skips the price sanity check. |
+
+### SKU schema → eval type mapping
+
+The SKU schema uses descriptive data types; the eval config uses a closed set of 4 type strings. Convert using this table:
+
+| SKU schema Data Type | Eval `type_map` value |
+|---------------------|----------------------|
+| `text`, `text (mm)`, `text (deg C)`, `text (list)` with single values, `enum` | `"str"` |
+| `number`, `number (kg)`, `number (kW)`, `number (A)`, `number (m)`, `number (N)` | `"number"` |
+| `text (list)` when the scraper outputs an array | `"list"` |
+| `boolean` | `"bool"` |
+
+When in doubt, check the scraper source to see what Python type the attribute actually produces.
 
 ### Checks (12 total)
 
@@ -94,7 +109,7 @@ The shared eval script implements 12 weighted checks. Weights sum to 100:
 | `extended_attribute_coverage` | 5 | 0.50 | Extended attributes missing — less critical but tracked |
 | `pagination_completeness` | 10 | 0.70 | Broken pagination, removed categories |
 | `category_diversity` | 5 | 0.50 | Broken category traversal, sitemap gaps |
-| `category_classification` | 10 | 0.95 | Products with `_unclassified` product_category |
+| `category_classification` | 10 | 0.95 | Products with invalid `product_category` — note: `product_category` is validated by this dedicated check, not by `core_attribute_coverage` |
 | `price_sanity` | 10 | 1.00 | Parser errors, currency confusion |
 | `data_freshness` | 5 | 1.00 | Stale cache, broken upsert |
 | `schema_conformance` | 5 | 1.00 | Site redesign, new data format |
@@ -142,7 +157,7 @@ When checks are skipped (e.g., no baseline for `field_level_regression`, limited
 | **`company_slug` is a string** | `"finieris"` | Missing or numeric |
 | **`expected_product_count` is a positive integer** | `31` | `0`, negative, string, float |
 | **`expected_top_level_categories` is a non-empty array of strings** | `["Riga Wood"]` | Empty array, array of numbers |
-| **`core_attributes` contains only category-specific attributes** | `["material", "weight"]` | Includes `"sku"`, `"name"`, `"url"`, `"price"`, `"currency"`, `"brand"`, or `"scraped_at"` |
+| **`core_attributes` contains only category-specific Key values** | `["material", "weight"]` | Includes universal/top-level fields: `"sku"`, `"name"`, `"url"`, `"price"`, `"currency"`, `"brand"`, `"scraped_at"`, `"product_category"`, `"category_path"` |
 | **`extended_attributes` is an array of strings** | `["color", "finish"]` or `[]` | Missing, null, array of numbers |
 | **`type_map` values use exact type strings** | `"str"`, `"number"`, `"list"`, `"bool"` | `"string"`, `"int"`, `"float"`, `"array"`, `"boolean"` |
 | **`type_map` covers all attributes in `core_attributes` and `extended_attributes`** | Every core and extended attribute has a type entry | Attribute missing from type_map |
@@ -193,7 +208,7 @@ If the eval runs successfully and all 12 checks appear in the result, the config
 - This agent generates eval config files only — it does not modify the shared eval script or scraper code.
 - It does not trigger rediscovery — the shared eval script sets `recommend_rediscovery` based on the degradation score.
 - It does not define or modify the product taxonomy or SKU schemas.
-- Universal field checks (`sku`, `name`, `url`, `price`, `currency`, `scraped_at`) are hardcoded in the shared eval script. The config only controls category-specific attribute expectations.
+- Universal field checks (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) are hardcoded in the shared eval script. The config only controls category-specific attribute expectations.
 
 ---
 

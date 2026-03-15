@@ -48,7 +48,7 @@ Read and follow the agent instructions in `agents/eval-generator.md`.
   - `scraper_output_format_unclear` — 1) Fix the scraper and retry, 2) Describe the expected output format so the eval can be generated, 3) Stop
 - The `no_sku_schema` decision has an autonomous resolution path: when the subcategory exists in the taxonomy but the SKU schema hasn't been created yet, invoke `/product-taxonomy` for that subcategory to generate the schema, then continue. Only escalate if the subcategory itself is missing from the taxonomy.
 - Run the shared eval script for verification: `uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json`
-- The `missing_product_count_estimate` decision is handled autonomously without escalation — the agent skips the pagination completeness check and redistributes its weight. This is a graceful degradation, not a stop. No user interaction needed.
+- The `missing_product_count_estimate` decision is handled autonomously without escalation — the agent uses the best available estimate (from scraper source, category structure, or current output count). This is a graceful degradation, not a stop. No user interaction needed.
 - No web search or browsing tools are needed — this stage generates a config file locally.
 
 ## Notes

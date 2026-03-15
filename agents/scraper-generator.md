@@ -306,7 +306,7 @@ Select probe pages from **at least 3 different top-level categories** in the cat
 
 ### Extraction validation
 
-For each probe page, run the scraper's `--probe` mode with that URL. Examine the JSON output to verify: universal top-level fields (`sku`, `name`, `url`, `brand`, `product_category`, `scraped_at`) are populated, `core_attributes` and `extended_attributes` contain schema-matched keys, `extra_attributes` keys are `snake_case` with primitive values, and no extraction errors are reported. This executes the real extraction code path — do not manually simulate selectors or JSON parsing.
+For each probe page, run the scraper's `--probe` mode with that URL. Examine the JSON output to verify: universal top-level fields (`sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`) are populated (`price` and `currency` may be `null` when the catalog does not display prices), `core_attributes` and `extended_attributes` contain schema-matched keys, `extra_attributes` keys are `snake_case` with primitive values, and no extraction errors are reported. This executes the real extraction code path — do not manually simulate selectors or JSON parsing.
 
 If extraction would fail for a given page:
 1. Identify the specific issue (wrong selector, unexpected JSON-LD structure, missing field)
@@ -353,7 +353,7 @@ The test must verify:
 
 1. **Scraper completes without crashing** — no unhandled exceptions
 2. **Summary is valid** — `total_products` is between 1 and 20, `errors_count` is 0
-3. **Product records are correct** — `brand` is a top-level field (not inside attribute buckets) and `product_category` is a valid taxonomy ID. At least some records have the core universal fields populated (sku, name, url, scraped_at). Price and currency should be populated when the catalog displays prices — when the catalog assessment notes that prices are unavailable (e.g., international sites without pricing), null values are acceptable. At least some records should have attributes in `core_attributes` and/or `extended_attributes` matching the SKU schema names.
+3. **Product records are correct** — `brand` is a top-level field (not inside attribute buckets) and `product_category` is a valid taxonomy ID. At least some records have the core universal fields populated (sku, name, url, scraped_at). Price and currency should be populated when the catalog displays prices — when the catalog assessment notes that prices are unavailable (e.g., international sites without pricing), null values are acceptable. At least some records should have attributes in `core_attributes` and/or `extended_attributes` matching Key values from the SKU schema.
 4. **Persist hook worked** — the harness received batches and the output destination has product data
 5. **Category diversity** — the extracted products span at least 2 distinct `category_path` top-level values. The probe (Step 4) validates extraction logic across at least 3 categories; this gate verifies that the scraper traverses multiple categories in a real run with pagination and batching. If all 20 products come from a single category, the test coverage is insufficient. If the catalog has only one category, this check passes automatically.
 

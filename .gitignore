@@ -9,3 +9,9 @@ docs/*
 
 # Playwright MCP logs
 .playwright-mcp/
+
+# Claude Code project-level memory (user-specific)
+.claude/projects/
+
+# Python bytecode cache
+__pycache__/

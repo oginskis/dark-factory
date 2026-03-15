@@ -159,9 +159,9 @@ Keep compliance and certification attributes **international and universal**. In
 
 **Never delete an attribute.** Downstream systems may depend on it. If an attribute is wrong, redundant, or no longer used, mark it as deprecated:
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| Old Attr | text | **DEPRECATED** (2026-03-14) — replaced by "New Attr". Was: original description | — |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| Old Attr | old_attr | text | **DEPRECATED** (2026-03-14) — replaced by "New Attr". Was: original description | — |
 
 Mark the description with **DEPRECATED** and the date. This preserves backward compatibility while keeping the schema clean for readers.
 
@@ -182,7 +182,7 @@ Write to `docs/product-taxonomy/sku-schemas/{subcategory-slug}.md` using the **e
 
 **Last updated:** {today's date}
 **Parent category:** {Top-Level Category Name}
-**Taxonomy ID:** {taxonomy_id}
+**Taxonomy ID:** `{taxonomy_id}`
 
 ## Core Attributes
 
