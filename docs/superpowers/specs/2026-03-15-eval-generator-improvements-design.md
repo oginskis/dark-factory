@@ -47,17 +47,24 @@ The eval-generator agent produces this JSON. It is the only LLM-generated artifa
   "expected_product_count": 31,
   "expected_top_level_categories": ["Riga Wood"],
   "core_attributes": [
-    "sku", "name", "url", "scraped_at",
     "brand", "manufacturer", "panel_type", "wood_species", "surface_treatment"
   ],
   "type_map": {
+    "brand": "str",
+    "manufacturer": "str",
+    "panel_type": "str",
+    "wood_species": "str",
+    "surface_treatment": "str",
     "applications": "list",
     "grades": "list",
     "standard_thicknesses": "str",
-    "overlay_colors": "list"
+    "overlay_colors": "list",
+    "certifications": "list",
+    "country_of_origin": "str"
   },
-  "enum_attributes": {},
-  "numeric_attributes": [],
+  "enum_attributes": {
+    "surface_treatment": ["Uncoated", "Film-faced", "HPL", "Lacquered", "Melamine", "Primed", "Decorative", "Textured overlay", "Composite"]
+  },
   "has_prices": false
 }
 ```
@@ -68,12 +75,13 @@ The eval-generator agent produces this JSON. It is the only LLM-generated artifa
 |-------|------|-------------|
 | `company_slug` | string | Company identifier, used to derive scraper output path |
 | `expected_product_count` | number | From catalog assessment, used for pagination completeness |
-| `expected_top_level_categories` | string[] | From catalog assessment, used for category diversity |
-| `core_attributes` | string[] | Universal + category-specific attributes that every product should have. Includes top-level fields (sku, name, url, scraped_at) and attributes object fields. Price/currency excluded when `has_prices` is false. |
-| `type_map` | object | Maps attribute names to expected types: "str", "number", "list", "bool". Used for schema conformance. |
-| `enum_attributes` | object | Maps attribute names to arrays of allowed values. Used for schema conformance. |
-| `numeric_attributes` | string[] | Attribute names expected to be numeric. Used for schema conformance. |
+| `expected_top_level_categories` | string[] | Expected top-level category names from catalog assessment. Category diversity uses set intersection: `len(expected & actual) / len(expected)`. |
+| `core_attributes` | string[] | Category-specific attributes (inside the `attributes` object) that every product should have populated. Used for attribute coverage check alongside universal fields. |
+| `type_map` | object | Maps attribute names (inside `attributes` object) to expected types: "str", "number", "list", "bool". Used for schema conformance. Covers all attributes the scraper extracts, both core and optional. |
+| `enum_attributes` | object | Maps attribute names to arrays of allowed values. Products with values outside the set count as schema conformance failures for that attribute-value pair. Example: `{"surface_treatment": ["Uncoated", "Film-faced", "HPL"]}`. |
 | `has_prices` | boolean | Whether the catalog has prices. When false, price_sanity check is skipped. |
+
+**Universal fields are hardcoded in the shared script, not in the config.** The 6 universal product fields (`sku`, `name`, `url`, `price`, `currency`, `scraped_at`) live at the top level of each product record and are fixed across all companies. The shared eval script knows to check `product["sku"]` for these. The `core_attributes` in the config lists only category-specific attributes that live inside `product["attributes"]`. The eval checks `product["attributes"]["brand"]` for those. This avoids the ambiguity of mixing top-level and nested fields in one list.
 
 ### Path Resolution
 
@@ -83,7 +91,7 @@ The shared eval script derives all paths from the config file location and `comp
 - **Scraper output:** `{project_root}/docs/scraper-generator/{slug}/output/products.jsonl`
 - **Scraper summary:** `{project_root}/docs/scraper-generator/{slug}/output/summary.json`
 - **Eval output dir:** sibling `output/` directory next to the config file
-- **Project root:** walk up from config file until a directory containing `eval/` is found
+- **Project root:** walk up from config file until a directory containing `eval/` is found. If not found after reaching filesystem root, exit with error: "Could not find project root (no eval/ directory found)"
 
 ## Checks
 
@@ -101,11 +109,27 @@ The shared eval script derives all paths from the config file location and `comp
 | category_diversity | 5 | 0.50 | Broken traversal, sitemap gaps | Limited run |
 | row_count_trend | 10 | 0.80 | Category removal, pagination break | Limited run or first run |
 
-### New Checks
+### Check Implementation Details
+
+All 9 checks are implemented in the shared eval script. The definitions below are authoritative — the agent does not need to know these details.
+
+**Attribute coverage (weight 20).** For each product, count how many core attributes are present and non-empty. Core = the 6 universal fields (sku, name, url, price, currency, scraped_at — with price/currency excluded when `has_prices` is false) plus the `core_attributes` from the config (checked inside `product["attributes"]`). Compute per-product coverage ratio, then measure what fraction of products exceed 80% coverage. Measured value = that fraction. Threshold: 0.90. Never skips.
 
 **Duplicate detection (weight 15).** Count products sharing the same SKU. Measured value = number of unique SKUs / total products. Threshold: 0.99 (less than 1% duplicates). Never skips — duplicates can appear in any run.
 
-**Field-level regression (weight 10).** After the first full run creates a baseline, compare each attribute's fill rate (fraction of products where it is non-null and non-empty) against the baseline. If any core attribute's fill rate drops by more than 50% relative to the baseline, the check fails. Measured value = fraction of core attributes whose fill rate has not regressed. Threshold: 0.50 (at least half of core attributes must maintain fill rates). Skips when no baseline exists.
+**Price sanity (weight 10).** Check every product's price: no zeros, no negatives, no value exceeding 10x the median price in this run. Products with null price are excluded from the check (not counted as failures). Measured value = fraction of products-with-prices that have sane prices. Threshold: 1.0. Skips when `has_prices` is false in the config.
+
+**Schema conformance (weight 10).** For each product, validate attribute values in `product["attributes"]` against `type_map` and `enum_attributes` from the config. Type checks: "str" must be a non-empty string, "number" must be int or float, "list" must be a list, "bool" must be boolean. Enum checks: value must be in the allowed set. Attributes not in `type_map` are ignored. Null values are ignored (not counted). Measured value = fraction of all checked attribute-value pairs across all products that conform. Threshold: 1.0. Never skips.
+
+**Data freshness (weight 10).** Every product must have a `scraped_at` timestamp within the last 24 hours. Measured value = fraction of products with current timestamps. Threshold: 1.0. Never skips.
+
+**Field-level regression (weight 10).** After the first full run creates a baseline, compare each core attribute's fill rate (fraction of products where it is non-null and non-empty) against the baseline fill rate for that attribute. An attribute "regresses" if its current fill rate is less than 50% of its baseline fill rate. Measured value = fraction of core attributes whose fill rate has not regressed. Threshold: 0.50. Skips when no baseline exists.
+
+**Pagination completeness (weight 10).** Compare `products_found` from the scraper summary against `expected_product_count` from the config. Measured value = `actual / expected`. Threshold: 0.70. Skips on limited runs (`limited: true` in summary).
+
+**Category diversity (weight 5).** Extract the top-level category from each product's `category_path` (first segment before ` > `). Compare against `expected_top_level_categories` from the config using set intersection: `len(expected_set & actual_set) / len(expected_set)`. Threshold: 0.50. Skips on limited runs.
+
+**Row count trend (weight 10).** Compare current `products_found` against the previous run's count from eval history. Measured value = `current / previous`. Threshold: 0.80. Skips on limited runs, first run, or when the previous run was limited.
 
 ### Weight Redistribution
 
@@ -155,7 +179,7 @@ Same as current — no breaking change:
 }
 ```
 
-Skipped checks include `"skipped": true` and `"value": null`.
+Skipped checks have `"score": 0, "value": null, "skipped": true`.
 
 ## Baseline Mechanism
 
@@ -163,6 +187,7 @@ Skipped checks include `"skipped": true` and `"value": null`.
 - Contains: product count, per-attribute fill rates, category list, timestamp
 - Field-level regression compares current fill rates against baseline
 - Re-establish by deleting `baseline.json` and running a full eval
+- The pipeline default is a limited run (`--limit 20`). To activate field_level_regression and establish the baseline, schedule a periodic full eval run (no `--limit`). The first full run creates the baseline automatically.
 
 ```json
 {
@@ -234,3 +259,5 @@ Update run commands, project structure, and descriptions.
 - Existing `eval_result.json` files are compatible — same format
 - Existing companies can be re-configured by running `/eval-generator {slug}` to generate `eval_config.json`
 - No backward compatibility concerns — old files were standalone and gitignored
+- Behavioral change: price_sanity previously always ran (returning 1.0 when no prices existed), now explicitly skips when `has_prices: false`. This changes the `skipped` flag in output but not the effective score.
+- The agent's self-verification step updates to expect 9 checks instead of 7
