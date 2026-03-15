@@ -44,7 +44,7 @@ This runs all four stages sequentially:
 1. **Classify** — researches the company and classifies it into the product taxonomy
 2. **Detect catalog** — finds the product catalog, analyzes its structure, and picks a scraping strategy
 3. **Generate scraper** — writes a standalone Python scraper, probes live pages, and runs a test
-4. **Generate eval** — writes a quality validation script with seven weighted checks
+4. **Generate eval** — writes a quality validation script with nine weighted checks
 
 Each stage can stop the pipeline if it hits a blocker (no physical products, no public catalog, anti-bot protection, etc.). You'll be told what happened and why.
 
@@ -69,7 +69,7 @@ Replace `{slug}` with the company slug shown in the pipeline summary (e.g., `fes
 Run the eval script to check scrape quality:
 
 ```bash
-uv run docs/eval-generator/{slug}/eval.py
+uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json
 ```
 
 ### 4. Interpret the results
@@ -85,7 +85,7 @@ uv run docs/eval-generator/{slug}/eval.py
 
 | File | Contents |
 |------|----------|
-| `eval_result.json` | Quality report with seven weighted checks, a degradation score (0-100), and a pass/degraded/fail status |
+| `eval_result.json` | Quality report with nine weighted checks, a degradation score (0-100), and a pass/degraded/fail status |
 | `eval_history.json` | Append-only log of all eval runs, used to detect trends |
 
 **Eval status meanings:**
@@ -129,6 +129,7 @@ Schemas live in `docs/product-taxonomy/sku-schemas/` and define 20-40 category-s
 dark-factory/
   agents/                                   # Harness-agnostic agent reasoning (tracked)
   .claude/skills/                           # Claude Code skill wrappers (tracked)
+  eval/                                     # Shared eval script (quality validation for scrapers)
   docs/
     product-taxonomy/                       # Canonical taxonomy + SKU schemas (tracked)
       categories.md                         #   Master category list
@@ -141,7 +142,7 @@ dark-factory/
       config.json                           #   Scraper metadata
       output/                               #   Scraped product data
     eval-generator/{slug}/                  # Eval artifacts (gitignored)
-      eval.py                               #   Quality validation script
+      eval_config.json                      #   Eval configuration
       output/                               #   Eval results and history
 ```
 

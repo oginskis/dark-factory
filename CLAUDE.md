@@ -18,7 +18,8 @@ Pipeline stages: product-classifier → catalog-detector → scraper-generator �
 - `docs/product-classifier/` — Company reports (output of product-classifier)
 - `docs/catalog-detector/` — Catalog assessments (output of catalog-detector)
 - `docs/scraper-generator/` — Scraper artifacts (scraper.py, config.json, output/)
-- `docs/eval-generator/` — Eval artifacts (eval.py, output/)
+- `eval/` — Shared eval script (quality validation for scrapers)
+- `docs/eval-generator/` — Eval artifacts (eval_config.json, output/)
 ## Skills-First Approach
 
 **When a skill matches the task, use it.** This project relies heavily on skills to encode domain knowledge, enforce conventions, and maintain consistency across the pipeline. Do not improvise workflows that a skill already covers — invoke the skill and follow its instructions.

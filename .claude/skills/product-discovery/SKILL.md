@@ -91,7 +91,7 @@ If no SKU schema exists but the subcategory is valid, the scraper-generator will
 
 Read file locations from `.claude/skills/eval-generator/SKILL.md`, then read and follow `agents/eval-generator.md` in full.
 
-This stage generates a standalone eval script that validates scrape quality using seven weighted checks.
+This stage generates a standalone eval script that validates scrape quality using nine weighted checks.
 
 **Stop the pipeline if:**
 - The company's subcategory is not found in the product taxonomy categories file (same gate as Stage 3 — should not occur if Stage 3 already generated the schema)
@@ -128,7 +128,7 @@ When all four stages complete successfully, present a structured summary to the 
 - **Category-specific attributes extracted:** {comma-separated list of attribute names found in test products}
 
 ### Eval
-- **Checks:** 7 weighted checks configured
+- **Checks:** 9 weighted checks configured
 - **Status from test run:** {pass / degraded / fail} (score: {N})
 
 ### Notes
@@ -148,7 +148,7 @@ When all four stages complete successfully, present a structured summary to the 
 | Catalog assessment | `docs/catalog-detector/{slug}.md` |
 | Scraper | `docs/scraper-generator/{slug}/scraper.py` |
 | Scraper config | `docs/scraper-generator/{slug}/config.json` |
-| Eval script | `docs/eval-generator/{slug}/eval.py` |
+| Eval config | `docs/eval-generator/{slug}/eval_config.json` |
 
 ### Run Locally
 
@@ -159,7 +159,7 @@ Run the scraper (limited test):
     uv run docs/scraper-generator/{slug}/scraper.py --limit 20
 
 Run the eval against scraper output:
-    uv run docs/eval-generator/{slug}/eval.py
+    uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json
 
 Output files are written to:
 - `docs/scraper-generator/{slug}/output/products.jsonl` — scraped product data
