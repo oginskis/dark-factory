@@ -67,6 +67,7 @@ Once a catalog is located, analyze its structure thoroughly.
 - Map the full category tree: top-level categories, subcategories, any deeper nesting
 - Record the URL pattern for each category level
 - Note whether categories use path segments (`/furniture/chairs/`) or query parameters (`?category=chairs`)
+- Note the URL path structure — how product categories map to URL segments. The scraper-generator uses these patterns to classify products by taxonomy subcategory.
 - Count the number of leaf categories (categories that contain products directly)
 
 ### Pagination
@@ -196,6 +197,14 @@ Write the catalog assessment report. Use one of the two templates below dependin
 ## Category Structure
 {Description of category hierarchy, with example paths}
 
+## URL Path Patterns
+
+{Map the top-level URL path segments to their product categories. This informs the scraper-generator's category mapping.}
+
+- `/Head-Protection/` → head protection products
+- `/Respiratory-Protection/` → respiratory protection products
+- `/Portable-Gas-Detection/` → gas detection/sensors products
+
 ## Pagination
 - **Mechanism:** {page numbers | load more | infinite scroll | none}
 - **URL pattern:** {pattern with placeholder}
@@ -246,7 +255,7 @@ Use this when any stop decision is triggered (`no_public_catalog`, `auth_require
 | **Slug matches the company slug from product-classifier** | `festool` | Company name, URL, or different slug |
 | **Scraping strategy is a valid value** | `static_html`, `structured_data`, `pdf_pricelist`, or `none` | `headless_browser`, free-text descriptions, mixed values |
 | **Stop reports use the stop template** | `**Stop reason:** auth_required` with `## Findings` | Success template with empty sections |
-| **Success reports include all sections** | All 7 sections present (Entry Points through Notes) | Missing sections, extra sections |
+| **Success reports include all sections** | All 8 sections present (Entry Points through Notes) | Missing sections, extra sections |
 | **Anti-bot severity uses exact values** | `none`, `light`, `moderate`, `severe` | Free-text descriptions, `low`/`high`/`medium` |
 | **Sections use `##` headings** | `## Catalog Entry Points` | `###` or other heading levels for top-level sections |
 | **Platform uses closed enumeration** | `woocommerce`, `shopify`, `magento`, `prestashop`, `custom`, `unknown` | Free-text platform names, `WordPress`, `WooCommerce` (wrong case) |
@@ -264,7 +273,7 @@ Before presenting results, re-read the catalog assessment you just wrote and che
 | 1 | **Correct template used** | Success template for scrapable catalogs, stop template for stop decisions |
 | 2 | **Heading and slug present** | `# Catalog Assessment: {Company Name}` with correct slug |
 | 3 | **Scraping strategy is valid** | One of: `static_html`, `structured_data`, `pdf_pricelist` — never `headless_browser` |
-| 4 | **All sections present** | Catalog Entry Points, Category Structure, Pagination, Structured Data, Navigation Paths, Anti-Bot Details, Notes |
+| 4 | **All sections present** | Catalog Entry Points, Category Structure, URL Path Patterns, Pagination, Structured Data, Navigation Paths, Anti-Bot Details, Notes |
 | 5 | **Product count has estimation method** | Number followed by method in parentheses, e.g., `~2,400 (sitemap count)` |
 | 6 | **Navigation Paths are actionable** | A scraper could follow the listed URL patterns to reach all products |
 | 7 | **Anti-bot severity uses exact value** | One of: `none`, `light`, `moderate`, `severe` |
