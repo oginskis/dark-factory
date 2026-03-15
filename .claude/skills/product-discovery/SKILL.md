@@ -50,7 +50,7 @@ The slug is derived from the company's primary domain name — see the slug deri
 
 Read file locations from `.claude/skills/product-classifier/SKILL.md`, then read and follow `agents/product-classifier.md` in full.
 
-This stage resolves the company identity, applies the tangible goods gate, classifies it into the taxonomy, and produces the company profile report.
+This stage resolves the company identity, applies the tangible goods gate, classifies it into the taxonomy using taxonomy IDs (e.g., `machinery.power_tools`), and produces the company profile report. The report lists all matching subcategories (not limited to two) and identifies one as the primary.
 
 **Stop the pipeline if:**
 - The company fails the tangible goods gate (no physical products)
@@ -77,7 +77,7 @@ This stage examines the company's website for a public product catalog, analyzes
 
 Read file locations from `.claude/skills/scraper-generator/SKILL.md`, then read and follow `agents/scraper-generator.md` in full.
 
-This stage generates a standalone Python scraper based on the catalog assessment, SKU schema, and platform knowledgebase (if available). It validates extraction with a quick probe before running the full test, and writes platform-specific discoveries back to the knowledgebase after success.
+This stage generates a standalone Python scraper based on the catalog assessment, SKU schema, and platform knowledgebase (if available). Scrapers output the three-bucket product record format (`_format: 2`) with `core_attributes`, `extended_attributes`, and `extra_attributes`. For multi-subcategory companies, the scraper builds a URL-prefix to taxonomy ID mapping in `config.json` so products are classified at runtime without any LLM. It validates extraction with a quick probe before running the full test, runs a post-test taxonomy feedback loop to verify `product_category` values are valid taxonomy IDs, and writes platform-specific discoveries back to the knowledgebase after success.
 
 **Stop the pipeline if:**
 - No catalog assessment exists for the company (defensive — Stage 2 ensures this)
@@ -91,7 +91,7 @@ If no SKU schema exists but the subcategory is valid, the scraper-generator will
 
 Read file locations from `.claude/skills/eval-generator/SKILL.md`, then read and follow `agents/eval-generator.md` in full.
 
-This stage generates an eval config that the shared eval script uses to validate scrape quality using nine weighted checks.
+This stage generates an eval config that the shared eval script uses to validate scrape quality using twelve weighted checks.
 
 **Stop the pipeline if:**
 - The company's subcategory is not found in the product taxonomy categories file (same gate as Stage 3 — should not occur if Stage 3 already generated the schema)
@@ -107,8 +107,9 @@ When all four stages complete successfully, present a structured summary to the 
 ### Company Profile
 - **Website:** {URL}
 - **Slug:** {slug}
-- **Classification:** {Primary Category > Subcategory}
-- **Secondary:** {Secondary Category > Subcategory, or "None"}
+- **Subcategories:** {all taxonomy IDs, e.g. `machinery.power_tools`, `machinery.cnc_machines`}
+- **Primary:** {single taxonomy ID, e.g. `machinery.power_tools`}
+- **product_category:** {primary taxonomy ID — used as `product_category` in scraper output}
 - **Business model:** {B2B / B2C / etc.}
 - **Entity type:** {Company / etc.}
 
@@ -123,12 +124,13 @@ When all four stages complete successfully, present a structured summary to the 
   - {URL 2}
 
 ### Scraper
+- **Output format:** `_format: 2` (three-bucket: `core_attributes`, `extended_attributes`, `extra_attributes`)
 - **Test result:** {passed / failed} ({N} products extracted, {errors} errors, {duration}s)
 - **SKU schema:** {subcategory-slug}
 - **Category-specific attributes extracted:** {comma-separated list of attribute names found in test products}
 
 ### Eval
-- **Checks:** 9 weighted checks configured
+- **Checks:** 12 weighted checks configured
 - **Status from test run:** {pass / degraded / fail} (score: {N})
 
 ### Notes
