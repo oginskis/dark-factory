@@ -385,7 +385,7 @@ After the scraper passes its `--limit 20` test, analyze the test output for pote
 ### File locking for concurrency
 
 Before modifying any schema file, the feedback step must acquire a file lock:
-- Lock file: `{schema-filename}.lock` next to the schema file in `docs/product-taxonomy/sku-schemas/`
+- Lock file: `{schema-filename}.lock` next to the schema file in the SKU schemas directory
   - Example: `power-tools-drills-saws-sanders.md.lock`
 - If the lock file exists and is less than 10 minutes old: skip the feedback step, log a warning ("Another agent is updating this schema, skipping feedback")
 - If the lock file exists but is older than 10 minutes: consider it stale, delete it, and proceed (the holding agent likely crashed)
