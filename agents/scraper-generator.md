@@ -1,6 +1,6 @@
 # Scraper Generator Agent
 
-**Input:** Company report, catalog assessment, and SKU schema for the company's category
+**Input:** Company report, catalog assessment, and SKU schema(s) for the company's subcategories
 **Output:** Scraper code, config metadata, and product data contract
 
 ---
@@ -32,13 +32,46 @@ If no catalog assessment exists (meaning the catalog-detector has not run yet), 
 
 ---
 
+## Step 1b: Build Category Mapping
+
+When the company report lists multiple `Subcategories` and the catalog assessment includes URL path patterns (e.g., `/Head-Protection/` → head protection), build a mapping from URL prefixes to taxonomy IDs so the scraper can classify products at runtime without any LLM.
+
+1. Read all `Subcategories` taxonomy IDs from the company report (e.g., `safety.head_protection`, `safety.respiratory_protection`, `electronics.sensors_instrumentation`).
+2. Read URL path patterns from the catalog assessment (e.g., `/Head-Protection/`, `/Respiratory-Protection/`, `/Portable-Gas-Detection/`).
+3. Map each URL path pattern to the matching taxonomy ID by matching the semantic meaning of the URL segment to the subcategory name. For example, `/Head-Protection/` maps to `safety.head_protection`, `/Respiratory-Protection/` maps to `safety.respiratory_protection`.
+4. **Every discovered URL prefix MUST be mapped.** If a prefix cannot be mapped to any subcategory, escalate — see the `unmapped_url_prefix` decision. Do not silently skip unmapped prefixes.
+5. Set `default_category` to the company's `Primary` taxonomy ID (used as fallback when no prefix matches).
+
+For **single-subcategory companies**, the mapping is trivial — all products get the primary taxonomy ID. The `category_mapping` in config can be empty or contain one entry.
+
+The generated scraper uses this mapping at runtime (no LLM involved):
+- For each product, check the product URL against the category mapping prefixes.
+- The first prefix found in the URL determines the product's `product_category` taxonomy ID.
+- If no prefix matches, use `default_category`.
+
+Store the mapping in `config.json` (see Step 7 for the full format):
+```json
+{
+  "category_mapping": {
+    "/Head-Protection/": "safety.head_protection",
+    "/Respiratory-Protection/": "safety.respiratory_protection",
+    "/Portable-Gas-Detection/": "electronics.sensors_instrumentation"
+  },
+  "default_category": "safety.respiratory_protection"
+}
+```
+
+---
+
 ## Step 2: Load the SKU Schema
 
-Read the SKU schema for the company's product category.
+Read the SKU schema for each subcategory the company covers.
 
-The schema defines category-specific attributes — their names, data types, descriptions, and example values. These attributes are split into **core** and **extended** lists within the schema. The scraper uses these lists to route extracted attributes into the correct bucket of the product record (see Step 2a).
+**Single-subcategory companies:** Load the one SKU schema for the company's primary subcategory.
 
-If no SKU schema exists for the company's category, check the product taxonomy categories file to verify the subcategory exists — see the `no_sku_schema` decision.
+**Multi-subcategory companies:** Load the SKU schema for EVERY subcategory listed in the company report's `Subcategories` field. Each schema defines different category-specific attributes — their names, data types, descriptions, and example values. These attributes are split into **core** and **extended** lists within each schema. The scraper uses the category mapping from Step 1b to determine which schema applies to each product, and routes attributes into the correct bucket accordingly (see Step 2a).
+
+If no SKU schema exists for any of the company's subcategories, check the product taxonomy categories file to verify the subcategory exists — see the `no_sku_schema` decision. Repeat for each missing schema before proceeding.
 
 **Backward compatibility for company reports:** The scraper-generator must handle both old and new company report formats:
 - **Old format:** `Primary` and `Secondary` rows with `Category > Subcategory` display names
@@ -49,16 +82,23 @@ If no SKU schema exists for the company's category, check the product taxonomy c
 
 ## Step 2a: Map Attributes to Schema
 
-After loading the SKU schema, determine how each attribute the scraper extracts will be routed into the three-bucket product record format.
+After loading the SKU schema(s), determine how each attribute the scraper extracts will be routed into the three-bucket product record format.
 
 The scraper-generator MUST:
 
-1. Read the SKU schema for the company's subcategory — specifically the **core** and **extended** attribute lists.
+1. Read the SKU schema for the company's subcategory (or each subcategory for multi-subcategory companies) — specifically the **core** and **extended** attribute lists.
 2. For each attribute the scraper extracts, match it against schema attribute names (exact `snake_case` match).
 3. Matched **core** → `core_attributes`
 4. Matched **extended** → `extended_attributes`
 5. No match → `extra_attributes`
 6. The scraper code must use the **EXACT attribute names** from the schema — no inventing names, no renaming.
+
+**Multi-subcategory attribute routing:** When a company spans multiple subcategories, each subcategory has its own SKU schema with potentially different core and extended attribute lists. The same attribute name (e.g., `weight`) might be core in one schema and extended in another, or present in one but absent from another. The scraper must:
+
+1. Determine the product's subcategory from the URL-based category mapping (Step 1b).
+2. Look up the correct SKU schema for that subcategory.
+3. Route the product's attributes against THAT schema's core/extended lists — not a merged or generic list.
+4. This means the attribute classification (core vs extended vs extra) may differ per product depending on which subcategory it belongs to.
 
 **`extra_attributes` governance:**
 - Keys must be `snake_case`
@@ -97,7 +137,7 @@ The generated scraper must:
    - `price` — numeric price (float, no currency symbols), or `null` if unavailable
    - `currency` — ISO 4217 currency code, or `null` if unavailable
    - `brand` — the product's brand name (promoted to top-level, not inside attribute buckets)
-   - `product_category` — the taxonomy ID for the product's subcategory (e.g., `machinery.power_tools`). Use the company's primary taxonomy ID from the company report. For old-format reports without taxonomy IDs, derive the ID from the `Category > Subcategory` display name.
+   - `product_category` — the taxonomy ID for the product's subcategory (e.g., `machinery.power_tools`). For multi-subcategory companies, determine from the URL-based category mapping built in Step 1b. For single-subcategory companies, use the company's primary taxonomy ID. For old-format reports without taxonomy IDs, derive the ID from the `Category > Subcategory` display name.
    - `scraped_at` — ISO 8601 timestamp of when this product was extracted
 
 2. **Extract category-specific attributes** as defined in the SKU schema and route them into the correct bucket per Step 2a. Map site elements to schema attributes using the descriptions and example values in the schema as guidance. Not every attribute will be present on every site — extract what is available, skip what is not.
@@ -358,20 +398,24 @@ Produce config metadata for the scraper:
   "sku_schema": "{category-slug}",
   "scraping_strategy": "static_html",
   "expected_product_count": 1200,
+  "subcategories": ["safety.head_protection", "safety.respiratory_protection", "electronics.sensors_instrumentation"],
   "category_mapping": {
-    "default": "machinery.power_tools"
+    "/Head-Protection/": "safety.head_protection",
+    "/Respiratory-Protection/": "safety.respiratory_protection",
+    "/Portable-Gas-Detection/": "electronics.sensors_instrumentation"
   },
-  "default_category": "machinery.power_tools",
+  "default_category": "safety.respiratory_protection",
   "generated_at": "2026-03-14T12:00:00Z"
 }
 ```
 
 - `category` — the exact classification from the company report
-- `sku_schema` — the slug of the SKU schema file that was used
+- `sku_schema` — the slug of the SKU schema file that was used (for single-subcategory companies). For multi-subcategory companies, this is the primary subcategory's schema slug.
 - `scraping_strategy` — the strategy the scraper implements
 - `expected_product_count` — from the catalog assessment estimate, updated with the actual count found during testing if it is higher
-- `category_mapping` — a dict mapping site category paths or identifiers to taxonomy IDs. At minimum, includes a `"default"` key with the company's primary taxonomy ID.
-- `default_category` — the company's primary taxonomy ID, used as the fallback `product_category` value when no specific mapping applies
+- `subcategories` — list of all taxonomy IDs this scraper covers. For single-subcategory companies, this is a one-element list. Matches the `Subcategories` field from the company report.
+- `category_mapping` — a dict mapping URL path prefixes to taxonomy IDs. Built in Step 1b from the catalog assessment's URL path patterns and the company report's subcategories. For single-subcategory companies, this can be empty (all products use `default_category`). For multi-subcategory companies, every URL prefix from the catalog assessment must have an entry.
+- `default_category` — the company's primary taxonomy ID, used as the fallback `product_category` value when no URL prefix matches
 - `generated_at` — ISO 8601 timestamp of when the scraper was generated
 
 ### Strict format rules
@@ -409,15 +453,16 @@ Before presenting results, verify the scraper and config against these quality g
 | 8 | **`extra_attributes` keys are governed** | Keys are `snake_case`, values are primitives (string, number, boolean) or arrays of primitives, no nested objects |
 | 9 | **Pagination handled** | Scraper follows all pages, not hardcoded to first page |
 | 10 | **Error handling present** | Retries, timeouts, and graceful skipping of failed products |
-| 11 | **Config metadata complete** | All required fields present with correct values, including `category_mapping` and `default_category` |
+| 11 | **Config metadata complete** | All required fields present with correct values, including `subcategories`, `category_mapping`, and `default_category`. For multi-subcategory companies, every URL prefix from the catalog assessment appears in `category_mapping`. |
 | 12 | **Logging implemented** | JSON lines to stderr with required events |
 | 13 | **Code quality** | PEP 723 inline script metadata present at top of file, `from __future__ import annotations` follows, all functions typed, no bare `except:`, constants at module level, single `httpx.Client` reused |
 | 14 | **Persist hook present** | setup/persist/teardown functions exist, persist is called after each batch of up to 100 records, teardown is always called |
 | 15 | **Platform knowledgebase updated** | Platform knowledgebase was written or updated after a successful test (when platform is an enumerated value — not `unknown` or `custom`) |
 | 16 | **Category diversity in test** | Dry-run test produced products from at least 2 distinct top-level categories (or the catalog has only one category) |
 | 17 | **Product discovery strategy is robust** | Scraper uses the most comprehensive discovery source available (sitemap, JSON API, or exhaustive category traversal). For `custom`/`unknown` platforms, scraper uses URL-pattern-based link discovery rather than platform-specific CSS selectors. Deduplication by URL or SKU is present. |
+| 18 | **Multi-subcategory mapping correct** | For multi-subcategory companies: category mapping covers all URL prefixes from catalog assessment, scraper uses per-subcategory SKU schemas for attribute routing, and `product_category` varies correctly across products from different sections. For single-subcategory companies: all products use the primary taxonomy ID. |
 
-If all 17 pass, the scraper is complete.
+If all 18 pass, the scraper is complete.
 
 ---
 
@@ -437,6 +482,13 @@ If all 17 pass, the scraper is complete.
 **Autonomous resolution:** Never. The catalog assessment is a required input.
 **Escalate when:** Always. Report that the catalog assessment is missing and suggest running the catalog-detector first.
 **Escalation payload:** Company slug, path where the catalog assessment was expected.
+
+### Decision: unmapped_url_prefix
+
+**Context:** A URL path pattern from the catalog assessment cannot be mapped to any subcategory in the company report's `Subcategories` list. This means the catalog contains a product section that does not correspond to any known classification for this company.
+**Autonomous resolution:** Never. Every URL prefix must map to a taxonomy ID — silently skipping prefixes would cause products in that section to be misclassified under the default category.
+**Escalate when:** Always. Report the unmapped prefix, the full list of subcategories from the company report, and all URL patterns from the catalog assessment.
+**Escalation payload:** Company slug, the unmapped URL prefix, the list of subcategories, all URL patterns from the catalog assessment.
 
 ### Decision: no_sku_schema
 
