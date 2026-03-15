@@ -8,7 +8,7 @@ Include these functions in the generated scraper:
 
 ```python
 BATCH_SIZE = 100
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = Path(__file__).resolve().parent / "output"
 
 def setup() -> Path:
     """Prepare output destination. Clear previous run."""

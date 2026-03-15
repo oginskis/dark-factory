@@ -37,7 +37,7 @@ Required Claude Code plugins (Playwright, Context7) are auto-installed when you 
 Inside Claude Code, type:
 
 ```
-/product-discovery festool.com
+/product-discovery https://www.evergy.co.uk/
 ```
 
 This runs all four stages sequentially:

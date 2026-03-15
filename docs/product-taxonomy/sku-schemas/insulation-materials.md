@@ -1,0 +1,46 @@
+# SKU Schema: Insulation Materials
+
+**Last updated:** 2026-03-15
+**Parent category:** Construction Materials & Glass/Ceramics
+
+## Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
+| SKU | text | Retailer or manufacturer product identifier | OCNGX-1-Single, RC-R23-1, JM-R30-UF |
+| Product Name | text | Full product name including key specs such as material, R-value, and dimensions | Owens Corning FOAMULAR NGX 250 4ft x 8ft x 1in, Rockwool Comfortbatt R-23 |
+| URL | text | Direct link to the product page | https://example.com/product/foamular-ngx-250 |
+| Price | number | Numeric price per unit (bag, board, roll, or bundle), excluding currency symbol | 52.55, 86.70, 48.27 |
+| Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
+| Brand | text | Manufacturer or brand name | Owens Corning, Rockwool, Johns Manville, Knauf, Kingspan |
+| Material Type | enum | Primary insulation material composition | Fiberglass, Mineral Wool, XPS, EPS, Polyisocyanurate, Spray Foam, Cellulose |
+| Product Form | enum | Physical form of the insulation product | Batt, Roll, Rigid Board, Loose Fill, Spray, Blown-In |
+| R-Value | number | Total thermal resistance of the product as sold | 11, 13, 15, 19, 23, 30, 38, 49, 60 |
+| R-Value per Inch | number | Thermal resistance per inch of thickness | 2.2, 3.0, 3.7, 4.2, 5.0, 6.5 |
+| Thermal Conductivity | number (W/mK) | Thermal conductivity (lambda value) at mean temperature | 0.032, 0.035, 0.040, 0.044 |
+| Thickness | number (mm) | Product thickness | 25, 50, 75, 89, 100, 140, 150, 184 |
+| Width | number (mm) | Product width | 380, 400, 580, 600, 1200, 1220 |
+| Length | number (mm) | Product length | 1170, 1200, 2400, 2440 |
+| Coverage Area | number (m2) | Area covered per package or unit | 2.23, 5.58, 8.36, 11.15 |
+| Facing Type | enum | Type of facing or vapour barrier applied to the insulation | Unfaced, Kraft Faced, Foil Faced, FSK, Poly-Wrapped |
+| Density | number (kg/m3) | Nominal density of the insulation material | 12, 24, 32, 48, 96, 128 |
+| Compressive Strength | number (kPa) | Compressive strength at 10 percent deformation | 100, 172, 276, 414 |
+| Flame Spread Index | number | Surface burning flame spread rating per ASTM E84 / UL 723 | 0, 5, 15, 25 |
+| Smoke Developed Index | number | Smoke developed rating per ASTM E84 / UL 723 | 0, 5, 25, 50, 450 |
+| Fire Classification | text | Fire performance class per applicable standard | Class A, Class B, Euroclass A1, Euroclass A2-s1 d0 |
+| Sound Transmission Class | number | STC rating for sound blocking through partitions | 35, 43, 45, 52 |
+| Noise Reduction Coefficient | number | NRC rating for sound absorption (0 to 1) | 0.75, 0.85, 0.95, 1.05 |
+| Water Absorption | text | Moisture uptake characteristic or percentage | Less than 0.3%, Negligible, Less than 1% by volume |
+| Application | text (list) | Primary intended uses for the product | Wall Cavity, Ceiling, Attic, Floor, Basement, Exterior Sheathing, Pipe Wrap, Duct Wrap |
+| Applicable Standard | text (list) | Industry or test standards the product meets | ASTM C665, ASTM C726, ASTM C1289, EN 13162, EN 13164, EN 13165 |
+| Certification | text (list) | Product and sustainability certifications | UL, GREENGUARD Gold, Energy Star, EPD, FSC |
+| Temperature Rating | text | Maximum service temperature range | -40 to 80C, -40 to 150C, Up to 1177C |
+| Pack Quantity | number | Number of pieces, boards, or batts per package | 4, 6, 8, 12, 16 |
+| Country of Origin | text | Country where the product was manufactured | USA, Canada, Denmark, Germany, Poland |
+| Water Vapour Permeance | number (ng/Pa.s.m2) | Vapour permeability of the product | 3.4, 57, 170, 860 |
+
+## Changelog
+
+| Date | Change | Sources |
+|------|--------|---------|
+| 2026-03-15 | Initial schema — 30 attributes from 4 companies plus industry standards (ASTM C665, ASTM E84, EN 13162) | [Insulation4US](https://insulation4us.com/collections/mineral-wool), [Owens Corning](https://www.owenscorning.com/en-us/insulation/residential), [Johns Manville](https://www.jm.com/en/building-insulation/residential/fiberglass/), [Rockwool](https://www.buildsite.com/pdf/rockwool/ROCKWOOL-AFB-evo-Insulation-Batts-Guide-Specifications-2112204.pdf) |

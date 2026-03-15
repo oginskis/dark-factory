@@ -37,3 +37,4 @@
 | Company | Slug | Date | Notes |
 |---------|------|------|-------|
 | Topwood Timber | topwoodtimber | 2026-03-15 | Kadence theme, list-wrapped offers with priceSpecification, ~120 products |
+| Electric Vehicle Equipment | electricvehicleequipment | 2026-03-15 | Standard WooCommerce, JSON-LD with @graph wrapper, AggregateOffer for variable products, 5 products |

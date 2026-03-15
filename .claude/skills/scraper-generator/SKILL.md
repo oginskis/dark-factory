@@ -44,13 +44,15 @@ Read and follow the agent instructions in `agents/scraper-generator.md`.
 
 - Provide the file paths from the table above when the agent references logical resources (e.g., "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the platform knowledgebase").
 - When the agent reaches an escalation point, present it using the standard escalation format (see orchestrator) and **wait for the user's response** before continuing. User options per escalation:
-  - `missing_catalog_assessment` — 1) Run `/catalog-detector {slug}` first, then retry
+  - `missing_catalog_assessment` — 1) Run `/catalog-detector {slug}` first, then retry, 2) Stop
   - `no_sku_schema` (taxonomy issue, only escalates when subcategory is missing from taxonomy) — 1) Add the missing subcategory to `docs/product-taxonomy/categories.md` and retry, 2) Stop
   - `probe_extraction_failed` — 1) Provide guidance on how to extract from this site, 2) Stop
   - `scraper_test_failed` — 1) Provide debugging guidance or site-specific hints, 2) Stop
 - The `no_sku_schema` decision has an autonomous resolution path: when the subcategory exists in the taxonomy but the SKU schema file hasn't been created yet, automatically invoke `/product-taxonomy` for that subcategory to generate the schema, then continue without user interaction. Only escalate if the subcategory itself is missing from the taxonomy entirely.
 - Run the scraper using `uv run` (not `uv run python`) for the full verification test as directed by the agent in Step 5. The PEP 723 inline metadata in the script declares its own dependencies, so `uv` resolves them automatically.
-- Web fetch is used during the probe phase (Step 4) to test extraction patterns against live product pages. No web search or Playwright browser tools are needed.
+- **Test timeout enforcement:** Run the `--limit 20` test with a **2-minute timeout** (use `timeout 120` or the Bash tool's timeout parameter set to 120000ms). Redirect stderr to a debug log for post-mortem analysis: `uv run docs/scraper-generator/{slug}/scraper.py --limit 20 2>docs/scraper-generator/{slug}/output/debug.log`. If the process exceeds 2 minutes, kill it immediately, then read `docs/scraper-generator/{slug}/output/debug.log` to diagnose the failure, fix the scraper, and retry. A `--limit 20` test that exceeds 2 minutes is always broken — do not wait for it to finish naturally.
+- **Probe execution:** Run probes using `uv run docs/scraper-generator/{slug}/scraper.py --probe <URL>`. The scraper fetches the page internally, runs the real extraction code, and prints the result as formatted JSON to stdout. Examine the output to verify extraction quality — no web fetch tools are needed for probing.
+- No web search or Playwright browser tools are needed.
 - The knowledgebase write (Step 6) uses file write/edit tools to create or append to the platform knowledgebase file.
 
 ## Data persistence

@@ -57,7 +57,7 @@ Choose based on the scraping strategy from the catalog assessment:
 | Strategy | Libraries | When |
 |----------|-----------|------|
 | `static_html` | `httpx` + `selectolax` | Server-rendered HTML, no JavaScript required |
-| `structured_data` | `httpx` | JSON-LD, public API endpoints, product feeds |
+| `structured_data` | `httpx` (+ `selectolax` if HTML parsing needed alongside JSON/API) | JSON-LD, public API endpoints, product feeds. Add `selectolax` when the scraper also parses HTML for specs, breadcrumbs, or embedded script data not available in the structured source. |
 | `pdf_pricelist` | `pdfplumber` | PDF price lists or catalogs |
 
 ### Required Behavior
@@ -124,9 +124,45 @@ The generated scraper must:
    - Respect rate limits — include reasonable delays between requests (1-2 seconds default)
    - Set request timeouts (30 seconds default)
 
-9. **Include a `main()` entry point** that accepts an optional `--limit N` argument via `argparse`. When provided, the scraper stops after extracting N products total. `--limit` must be a positive integer — argparse rejects zero or negative values. Scraping configuration (target URL, request headers, delays) is embedded in the script. The output destination is provided by the harness.
+9. **Include a `main()` entry point** that accepts an optional `--limit N` argument via `argparse`. When provided, the scraper stops after extracting N products total. `--limit` must be a positive integer — argparse rejects zero or negative values. Use a custom `argparse` type function (e.g., `positive_int`) that raises `ArgumentTypeError` for values `<= 0`, rather than post-hoc `if` checks. Scraping configuration (target URL, request headers, delays) is embedded in the script. The output destination is provided by the harness. Always use `with httpx.Client(...) as client:` as a context manager — never manual `create_client()` / `client.close()` pairs, which leak connections on exceptions.
 
    When `--limit` is used, the scraper traverses categories normally and stops when the cumulative product count reaches N. The `limited` field in the teardown summary is `true` only when the limit was the binding constraint: `limited = (total_products >= limit)`. If the catalog is smaller than the limit, `limited` is `false`.
+
+10. **Include a `--probe URL` argument** that accepts a single product-page URL, runs the extraction logic against it, and prints the result as formatted JSON to stdout. If extraction succeeds, the output is the full product record. If extraction fails, the output is a JSON object with `"error"` and `"details"` fields describing the failure. `--probe` skips the persist hooks entirely (no `setup`/`persist`/`teardown` calls) and exits immediately after the single extraction. `--probe` and `--limit` are mutually exclusive — argparse enforces this.
+
+### Product Discovery Strategy
+
+The scraper must find every product in the catalog, not just the ones visible on the first page of the most obvious categories. The catalog assessment provides primary navigation paths, but the scraper should be robust against incomplete navigation — especially on custom or unknown platforms where catalog structure may be irregular.
+
+**Discovery sources — use multiple when available:**
+
+1. **Sitemap-based discovery.** When the catalog assessment identifies a product sitemap, parse it for all product URLs. Sitemaps are the most comprehensive source — they often include products not reachable through category navigation (uncategorized items, recently added products, items in hidden or seasonal categories). Extract all `<loc>` entries matching the site's product URL pattern.
+
+2. **JSON API endpoints.** Known platforms expose bulk product APIs (e.g., Shopify's `/products.json`). Custom sites may have internal APIs discovered during catalog detection. When available, these return complete product data without page-by-page crawling — use them as the primary source.
+
+3. **Category tree traversal.** Walk every leaf category from the catalog assessment's category structure. Follow nested subcategories to their deepest level — do not stop at parent categories that also have child categories. A parent category page may show aggregated products, but child categories often contain additional products not visible on the parent. Exhaust pagination within each leaf category.
+
+4. **"All products" or "shop" pages.** Some sites have a single collection page listing every product (with pagination). When this exists and the site is small enough, prefer it over category-by-category traversal — it guarantees no products are missed due to navigation gaps.
+
+**Deduplication.** Products may appear in multiple categories or across different discovery sources. The scraper must never emit the same product twice. Deduplicate by product URL or SKU — maintain a set of seen identifiers and skip duplicates. When the same product appears in multiple categories, use the first occurrence's `category_path`.
+
+**Discovery validation.** After the discovery phase completes (before or during extraction), track the total number of unique product URLs found. Compare against the catalog assessment's estimated product count:
+
+- If discovered count is **less than 50%** of the estimate, log a warning — the discovery logic may be missing categories, failing to follow pagination, or using selectors that don't match the site.
+- If discovered count is **more than 5x** the estimate, log a warning — the discovery logic may be following non-product links (blog posts, documentation pages, category index pages).
+
+Neither case is an automatic stop — the scraper continues — but the warning provides a diagnostic signal during testing.
+
+**Custom and unknown platform guidance.** When the platform is `custom` or `unknown`, the scraper cannot rely on platform-specific CSS classes, API conventions, or URL patterns. Apply these defensive measures:
+
+| Concern | Approach |
+|---------|----------|
+| **Link discovery** | Look for product links using the URL pattern from the catalog assessment (e.g., any `<a>` whose `href` matches `/product/`, `/item/`, `/p/`). Do not depend on a specific CSS class like `.product-card` — custom sites use arbitrary class names. |
+| **Navigation depth** | Follow every link in the navigation tree without assuming a fixed depth. Custom sites may nest categories 4–5 levels deep, or use flat structures with hundreds of categories at one level. |
+| **Pagination variants** | Check for all common pagination mechanisms: numbered page links, "next" links, "load more" buttons (which may correspond to an AJAX endpoint discoverable in the HTML), offset/cursor parameters, and "showing X of Y" counters that reveal additional pages. |
+| **Sitemap as ground truth** | When both a sitemap and category navigation are available, use the sitemap as the authoritative product URL list. Use category navigation only to build `category_path` values. This prevents missing products that exist in the sitemap but are unreachable through navigation (common on custom sites with inconsistent internal linking). |
+| **Empty category detection** | Log the number of products found per category. A category yielding 0 products may indicate a selector mismatch rather than an empty category — verify by checking whether the page contains product-like content before concluding it is empty. |
+| **Cross-source reconciliation** | When multiple discovery sources are used (sitemap + navigation + API), log the count from each source separately. Large discrepancies (e.g., sitemap has 200 URLs but navigation yields 50) indicate the scraper is not reaching all products through one of the sources. |
 
 ### What NOT to Include
 
@@ -188,7 +224,7 @@ Select probe pages from **at least 3 different top-level categories** in the cat
 
 ### Extraction validation
 
-For each probe page, fetch it using web fetch capabilities (not by running the scraper script) and apply the extraction logic from the generated scraper: check whether the CSS selectors match, whether JSON-LD parses correctly, whether universal attributes (sku, name, url, price, currency) can be extracted, and whether category-specific attributes are found.
+For each probe page, run the scraper's `--probe` mode with that URL. Examine the JSON output to verify: universal attributes (sku, name, url, price, currency) are populated, category-specific attributes are present in the `attributes` object, and no extraction errors are reported. This executes the real extraction code path — do not manually simulate selectors or JSON parsing.
 
 If extraction would fail for a given page:
 1. Identify the specific issue (wrong selector, unexpected JSON-LD structure, missing field)
@@ -206,11 +242,36 @@ Once the probe passes for all sampled pages (across all probed categories), proc
 
 Run the scraper with `--limit 20` and verify it works end-to-end. The probe (Step 4) already validated extraction logic, so failures at this stage are structural — pagination, batching, rate limiting, or persist hook issues.
 
+### Test timeout
+
+The test run has a **hard time limit of 2 minutes**. A `--limit 20` scraper that takes longer than 2 minutes is broken — it is either failing silently on every product, stuck in a retry loop, or crawling categories without extracting data. If the test process exceeds 2 minutes:
+
+1. **Kill the process immediately** — do not wait for it to finish.
+2. **Read the scraper's stderr output** (the JSON log lines) to diagnose the failure. Common patterns:
+   - Repeated "Failed to parse" warnings with 0 products extracted → extraction logic is broken (regex, selector, or JSON path does not match the live site)
+   - Repeated HTTP errors or retries → authentication, rate limiting, or network issue
+   - Processing many categories with 0 products → the scraper discovers products but fails to extract every one
+
+   Additional failure patterns:
+
+   | Symptom | Likely cause | Fix |
+   |---------|-------------|-----|
+   | HTTP 429 responses in retry logs | Rate limiting — requests too frequent | Increase `REQUEST_DELAY`, add random jitter |
+   | 200 responses but empty or minimal HTML body | Geo-blocking or bot detection | Add realistic headers (Accept, Accept-Language), rotate User-Agent |
+   | Redirect chains to different domain or language | Localized site redirect | Pin URL scheme, set Accept-Language, handle redirects manually |
+   | Garbled product names or `json.dumps` failures | Encoding mismatch — non-UTF-8 content | Detect encoding from Content-Type or HTML meta, decode explicitly |
+
+3. **Fix the root cause** in the scraper code, then re-run the test. This counts as the first attempt — one more retry is allowed before escalating.
+
+Do not assume the scraper is "just slow." A correctly working `--limit 20` test should complete in under 90 seconds for most sites. If it consistently exceeds 2 minutes after a fix attempt, escalate — see the `scraper_test_failed` decision.
+
+### Test verification
+
 The test must verify:
 
 1. **Scraper completes without crashing** — no unhandled exceptions
 2. **Summary is valid** — `total_products` is between 1 and 20, `errors_count` is 0
-3. **Product records are correct** — at least some records have all 6 universal attributes populated (sku, name, url, price, currency, scraped_at) and at least some category-specific attributes in the `attributes` object
+3. **Product records are correct** — at least some records have the core universal attributes populated (sku, name, url, scraped_at). Price and currency should be populated when the catalog displays prices — when the catalog assessment notes that prices are unavailable (e.g., international sites without pricing), null values are acceptable. At least some records should have category-specific attributes in the `attributes` object.
 4. **Persist hook worked** — the harness received batches and the output destination has product data
 5. **Category diversity** — the extracted products span at least 2 distinct `category_path` top-level values. The probe (Step 4) validates extraction logic across at least 3 categories; this gate verifies that the scraper traverses multiple categories in a real run with pagination and batching. If all 20 products come from a single category, the test coverage is insufficient. If the catalog has only one category, this check passes automatically.
 
@@ -289,8 +350,9 @@ Before presenting results, verify the scraper and config against these quality g
 | 9 | **Persist hook present** | setup/persist/teardown functions exist, persist is called after each batch of up to 100 records, teardown is always called |
 | 10 | **Platform knowledgebase updated** | Platform knowledgebase was written or updated after a successful test (when platform is an enumerated value — not `unknown` or `custom`) |
 | 11 | **Category diversity in test** | Dry-run test produced products from at least 2 distinct top-level categories (or the catalog has only one category) |
+| 12 | **Product discovery strategy is robust** | Scraper uses the most comprehensive discovery source available (sitemap, JSON API, or exhaustive category traversal). For `custom`/`unknown` platforms, scraper uses URL-pattern-based link discovery rather than platform-specific CSS selectors. Deduplication by URL or SKU is present. |
 
-If all 11 pass, the scraper is complete.
+If all 12 pass, the scraper is complete.
 
 ---
 
