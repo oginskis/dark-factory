@@ -184,7 +184,6 @@ def collect_attributes(
     Returns ``(core_found, extended_found, extra_found)`` where each is the
     set of attribute names that appear at least once in the output.
 
-    Handles both v1 (flat ``attributes``) and v2 (three-bucket) formats.
     """
     core_found: set[str] = set()
     extended_found: set[str] = set()
@@ -204,24 +203,11 @@ def collect_attributes(
         except json.JSONDecodeError:
             continue
 
-        fmt = record.get("_format")
-        if fmt == 2:
-            # v2 three-bucket format
-            for key in record.get("core_attributes", {}):
-                core_found.add(key)
-            for key in record.get("extended_attributes", {}):
-                extended_found.add(key)
-            for key in record.get("extra_attributes", {}):
-                extra_found.add(key)
-        else:
-            # v1 flat attributes — classify by schema membership
-            attrs = record.get("attributes", {})
-            if not isinstance(attrs, dict):
-                continue
-            for key in attrs:
-                if key in core_schema_attrs:
-                    core_found.add(key)
-                elif key in extended_schema_attrs:
+        for key in record.get("core_attributes", {}):
+            core_found.add(key)
+        for key in record.get("extended_attributes", {}):
+            extended_found.add(key)
+        for key in record.get("extra_attributes", {}):
                     extended_found.add(key)
                 else:
                     extra_found.add(key)

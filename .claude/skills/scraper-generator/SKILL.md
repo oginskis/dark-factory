@@ -3,7 +3,7 @@ name: scraper-generator
 description: >
   Generate a production-ready Python scraper for a company's product catalog.
   Produces a standalone scraper.py, config.json, and test output.
-  Scrapers output the three-bucket product record format (_format: 2) with core_attributes, extended_attributes, and extra_attributes.
+  Scrapers output the three-bucket product record format with core_attributes, extended_attributes, and extra_attributes.
   Use this skill when the user wants to create a scraper for a company that already has a catalog assessment —
   "generate scraper for X", "create scraper for X", "build a scraper for X products", "scrape X's catalog".
   Requires both a company report from /product-classifier and a catalog assessment from /catalog-detector to exist first.
@@ -62,12 +62,12 @@ Read and follow the agent instructions in `agents/scraper-generator.md`.
 
 ### Product record format
 
-Scrapers output the **three-bucket format** (`_format: 2`):
-- **Top-level fields:** `_format`, `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`, `category_path`
+Scrapers output the **three-bucket format**:
+- **Top-level fields:** `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`, `category_path`
 - `brand` is a top-level field (not inside any attribute bucket)
 - `product_category` is the taxonomy ID (e.g., `machinery.power_tools`)
-- **`core_attributes`** — attributes matching core names in the SKU schema
-- **`extended_attributes`** — attributes matching extended names in the SKU schema
+- **`core_attributes`** — attributes matching the Key column in the SKU schema's Core Attributes table
+- **`extended_attributes`** — attributes matching the Key column in the SKU schema's Extended Attributes table
 - **`extra_attributes`** — everything else (snake_case keys, primitive values only)
 
 The `config.json` includes:

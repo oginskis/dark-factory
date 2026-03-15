@@ -77,7 +77,7 @@ This stage examines the company's website for a public product catalog, analyzes
 
 Read file locations from `.claude/skills/scraper-generator/SKILL.md`, then read and follow `agents/scraper-generator.md` in full.
 
-This stage generates a standalone Python scraper based on the catalog assessment, SKU schema, and platform knowledgebase (if available). Scrapers output the three-bucket product record format (`_format: 2`). For multi-subcategory companies, the scraper classifies products by URL-prefix to taxonomy ID mapping at runtime. It validates the scraper via probe testing and a full test before finalizing.
+This stage generates a standalone Python scraper based on the catalog assessment, SKU schema, and platform knowledgebase (if available). Scrapers output the three-bucket product record format. For multi-subcategory companies, the scraper classifies products by URL-prefix to taxonomy ID mapping at runtime. It validates the scraper via probe testing and a full test before finalizing.
 
 **Stop the pipeline if:**
 - No catalog assessment exists for the company (defensive — Stage 2 ensures this)
@@ -124,7 +124,7 @@ When all four stages complete successfully, present a structured summary to the 
   - {URL 2}
 
 ### Scraper
-- **Output format:** `_format: 2` (three-bucket: `core_attributes`, `extended_attributes`, `extra_attributes`)
+- **Output format:** three-bucket (`core_attributes`, `extended_attributes`, `extra_attributes`)
 - **Test result:** {passed / failed} ({N} products extracted, {errors} errors, {duration}s)
 - **SKU schema:** {subcategory-slug}
 - **Category-specific attributes extracted:** {comma-separated list of attribute names found in test products}

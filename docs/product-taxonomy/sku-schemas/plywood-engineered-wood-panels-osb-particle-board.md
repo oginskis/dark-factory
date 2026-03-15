@@ -7,38 +7,38 @@
 
 ## Core Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| SKU | text | Manufacturer or retailer product identifier | RIG-PLY-18-BB, WISA-BIRCH-12, OSB3-1220 |
-| Product Name | text | Full product name including brand and variant | Riga Ply, WISA-Birch BB/BB, Edge Gold Enhanced Floor Panel |
-| URL | text | Direct link to the product page or listing | https://example.com/products/riga-ply/ |
-| Price | number | Numeric price value per panel or per unit, no currency symbol | 45.99, 128.50 |
-| Currency | text | ISO 4217 currency code | EUR, USD, GBP |
-| Panel Type | enum | Type of engineered wood panel | Plywood, OSB, MDF, Particle board, LVL, HDF |
-| Surface Grade Front | text | Quality grade of the front (face) veneer per EN 635 or equivalent | S (II), BB (III), B, A, WGE, CP |
-| Surface Grade Back | text | Quality grade of the back veneer per EN 635 or equivalent | BB (III), WG (IV), C, CP, WGE |
-| Glue Type | enum | Adhesive bonding classification indicating moisture and weather resistance | WBP (weather and boil proof), MR (moisture resistant), Interior, Phenol-formaldehyde, Melamine |
-| Structural Class | text | Structural use classification per EN 636 for plywood or EN 300 for OSB | EN 636-2S, EN 636-3S, OSB/2, OSB/3, OSB/4 |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| SKU | sku | text | Manufacturer or retailer product identifier | RIG-PLY-18-BB, WISA-BIRCH-12, OSB3-1220 |
+| Product Name | product_name | text | Full product name including brand and variant | Riga Ply, WISA-Birch BB/BB, Edge Gold Enhanced Floor Panel |
+| URL | url | text | Direct link to the product page or listing | https://example.com/products/riga-ply/ |
+| Price | price | number | Numeric price value per panel or per unit, no currency symbol | 45.99, 128.50 |
+| Currency | currency | text | ISO 4217 currency code | EUR, USD, GBP |
+| Panel Type | panel_type | enum | Type of engineered wood panel | Plywood, OSB, MDF, Particle board, LVL, HDF |
+| Surface Grade Front | surface_grade_front | text | Quality grade of the front (face) veneer per EN 635 or equivalent | S (II), BB (III), B, A, WGE, CP |
+| Surface Grade Back | surface_grade_back | text | Quality grade of the back veneer per EN 635 or equivalent | BB (III), WG (IV), C, CP, WGE |
+| Glue Type | glue_type | enum | Adhesive bonding classification indicating moisture and weather resistance | WBP (weather and boil proof), MR (moisture resistant), Interior, Phenol-formaldehyde, Melamine |
+| Structural Class | structural_class | text | Structural use classification per EN 636 for plywood or EN 300 for OSB | EN 636-2S, EN 636-3S, OSB/2, OSB/3, OSB/4 |
 
 ## Extended Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| Formaldehyde Emission Class | text | Formaldehyde emission rating per applicable standard | E1, E0, CARB Phase 2, F4-star |
-| Moisture Resistance Class | text | Bond quality class per EN 314-2 indicating service conditions | Class 1 (dry), Class 2 (humid), Class 3 (exterior) |
-| Fire Reaction Class | text | Reaction to fire classification per EN 13501-1 | D-s2 d0, B-s1 d0, C-s2 d0 |
-| Country of Origin | text | Country where the panel was manufactured | Latvia, Finland, Estonia, Germany, Canada, USA |
-| Manufacturer | text | Company that manufactures the panel | Latvijas Finieris, UPM-Kymmene, Weyerhaeuser |
-| Wood Species | text | Primary wood species used in the panel | Birch, Spruce, Pine, Fir, Poplar, Mixed hardwood |
-| Thickness | number (mm) | Nominal panel thickness in millimeters | 6.5, 12, 18, 21, 27 |
-| Width | number (mm) | Panel width in millimeters | 1220, 1250, 1500, 1525, 2440 |
-| Number of Plies | number | Number of veneer layers in the panel, applicable to plywood and LVL | 3, 5, 7, 9, 13, 15 |
-| Density | number (kg/m3) | Panel density in kilograms per cubic meter | 460, 630, 680, 750 |
-| Surface Treatment | enum | Type of surface coating or overlay applied to the panel | Uncoated, Film-faced, Textured overlay, HPL, Lacquered, Painted, Melamine, Primed |
-| Overlay Pattern | text | Pattern or texture of the surface overlay, if applicable | Hexagonal, Diamond, Wire mesh, Smooth, Rhomb, Dot |
-| Overlay Color | text | Color of the surface overlay or film | Dark brown, Light brown, Black, Green, Silver grey, Natural birch |
-| Bending Strength | number (N/mm2) | Characteristic bending strength parallel to face grain per EN 310 | 30, 40, 55, 70 |
-| Modulus of Elasticity | number (N/mm2) | Modulus of elasticity in bending parallel to face grain per EN 310 | 5000, 7000, 10000, 12000 |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| Formaldehyde Emission Class | formaldehyde_emission_class | text | Formaldehyde emission rating per applicable standard | E1, E0, CARB Phase 2, F4-star |
+| Moisture Resistance Class | moisture_resistance_class | text | Bond quality class per EN 314-2 indicating service conditions | Class 1 (dry), Class 2 (humid), Class 3 (exterior) |
+| Fire Reaction Class | fire_reaction_class | text | Reaction to fire classification per EN 13501-1 | D-s2 d0, B-s1 d0, C-s2 d0 |
+| Country of Origin | country_of_origin | text | Country where the panel was manufactured | Latvia, Finland, Estonia, Germany, Canada, USA |
+| Manufacturer | manufacturer | text | Company that manufactures the panel | Latvijas Finieris, UPM-Kymmene, Weyerhaeuser |
+| Wood Species | wood_species | text | Primary wood species used in the panel | Birch, Spruce, Pine, Fir, Poplar, Mixed hardwood |
+| Thickness | thickness | number (mm) | Nominal panel thickness in millimeters | 6.5, 12, 18, 21, 27 |
+| Width | width | number (mm) | Panel width in millimeters | 1220, 1250, 1500, 1525, 2440 |
+| Number of Plies | number_of_plies | number | Number of veneer layers in the panel, applicable to plywood and LVL | 3, 5, 7, 9, 13, 15 |
+| Density | density | number (kg/m3) | Panel density in kilograms per cubic meter | 460, 630, 680, 750 |
+| Surface Treatment | surface_treatment | enum | Type of surface coating or overlay applied to the panel | Uncoated, Film-faced, Textured overlay, HPL, Lacquered, Painted, Melamine, Primed |
+| Overlay Pattern | overlay_pattern | text | Pattern or texture of the surface overlay, if applicable | Hexagonal, Diamond, Wire mesh, Smooth, Rhomb, Dot |
+| Overlay Color | overlay_color | text | Color of the surface overlay or film | Dark brown, Light brown, Black, Green, Silver grey, Natural birch |
+| Bending Strength | bending_strength | number (N/mm2) | Characteristic bending strength parallel to face grain per EN 310 | 30, 40, 55, 70 |
+| Modulus of Elasticity | modulus_of_elasticity | number (N/mm2) | Modulus of elasticity in bending parallel to face grain per EN 310 | 5000, 7000, 10000, 12000 |
 
 ## Changelog
 

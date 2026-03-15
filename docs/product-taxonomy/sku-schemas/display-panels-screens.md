@@ -7,38 +7,38 @@
 
 ## Core Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| SKU | text | Retailer or manufacturer product identifier | 27GP850-B, LS32BG852NNXGO, PA278QV, C4422QN |
-| Product Name | text | Full product name including brand, size, resolution, and key feature | LG 27GP850-B 27-inch QHD Nano IPS Gaming Monitor, Samsung Odyssey Neo G8 32-inch 4K Curved Monitor |
-| URL | text | Direct link to the product page | https://example.com/product/lg-27gp850-b |
-| Price | number | Numeric unit price excluding currency symbol | 179.99, 599.00, 1299.95, 4999.00 |
-| Currency | text | ISO 4217 currency code | USD, EUR, GBP, JPY, KRW |
-| Product Type | enum | Primary display category | Computer Monitor, Gaming Monitor, Professional Monitor, Digital Signage Display, Video Wall Panel, Touch Display, Portable Monitor |
-| Model Number | text | Manufacturer model or part number | 27GP850-B, U2723QE, PA278QV, C4422QN |
-| Panel Type | enum | Display panel technology | IPS, VA, TN, OLED, QD-OLED, Mini LED, Nano IPS, Fast IPS |
-| Country of Origin | text | Country where the display was manufactured | China, South Korea, Taiwan, Mexico |
-| Screen Size | number (inches) | Viewable screen diagonal measurement | 15.6, 24, 27, 32, 34, 43, 49, 55, 65, 86 |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| SKU | sku | text | Retailer or manufacturer product identifier | 27GP850-B, LS32BG852NNXGO, PA278QV, C4422QN |
+| Product Name | product_name | text | Full product name including brand, size, resolution, and key feature | LG 27GP850-B 27-inch QHD Nano IPS Gaming Monitor, Samsung Odyssey Neo G8 32-inch 4K Curved Monitor |
+| URL | url | text | Direct link to the product page | https://example.com/product/lg-27gp850-b |
+| Price | price | number | Numeric unit price excluding currency symbol | 179.99, 599.00, 1299.95, 4999.00 |
+| Currency | currency | text | ISO 4217 currency code | USD, EUR, GBP, JPY, KRW |
+| Product Type | product_type | enum | Primary display category | Computer Monitor, Gaming Monitor, Professional Monitor, Digital Signage Display, Video Wall Panel, Touch Display, Portable Monitor |
+| Model Number | model_number | text | Manufacturer model or part number | 27GP850-B, U2723QE, PA278QV, C4422QN |
+| Panel Type | panel_type | enum | Display panel technology | IPS, VA, TN, OLED, QD-OLED, Mini LED, Nano IPS, Fast IPS |
+| Country of Origin | country_of_origin | text | Country where the display was manufactured | China, South Korea, Taiwan, Mexico |
+| Screen Size | screen_size | number (inches) | Viewable screen diagonal measurement | 15.6, 24, 27, 32, 34, 43, 49, 55, 65, 86 |
 
 ## Extended Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| Native Resolution | text | Pixel resolution at native setting | 1920x1080, 2560x1440, 3440x1440, 3840x2160, 5120x2880 |
-| Resolution Label | enum | Common marketing name for the resolution | Full HD, QHD, WQHD, UHD 4K, 5K, 8K |
-| Refresh Rate | number (Hz) | Maximum panel refresh rate | 60, 75, 100, 144, 165, 240, 360, 480 |
-| Response Time | number (ms) | Pixel response time (grey-to-grey or MPRT) | 0.03, 0.5, 1, 4, 5, 8 |
-| Adaptive Sync | text | Variable refresh rate technology supported | NVIDIA G-Sync, G-Sync Compatible, AMD FreeSync, FreeSync Premium, FreeSync Premium Pro, None |
-| Aspect Ratio | text | Display width to height ratio | 16:9, 16:10, 21:9, 32:9, 32:10 |
-| Curvature | text | Screen curvature radius (Flat if not curved) | Flat, 1000R, 1500R, 1800R, 3800R |
-| Brightness | number (nits) | Typical sustained brightness | 250, 350, 400, 600, 1000, 2000 |
-| Peak Brightness | number (nits) | Maximum HDR peak brightness | 400, 600, 1000, 1400, 2000 |
-| Contrast Ratio | text | Static or dynamic contrast ratio | 1000:1, 3000:1, 5000:1, 1000000:1 |
-| HDR Support | text | Highest HDR certification or standard supported | HDR10, HDR400, HDR600, HDR1000, HDR1400, Dolby Vision, None |
-| Color Gamut sRGB | number (%) | Percentage of sRGB color space coverage | 95, 99, 100, 135 |
-| Color Gamut DCI-P3 | number (%) | Percentage of DCI-P3 color space coverage | 85, 95, 98, 99 |
-| Color Depth | text | Number of displayable colors or bit depth | 16.7 Million (8-bit), 1.07 Billion (10-bit) |
-| Video Inputs | text (list) | Available video input ports and versions | DisplayPort 1.4, DisplayPort 2.1, HDMI 2.0, HDMI 2.1, USB-C (DP Alt), DVI-D, VGA |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| Native Resolution | native_resolution | text | Pixel resolution at native setting | 1920x1080, 2560x1440, 3440x1440, 3840x2160, 5120x2880 |
+| Resolution Label | resolution_label | enum | Common marketing name for the resolution | Full HD, QHD, WQHD, UHD 4K, 5K, 8K |
+| Refresh Rate | refresh_rate | number (Hz) | Maximum panel refresh rate | 60, 75, 100, 144, 165, 240, 360, 480 |
+| Response Time | response_time | number (ms) | Pixel response time (grey-to-grey or MPRT) | 0.03, 0.5, 1, 4, 5, 8 |
+| Adaptive Sync | adaptive_sync | text | Variable refresh rate technology supported | NVIDIA G-Sync, G-Sync Compatible, AMD FreeSync, FreeSync Premium, FreeSync Premium Pro, None |
+| Aspect Ratio | aspect_ratio | text | Display width to height ratio | 16:9, 16:10, 21:9, 32:9, 32:10 |
+| Curvature | curvature | text | Screen curvature radius (Flat if not curved) | Flat, 1000R, 1500R, 1800R, 3800R |
+| Brightness | brightness | number (nits) | Typical sustained brightness | 250, 350, 400, 600, 1000, 2000 |
+| Peak Brightness | peak_brightness | number (nits) | Maximum HDR peak brightness | 400, 600, 1000, 1400, 2000 |
+| Contrast Ratio | contrast_ratio | text | Static or dynamic contrast ratio | 1000:1, 3000:1, 5000:1, 1000000:1 |
+| HDR Support | hdr_support | text | Highest HDR certification or standard supported | HDR10, HDR400, HDR600, HDR1000, HDR1400, Dolby Vision, None |
+| Color Gamut sRGB | color_gamut_srgb | number (%) | Percentage of sRGB color space coverage | 95, 99, 100, 135 |
+| Color Gamut DCI-P3 | color_gamut_dci-p3 | number (%) | Percentage of DCI-P3 color space coverage | 85, 95, 98, 99 |
+| Color Depth | color_depth | text | Number of displayable colors or bit depth | 16.7 Million (8-bit), 1.07 Billion (10-bit) |
+| Video Inputs | video_inputs | text (list) | Available video input ports and versions | DisplayPort 1.4, DisplayPort 2.1, HDMI 2.0, HDMI 2.1, USB-C (DP Alt), DVI-D, VGA |
 
 ## Changelog
 

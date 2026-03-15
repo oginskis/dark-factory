@@ -121,15 +121,15 @@ Use this as a calibration guide:
 
 ### Mandatory attributes
 
-Every schema must include these 5 attributes as the first rows of the **Core Attributes** table. They appear in every schema regardless of category. Descriptions and example values should be tailored to the category, but the attribute names and data types are fixed.
+Every schema must include these 5 attributes as the first rows of the **Core Attributes** table. They appear in every schema regardless of category. Descriptions and example values should be tailored to the category, but the attribute names, keys, and data types are fixed.
 
-| Attribute | Data Type | Why mandatory |
-|-----------|-----------|---------------|
-| SKU | text | Every product needs a unique identifier |
-| Product Name | text | Every product needs a human-readable name |
-| URL | text | Link to the product page or listing |
-| Price | number | Numeric price value, no currency symbol |
-| Currency | text | ISO 4217 currency code, always separate from Price |
+| Attribute | Key | Data Type | Why mandatory |
+|-----------|-----|-----------|---------------|
+| SKU | sku | text | Every product needs a unique identifier |
+| Product Name | product_name | text | Every product needs a human-readable name |
+| URL | url | text | Link to the product page or listing |
+| Price | price | number | Numeric price value, no currency symbol |
+| Currency | currency | text | ISO 4217 currency code, always separate from Price |
 
 Start the Core Attributes table with these 5, then add category-specific core attributes discovered through research.
 
@@ -154,6 +154,7 @@ Keep compliance and certification attributes **international and universal**. In
 
 **What you cannot change:**
 - **Attribute Name** — renaming breaks downstream references. If the name is wrong, deprecate and create a new one.
+- **Key** — changing a key breaks downstream scrapers and eval configs that reference it. If the key is wrong, deprecate the attribute and create a new one.
 - **Data Type** — changing a type (e.g., text → enum, number → text) breaks downstream parsing. If the type needs to change, deprecate the old attribute and create a new one with the correct type.
 
 **Never delete an attribute.** Downstream systems may depend on it. If an attribute is wrong, redundant, or no longer used, mark it as deprecated:
@@ -185,22 +186,22 @@ Write to `docs/product-taxonomy/sku-schemas/{subcategory-slug}.md` using the **e
 
 ## Core Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| SKU | text | {category-specific description} | {examples} |
-| Product Name | text | {category-specific description} | {examples} |
-| URL | text | {category-specific description} | {examples} |
-| Price | number | {category-specific description} | {examples} |
-| Currency | text | {category-specific description} | {examples} |
-| {core attr} | {type} | {description} | {examples} |
-| ... | ... | ... | ... |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| SKU | sku | text | {category-specific description} | {examples} |
+| Product Name | product_name | text | {category-specific description} | {examples} |
+| URL | url | text | {category-specific description} | {examples} |
+| Price | price | number | {category-specific description} | {examples} |
+| Currency | currency | text | {category-specific description} | {examples} |
+| {core attr} | {key} | {type} | {description} | {examples} |
+| ... | ... | ... | ... | ... |
 
 ## Extended Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| {extended attr} | {type} | {description} | {examples} |
-| ... | ... | ... | ... |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| {extended attr} | {key} | {type} | {description} | {examples} |
+| ... | ... | ... | ... | ... |
 
 ## Changelog
 
@@ -217,7 +218,9 @@ These rules are non-negotiable. Every schema must comply exactly.
 
 | Rule | Correct | Wrong |
 |------|---------|-------|
-| **Table has exactly 4 columns** | `\| Attribute \| Data Type \| Description \| Example Values \|` | `\| # \| Attribute \| Data Type \| ...` (no row-number column) |
+| **Table has exactly 5 columns** | `\| Attribute \| Key \| Data Type \| Description \| Example Values \|` | Missing Key column, extra columns, row-number column |
+| **Key column contains valid snake_case** | `wood_type`, `structural_grade`, `charging_power_kw` | camelCase, display names, empty keys |
+| **Key derivation rule** | Lowercase, spaces to underscores, drop `/ ( ) , &`, collapse consecutive underscores, strip leading/trailing underscores. Example: "GTIN / EAN" becomes `gtin_ean`, "Charging Power (kW)" becomes `charging_power_kw` | Invented keys not derivable from the display name |
 | **No backticks in table cells** | `9x19mm, 5.56x45mm NATO` | `` `9x19mm`, `5.56x45mm NATO` `` |
 | **Only three `##` sections** | `## Core Attributes` then `## Extended Attributes` then `## Changelog` | No `## Notes`, `## Summary`, or other sections |
 | **Example values are comma-separated plain text** | `Red, Blue, Green` | `Red \| Blue \| Green` or bullet lists |
@@ -247,7 +250,8 @@ Before presenting results, re-read the schema file you just wrote and check it a
 | 7 | **No sub-subcategory drilling** | No third-level nesting (e.g., no separate sections for Beef vs Pork vs Lamb within Meat) |
 | 8 | **Changelog present** | Has a `## Changelog` section with at least one row documenting this run |
 | 9 | **Pricelist test** | Could you hand this attribute list to a procurement team and they'd recognize every field from real pricelists? If any attribute would only appear on a deep spec sheet, remove it. |
-| 10 | **Format compliance** | Table has exactly 4 columns (no `#` row-number column), no backticks in any table cell, no markdown formatting in cells (except **DEPRECATED** markers), example values are comma-separated plain text, data types are lowercase |
+| 10 | **Format compliance** | Table has exactly 5 columns (Attribute, Key, Data Type, Description, Example Values), no backticks in any table cell, no markdown formatting in cells (except **DEPRECATED** markers), example values are comma-separated plain text, data types are lowercase |
+| 11 | **Key column correct** | Every Key value matches the conversion rule applied to its Attribute display name (lowercase, spaces→underscores, drop `/()&,`, collapse underscores). Universal keys are: `sku`, `product_name`, `url`, `price`, `currency` |
 
 If all checks pass, proceed to the summary.
 

@@ -7,38 +7,38 @@
 
 ## Core Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| SKU | text | Supplier or distributor product identifier | CITGO-1DS15, MPC-ULSD-2D, VT-HO2-ULS |
-| Product Name | text | Full product name including brand, grade, and sulfur designation | CITGO No. 2 Diesel Ultra-Low Sulfur, Marathon No. 1-D S15 Winter Diesel, Premium Heating Oil No. 2 |
-| URL | text | Direct link to the product data sheet or listing page | https://example.com/fuels/ulsd-no2 |
-| Price | number | Numeric price per gallon or litre at time of listing, excluding currency symbol | 3.49, 3.89, 4.29 |
-| Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Fuel Type | enum | Primary fuel classification | No. 1-D Diesel, No. 2-D Diesel, No. 4-D Diesel, No. 1 Fuel Oil (Kerosene), No. 2 Fuel Oil (Heating Oil), No. 4 Fuel Oil, No. 6 Fuel Oil (Bunker), Biodiesel Blend |
-| ASTM Grade | text | Grade designation per ASTM D975 (diesel) or ASTM D396 (fuel oil) | No. 1-D S15, No. 2-D S500, No. 2-D S5000, No. 2 Oil |
-| Sulfur Classification | enum | Sulfur tier designation | Ultra-Low Sulfur (S15), Low Sulfur (S500), High Sulfur (S5000) |
-| Hazmat Class | text | DOT or UN hazardous materials classification | UN1202 Class 3 Flammable Liquid |
-| Country of Origin | text | Country where the fuel was refined | USA, Canada, UK, Netherlands, Saudi Arabia |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| SKU | sku | text | Supplier or distributor product identifier | CITGO-1DS15, MPC-ULSD-2D, VT-HO2-ULS |
+| Product Name | product_name | text | Full product name including brand, grade, and sulfur designation | CITGO No. 2 Diesel Ultra-Low Sulfur, Marathon No. 1-D S15 Winter Diesel, Premium Heating Oil No. 2 |
+| URL | url | text | Direct link to the product data sheet or listing page | https://example.com/fuels/ulsd-no2 |
+| Price | price | number | Numeric price per gallon or litre at time of listing, excluding currency symbol | 3.49, 3.89, 4.29 |
+| Currency | currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD |
+| Fuel Type | fuel_type | enum | Primary fuel classification | No. 1-D Diesel, No. 2-D Diesel, No. 4-D Diesel, No. 1 Fuel Oil (Kerosene), No. 2 Fuel Oil (Heating Oil), No. 4 Fuel Oil, No. 6 Fuel Oil (Bunker), Biodiesel Blend |
+| ASTM Grade | astm_grade | text | Grade designation per ASTM D975 (diesel) or ASTM D396 (fuel oil) | No. 1-D S15, No. 2-D S500, No. 2-D S5000, No. 2 Oil |
+| Sulfur Classification | sulfur_classification | enum | Sulfur tier designation | Ultra-Low Sulfur (S15), Low Sulfur (S500), High Sulfur (S5000) |
+| Hazmat Class | hazmat_class | text | DOT or UN hazardous materials classification | UN1202 Class 3 Flammable Liquid |
+| Country of Origin | country_of_origin | text | Country where the fuel was refined | USA, Canada, UK, Netherlands, Saudi Arabia |
 
 ## Extended Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| Sulfur Content | number (ppm) | Maximum sulfur content in parts per million | 15, 500, 5000 |
-| Cetane Number | number | Ignition quality rating — higher values mean easier ignition | 40, 45, 48, 55 |
-| Cetane Index | number | Calculated cetane value from density and distillation data | 40, 42, 46 |
-| Flash Point | number (deg C) | Minimum temperature at which fuel vapors will ignite | 38, 52, 55, 66 |
-| Cloud Point | number (deg C) | Temperature at which wax crystals first appear, indicating cold-weather performance | -18, -12, -5, 0 |
-| Pour Point | number (deg C) | Lowest temperature at which the fuel will flow | -30, -21, -12, -6 |
-| Kinematic Viscosity at 40C | text (mm2/s) | Flow resistance measured at 40 degrees C per ASTM D445 | 1.3-2.4, 1.9-4.1, 5.5-24.0 |
-| API Gravity | number | Density measurement on the API gravity scale | 34, 38, 40, 42 |
-| Specific Gravity at 60F | number | Density relative to water at 60 degrees F | 0.820, 0.840, 0.860 |
-| Distillation T90 | number (deg C) | Temperature at which 90 percent of the fuel has evaporated per ASTM D86 | 282, 338, 356 |
-| Energy Content | number (BTU/gal) | Heat energy per gallon | 128000, 132000, 137500, 138700 |
-| Biodiesel Blend Percentage | number (%) | Percentage of biodiesel (FAME) in the blend | 0, 2, 5, 20 |
-| Lubricity (HFRR) | number (micron) | High-Frequency Reciprocating Rig wear scar diameter per ASTM D6079 | 460, 520 |
-| Carbon Residue | number (%) | Residue after evaporation per ASTM D524 | 0.15, 0.35 |
-| Water and Sediment | number (% vol) | Maximum water and sediment content | 0.02, 0.05, 0.50 |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| Sulfur Content | sulfur_content | number (ppm) | Maximum sulfur content in parts per million | 15, 500, 5000 |
+| Cetane Number | cetane_number | number | Ignition quality rating — higher values mean easier ignition | 40, 45, 48, 55 |
+| Cetane Index | cetane_index | number | Calculated cetane value from density and distillation data | 40, 42, 46 |
+| Flash Point | flash_point | number (deg C) | Minimum temperature at which fuel vapors will ignite | 38, 52, 55, 66 |
+| Cloud Point | cloud_point | number (deg C) | Temperature at which wax crystals first appear, indicating cold-weather performance | -18, -12, -5, 0 |
+| Pour Point | pour_point | number (deg C) | Lowest temperature at which the fuel will flow | -30, -21, -12, -6 |
+| Kinematic Viscosity at 40C | kinematic_viscosity_at_40c | text (mm2/s) | Flow resistance measured at 40 degrees C per ASTM D445 | 1.3-2.4, 1.9-4.1, 5.5-24.0 |
+| API Gravity | api_gravity | number | Density measurement on the API gravity scale | 34, 38, 40, 42 |
+| Specific Gravity at 60F | specific_gravity_at_60f | number | Density relative to water at 60 degrees F | 0.820, 0.840, 0.860 |
+| Distillation T90 | distillation_t90 | number (deg C) | Temperature at which 90 percent of the fuel has evaporated per ASTM D86 | 282, 338, 356 |
+| Energy Content | energy_content | number (BTU/gal) | Heat energy per gallon | 128000, 132000, 137500, 138700 |
+| Biodiesel Blend Percentage | biodiesel_blend_percentage | number (%) | Percentage of biodiesel (FAME) in the blend | 0, 2, 5, 20 |
+| Lubricity (HFRR) | lubricity_hfrr | number (micron) | High-Frequency Reciprocating Rig wear scar diameter per ASTM D6079 | 460, 520 |
+| Carbon Residue | carbon_residue | number (%) | Residue after evaporation per ASTM D524 | 0.15, 0.35 |
+| Water and Sediment | water_and_sediment | number (% vol) | Maximum water and sediment content | 0.02, 0.05, 0.50 |
 
 ## Changelog
 

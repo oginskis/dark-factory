@@ -7,38 +7,38 @@
 
 ## Core Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| SKU | text | Retailer or manufacturer product identifier | 35000510853, B003UKM9CO, 324599 |
-| Product Name | text | Full product name including brand, product line, variant, and size | Colgate Cavity Protection Toothpaste 6.0 oz, Oral-B iO Series 9 Rechargeable Electric Toothbrush Black |
-| URL | text | Direct link to the product page | https://www.colgate.com/en-us/products/toothpaste/cc-cavity-protection |
-| Price | number | Numeric unit price excluding currency symbol | 2.49, 7.99, 199.99 |
-| Currency | text | ISO 4217 currency code | USD, EUR, GBP, JPY |
-| Product Type | enum | Primary product classification | Toothpaste, Manual Toothbrush, Electric Toothbrush, Mouthwash, Dental Floss, Whitening Kit, Tongue Cleaner, Interdental Brush, Water Flosser, Replacement Brush Head |
-| Active Ingredients | text (list) | Pharmacologically active ingredients | Sodium Monofluorophosphate, Stannous Fluoride, Sodium Fluoride, Potassium Nitrate, Hydrogen Peroxide |
-| Fluoride Type | text | Chemical form of the fluoride compound | Sodium Fluoride, Stannous Fluoride, Sodium Monofluorophosphate |
-| Inactive Ingredients | text | Full list of inactive ingredients from label | Dicalcium Phosphate Dihydrate, Water, Glycerin, Sodium Lauryl Sulfate, Cellulose Gum |
-| Bristle Material | text | Material the bristles are made from | Nylon, Charcoal-Infused Nylon, Silicone |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| SKU | sku | text | Retailer or manufacturer product identifier | 35000510853, B003UKM9CO, 324599 |
+| Product Name | product_name | text | Full product name including brand, product line, variant, and size | Colgate Cavity Protection Toothpaste 6.0 oz, Oral-B iO Series 9 Rechargeable Electric Toothbrush Black |
+| URL | url | text | Direct link to the product page | https://www.colgate.com/en-us/products/toothpaste/cc-cavity-protection |
+| Price | price | number | Numeric unit price excluding currency symbol | 2.49, 7.99, 199.99 |
+| Currency | currency | text | ISO 4217 currency code | USD, EUR, GBP, JPY |
+| Product Type | product_type | enum | Primary product classification | Toothpaste, Manual Toothbrush, Electric Toothbrush, Mouthwash, Dental Floss, Whitening Kit, Tongue Cleaner, Interdental Brush, Water Flosser, Replacement Brush Head |
+| Active Ingredients | active_ingredients | text (list) | Pharmacologically active ingredients | Sodium Monofluorophosphate, Stannous Fluoride, Sodium Fluoride, Potassium Nitrate, Hydrogen Peroxide |
+| Fluoride Type | fluoride_type | text | Chemical form of the fluoride compound | Sodium Fluoride, Stannous Fluoride, Sodium Monofluorophosphate |
+| Inactive Ingredients | inactive_ingredients | text | Full list of inactive ingredients from label | Dicalcium Phosphate Dihydrate, Water, Glycerin, Sodium Lauryl Sulfate, Cellulose Gum |
+| Bristle Material | bristle_material | text | Material the bristles are made from | Nylon, Charcoal-Infused Nylon, Silicone |
 
 ## Extended Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| Country of Origin | text | Country where the product is manufactured | USA, Germany, China, Ireland, Mexico |
-| Volume | number (ml) | Volume for liquid products such as mouthwash | 250, 473, 500, 1000 |
-| Fluoride Concentration | number (ppm) | Fluoride content in parts per million | 1000, 1100, 1450, 5000 |
-| Flavor | text | Taste or flavor of the product | Mint, Spearmint, Peppermint, Cinnamon, Bubblegum, Unflavored |
-| Product Purpose | text (list) | Specific oral care function the product addresses | Cavity Protection, Whitening, Sensitivity Relief, Gum Health, Tartar Control, Fresh Breath, Enamel Repair |
-| Bristle Stiffness | enum | Firmness of toothbrush bristles | Extra Soft, Soft, Medium, Hard |
-| Power Source | enum | Type of power for electric toothbrushes | Rechargeable, Battery (AA), Battery (AAA), Manual (none) |
-| Battery Life | number (days) | Battery life on a full charge for electric models | 14, 21, 30 |
-| Cleaning Modes | number | Number of cleaning modes for electric toothbrushes | 1, 3, 5, 7 |
-| Cleaning Mode Names | text (list) | Names of available cleaning modes | Daily Clean, Sensitive, Whitening, Deep Clean, Gum Care, Tongue Clean |
-| Timer | enum | Whether a 2-minute brushing timer is built in | Yes, No |
-| Pressure Sensor | enum | Whether a pressure sensor alerts against excessive force | Yes, No |
-| Smart Features | text (list) | Connected or intelligent features | Bluetooth, App Connectivity, AI Brushing Recognition, Interactive Display |
-| Replacement Head Compatible | text | Compatible replacement brush head model names | iO Series, FlossAction, Precision Clean, CrossAction |
-| Age Group | enum | Intended age group | Adults, Kids, Baby, All Ages |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| Country of Origin | country_of_origin | text | Country where the product is manufactured | USA, Germany, China, Ireland, Mexico |
+| Volume | volume | number (ml) | Volume for liquid products such as mouthwash | 250, 473, 500, 1000 |
+| Fluoride Concentration | fluoride_concentration | number (ppm) | Fluoride content in parts per million | 1000, 1100, 1450, 5000 |
+| Flavor | flavor | text | Taste or flavor of the product | Mint, Spearmint, Peppermint, Cinnamon, Bubblegum, Unflavored |
+| Product Purpose | product_purpose | text (list) | Specific oral care function the product addresses | Cavity Protection, Whitening, Sensitivity Relief, Gum Health, Tartar Control, Fresh Breath, Enamel Repair |
+| Bristle Stiffness | bristle_stiffness | enum | Firmness of toothbrush bristles | Extra Soft, Soft, Medium, Hard |
+| Power Source | power_source | enum | Type of power for electric toothbrushes | Rechargeable, Battery (AA), Battery (AAA), Manual (none) |
+| Battery Life | battery_life | number (days) | Battery life on a full charge for electric models | 14, 21, 30 |
+| Cleaning Modes | cleaning_modes | number | Number of cleaning modes for electric toothbrushes | 1, 3, 5, 7 |
+| Cleaning Mode Names | cleaning_mode_names | text (list) | Names of available cleaning modes | Daily Clean, Sensitive, Whitening, Deep Clean, Gum Care, Tongue Clean |
+| Timer | timer | enum | Whether a 2-minute brushing timer is built in | Yes, No |
+| Pressure Sensor | pressure_sensor | enum | Whether a pressure sensor alerts against excessive force | Yes, No |
+| Smart Features | smart_features | text (list) | Connected or intelligent features | Bluetooth, App Connectivity, AI Brushing Recognition, Interactive Display |
+| Replacement Head Compatible | replacement_head_compatible | text | Compatible replacement brush head model names | iO Series, FlossAction, Precision Clean, CrossAction |
+| Age Group | age_group | enum | Intended age group | Adults, Kids, Baby, All Ages |
 
 ## Changelog
 

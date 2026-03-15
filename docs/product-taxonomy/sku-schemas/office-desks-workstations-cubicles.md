@@ -7,38 +7,38 @@
 
 ## Core Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| SKU | text | Retailer or manufacturer product identifier | EOD660MR, WN-6630-BK, BBF-ProPanels-66H |
-| Product Name | text | Full product name including key specs such as configuration, size, and panel height | Bush Easy Office 60W 4-Person Cubicle 66H, VersaDesk WorkNest Corner Workstation, Herman Miller Layout Studio 120x60 Desk |
-| URL | text | Direct link to the product page | https://example.com/product/easy-office-4person-cubicle |
-| Price | number | Numeric price per unit or per configuration excluding currency symbol | 649.99, 1299.00, 4500.00, 12000.00 |
-| Currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD, AUD |
-| Product Type | enum | Specific type of office desk or workstation | Single Desk, L-Shaped Desk, U-Shaped Desk, Standing Desk, Cubicle System, Benching System, Workstation Cluster, Reception Desk, Credenza, Corner Workstation |
-| Desktop Material | text | Material of the work surface | High-Pressure Laminate (HPL), Thermally Fused Laminate (TFL), Solid Wood, Veneer, Glass, Bamboo, Linoleum |
-| Panel Material | text | Material and surface of the partition panels | Fabric-Wrapped, Frosted Acrylic, Glass, Metal, Tackable Fabric, Laminate, Acoustic Felt |
-| Frame/Leg Material | text | Material of the desk frame or support legs | Powder-Coated Steel, Aluminum, Chrome, Laminate End Panels |
-| Pedestal Type | text | Type of under-desk storage pedestal | Box/Box/File, File/File, Mobile Pedestal, Fixed Pedestal, None |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| SKU | sku | text | Retailer or manufacturer product identifier | EOD660MR, WN-6630-BK, BBF-ProPanels-66H |
+| Product Name | product_name | text | Full product name including key specs such as configuration, size, and panel height | Bush Easy Office 60W 4-Person Cubicle 66H, VersaDesk WorkNest Corner Workstation, Herman Miller Layout Studio 120x60 Desk |
+| URL | url | text | Direct link to the product page | https://example.com/product/easy-office-4person-cubicle |
+| Price | price | number | Numeric price per unit or per configuration excluding currency symbol | 649.99, 1299.00, 4500.00, 12000.00 |
+| Currency | currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD, AUD |
+| Product Type | product_type | enum | Specific type of office desk or workstation | Single Desk, L-Shaped Desk, U-Shaped Desk, Standing Desk, Cubicle System, Benching System, Workstation Cluster, Reception Desk, Credenza, Corner Workstation |
+| Desktop Material | desktop_material | text | Material of the work surface | High-Pressure Laminate (HPL), Thermally Fused Laminate (TFL), Solid Wood, Veneer, Glass, Bamboo, Linoleum |
+| Panel Material | panel_material | text | Material and surface of the partition panels | Fabric-Wrapped, Frosted Acrylic, Glass, Metal, Tackable Fabric, Laminate, Acoustic Felt |
+| Frame/Leg Material | frameleg_material | text | Material of the desk frame or support legs | Powder-Coated Steel, Aluminum, Chrome, Laminate End Panels |
+| Pedestal Type | pedestal_type | text | Type of under-desk storage pedestal | Box/Box/File, File/File, Mobile Pedestal, Fixed Pedestal, None |
 
 ## Extended Attributes
 
-| Attribute | Data Type | Description | Example Values |
-|-----------|-----------|-------------|----------------|
-| Country of Origin | text | Country where the product is manufactured | USA, China, Canada, Mexico, Germany |
-| Number of Workstations | number | Count of individual workspaces in a multi-person configuration | 1, 2, 4, 6, 8, 12 |
-| Desktop Width | number (mm) | Width of the primary work surface | 1200, 1500, 1800, 2100 |
-| Desktop Depth | number (mm) | Depth of the primary work surface | 600, 700, 750, 800 |
-| Desktop Height | number (mm) | Height of the work surface from floor (fixed desks) | 710, 730, 750, 760 |
-| Desktop Thickness | number (mm) | Thickness of the work surface | 22, 25, 30 |
-| Panel Height | number (mm) | Height of surrounding privacy panels in cubicle systems | 1040, 1350, 1520, 1680, 2100 |
-| Panel Thickness | number (mm) | Thickness of the partition panels | 50, 64, 75 |
-| Finish | text | Surface finish or color of the desktop and panels | White, Mahogany, Natural Maple, Mocha Cherry, Espresso, Storm Grey, Black |
-| Height Adjustable | boolean | Whether the desk supports electric or manual sit-stand adjustment | true, false |
-| Minimum Height | number (mm) | Lowest height setting for height-adjustable desks | 600, 630, 650 |
-| Maximum Height | number (mm) | Highest height setting for height-adjustable desks | 1050, 1200, 1270 |
-| Number of Drawers | number | Count of built-in pedestal or under-desk drawers | 0, 1, 2, 3 |
-| Cable Management | boolean | Whether the desk includes built-in grommets, trays, or channels for cable routing | true, false |
-| Power/Data Integration | text | Built-in electrical outlets and data connectivity | 2 AC Outlets + 2 USB, 4 AC Outlets, Daisy-Chain Power, Data Port Ready, None |
+| Attribute | Key | Data Type | Description | Example Values |
+|-----------|-----|-----------|-------------|----------------|
+| Country of Origin | country_of_origin | text | Country where the product is manufactured | USA, China, Canada, Mexico, Germany |
+| Number of Workstations | number_of_workstations | number | Count of individual workspaces in a multi-person configuration | 1, 2, 4, 6, 8, 12 |
+| Desktop Width | desktop_width | number (mm) | Width of the primary work surface | 1200, 1500, 1800, 2100 |
+| Desktop Depth | desktop_depth | number (mm) | Depth of the primary work surface | 600, 700, 750, 800 |
+| Desktop Height | desktop_height | number (mm) | Height of the work surface from floor (fixed desks) | 710, 730, 750, 760 |
+| Desktop Thickness | desktop_thickness | number (mm) | Thickness of the work surface | 22, 25, 30 |
+| Panel Height | panel_height | number (mm) | Height of surrounding privacy panels in cubicle systems | 1040, 1350, 1520, 1680, 2100 |
+| Panel Thickness | panel_thickness | number (mm) | Thickness of the partition panels | 50, 64, 75 |
+| Finish | finish | text | Surface finish or color of the desktop and panels | White, Mahogany, Natural Maple, Mocha Cherry, Espresso, Storm Grey, Black |
+| Height Adjustable | height_adjustable | boolean | Whether the desk supports electric or manual sit-stand adjustment | true, false |
+| Minimum Height | minimum_height | number (mm) | Lowest height setting for height-adjustable desks | 600, 630, 650 |
+| Maximum Height | maximum_height | number (mm) | Highest height setting for height-adjustable desks | 1050, 1200, 1270 |
+| Number of Drawers | number_of_drawers | number | Count of built-in pedestal or under-desk drawers | 0, 1, 2, 3 |
+| Cable Management | cable_management | boolean | Whether the desk includes built-in grommets, trays, or channels for cable routing | true, false |
+| Power/Data Integration | powerdata_integration | text | Built-in electrical outlets and data connectivity | 2 AC Outlets + 2 USB, 4 AC Outlets, Daisy-Chain Power, Data Port Ready, None |
 
 ## Changelog
 
