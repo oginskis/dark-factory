@@ -35,4 +35,4 @@
 ## Sites Using This Platform
 | Company | Slug | Date | Notes |
 |---------|------|------|-------|
-| EV OneStop | evonestop | 2026-03-15 | 112 products, JSON API works, tags used for categorization, product_type empty |
+| EV OneStop | evonestop | 2026-03-15 | ~123 products (sitemap), JSON API works, collection JSON endpoints work for category mapping, product_type empty, tags used for categorization, body_html has rich specs (kW, IP/IK ratings, OCPP, connectivity) |

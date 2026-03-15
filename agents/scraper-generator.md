@@ -322,9 +322,9 @@ Once the probe passes for all sampled pages (across all probed categories), proc
 
 ---
 
-## Step 5: Test the Scraper (Full Verification)
+## Step 5: Smoke Test
 
-Run the scraper with `--limit 20` and verify it works end-to-end. The probe (Step 4) already validated extraction logic, so failures at this stage are structural — pagination, batching, rate limiting, or persist hook issues.
+Run the scraper with `--limit 20` and verify it works end-to-end. This is a fast structural check — the probe (Step 4) already validated extraction logic, so failures here are about pagination, batching, rate limiting, or persist hook issues. Keep this at 20 products for fast iteration during scraper development.
 
 ### Test timeout
 
@@ -363,13 +363,13 @@ Print a few extracted products from different categories as formatted JSON for v
 
 If the test fails, attempt one retry — see the `scraper_test_failed` decision.
 
-Once the test passes, the scraper code is final. The harness persists it to the appropriate location.
+Once the smoke test passes, the scraper code is final. The harness persists it to the appropriate location. Proceed to taxonomy feedback (Step 5a) and final verification (Step 5b).
 
 ---
 
 ## Step 5a: Taxonomy Feedback
 
-After the scraper passes its `--limit 20` test, analyze the test output for potential schema improvements.
+After the scraper passes the smoke test (Step 5), analyze the test output for potential schema improvements.
 
 1. **Collect** all unique attribute keys from `extra_attributes` across all test products.
 2. **Evaluate significance** — for each extra attribute, count how many products include it. If an attribute appears on >80% of test products, it is a candidate for schema addition.
@@ -393,6 +393,45 @@ Skip this step entirely when:
 - There are no attributes in `extra_attributes` across any test products
 - No extra attribute appears on >80% of test products
 - The scraper test failed (feedback only runs after a successful test)
+
+---
+
+## Step 5b: Final Verification Run
+
+After the smoke test and taxonomy feedback, re-run the scraper with a larger, representative sample. This run produces the output that the eval-generator (Stage 4) validates against. The scraper code does not change — this is purely a re-run with a bigger limit.
+
+### Sample size
+
+Compute the verification sample size from the catalog assessment's estimated product count:
+
+```
+sample_size = min(ceil(expected_product_count * 0.2), 100)
+```
+
+This gives 20% of the catalog, capped at 100 products. Examples:
+
+| Estimated products | Sample size |
+|--------------------|-------------|
+| 50 | 10 |
+| 123 | 25 |
+| 500 | 100 |
+| 2,000 | 100 |
+
+**When to skip:** If `sample_size <= 20`, the smoke test output is already sufficient — skip the final verification run entirely. The smoke test's `--limit 20` output becomes the eval input.
+
+### Verification timeout
+
+Scale the timeout proportionally: `max(120, sample_size * 6)` seconds. This allows ~6 seconds per product (matching the smoke test's 2-minute budget for 20 products).
+
+### What to verify
+
+The smoke test already validated correctness. The final verification only checks:
+
+1. **Scraper completes without crashing** at the larger sample size
+2. **`errors_count` is 0** — no new errors appear at higher volume
+3. **`total_products`** is between 1 and `sample_size`
+
+If the final verification fails, apply the same retry logic as the smoke test — one retry allowed, then escalate via the `scraper_test_failed` decision.
 
 ---
 
@@ -468,7 +507,7 @@ Before presenting results, verify the scraper and config against these quality g
 | # | Check | Pass criteria |
 |---|-------|---------------|
 | 1 | **Scraper is standalone** | Single .py file, no imports from the codebase, only allowed libraries |
-| 2 | **Dry-run test passed** | Products extracted successfully with all universal top-level fields populated |
+| 2 | **Smoke test passed** | `--limit 20` test: products extracted successfully with all universal top-level fields populated |
 | 3 | **Product data contract correct** | Flat list of product records with `_format: 2` and the three-bucket attribute structure |
 | 4 | **`brand` is top-level** | `brand` appears as a top-level field in every product record, not inside any attribute bucket |
 | 5 | **`product_category` is valid** | `product_category` is a valid taxonomy ID from `categories.md` |
@@ -482,11 +521,12 @@ Before presenting results, verify the scraper and config against these quality g
 | 13 | **Code quality** | PEP 723 inline script metadata present at top of file, `from __future__ import annotations` follows, all functions typed, no bare `except:`, constants at module level, single `httpx.Client` reused |
 | 14 | **Persist hook present** | setup/persist/teardown functions exist, persist is called after each batch of up to 100 records, teardown is always called |
 | 15 | **Platform knowledgebase updated** | Platform knowledgebase was written or updated after a successful test (when platform is an enumerated value — not `unknown` or `custom`) |
-| 16 | **Category diversity in test** | Dry-run test produced products from at least 2 distinct top-level categories (or the catalog has only one category) |
+| 16 | **Category diversity in test** | Smoke test produced products from at least 2 distinct top-level categories (or the catalog has only one category) |
 | 17 | **Product discovery strategy is robust** | Scraper uses the most comprehensive discovery source available (sitemap, JSON API, or exhaustive category traversal). For `custom`/`unknown` platforms, scraper uses URL-pattern-based link discovery rather than platform-specific CSS selectors. Deduplication by URL or SKU is present. |
 | 18 | **Multi-subcategory mapping correct** | For multi-subcategory companies: category mapping covers all URL prefixes from catalog assessment, scraper uses per-subcategory SKU schemas for attribute routing, and `product_category` varies correctly across products from different sections. For single-subcategory companies: all products use the primary taxonomy ID. |
+| 19 | **Final verification passed** | Final verification run (Step 5b) completed with 0 errors, or was correctly skipped because `sample_size <= 20`. The output from the final verification (or the smoke test if skipped) is ready for eval. |
 
-If all 18 pass, the scraper is complete.
+If all 19 pass, the scraper is complete.
 
 ---
 
@@ -530,7 +570,7 @@ If all 18 pass, the scraper is complete.
 
 ### Decision: scraper_test_failed
 
-**Context:** The scraper failed during the full `--limit 20` test — it crashed, produced no output, found far fewer products than expected, or had widespread missing data. The probe passed, so this is a structural issue (pagination, rate limiting, batching), not an extraction issue.
+**Context:** The scraper failed during the smoke test (`--limit 20`) or the final verification run — it crashed, produced no output, found far fewer products than expected, or had widespread missing data. The probe passed, so this is a structural issue (pagination, rate limiting, batching), not an extraction issue.
 **Autonomous resolution:** Retry once. Analyze the error, adjust the scraper, and test again.
 **Escalate when:** The scraper fails a second time after adjustment.
 **Escalation payload:** Company slug, error details or partial results, what was tried in the retry, the scraping strategy that was used.

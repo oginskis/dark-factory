@@ -86,7 +86,7 @@ This stage generates a standalone Python scraper based on the catalog assessment
 - Probe extraction fails after 5 fix cycles (extraction logic cannot match the live site)
 - The scraper fails testing twice after adjustment
 
-If no SKU schema exists but the subcategory is valid, the scraper-generator will automatically invoke `/product-taxonomy` to generate it before continuing.
+If no SKU schema exists but the subcategory is valid, the scraper-generator will automatically invoke `/product-taxonomy` to generate it before continuing. **Before concluding a schema is missing, always list `docs/product-taxonomy/sku-schemas/` and search for the subcategory name** — never guess the filename from a partial slug.
 
 ## Stage 4: Eval Generator
 
@@ -109,8 +109,7 @@ When all four stages complete successfully, present a structured summary to the 
 - **Website:** {URL}
 - **Slug:** {slug}
 - **Subcategories:** {all taxonomy IDs, e.g. `machinery.power_tools`, `machinery.cnc_machines`}
-- **Primary:** {single taxonomy ID, e.g. `machinery.power_tools`}
-- **product_category:** {primary taxonomy ID — used as `product_category` in scraper output}
+- **Primary (`product_category`):** {single taxonomy ID, e.g. `machinery.power_tools`}
 - **Business model:** {B2B / B2C / etc.}
 - **Entity type:** {Company / etc.}
 
@@ -155,22 +154,28 @@ When all four stages complete successfully, present a structured summary to the 
 
 ### Run Locally
 
-Run the scraper (full catalog):
-    uv run docs/scraper-generator/{slug}/scraper.py
-
-Run the scraper (limited test):
-    uv run docs/scraper-generator/{slug}/scraper.py --limit 20
-
-Run the eval against scraper output:
-    uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json
-
-Output files are written to:
-- `docs/scraper-generator/{slug}/output/products.jsonl` — scraped product data
-- `docs/scraper-generator/{slug}/output/summary.json` — scraper run summary
-- `docs/eval-generator/{slug}/output/eval_result.json` — eval quality report
+Smoke test (20 products):
+```
+uv run docs/scraper-generator/{slug}/scraper.py --limit 20
 ```
 
-Replace `{slug}` and other placeholders with actual values from the pipeline run. The "Run Locally" commands must use the actual slug so the user can copy-paste them directly.
+Full catalog:
+```
+uv run docs/scraper-generator/{slug}/scraper.py
+```
+
+Run eval:
+```
+uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json
+```
+
+Output files:
+- `docs/scraper-generator/{slug}/output/products.jsonl`
+- `docs/scraper-generator/{slug}/output/summary.json`
+- `docs/eval-generator/{slug}/output/eval_result.json`
+```
+
+Replace `{slug}` with the actual company slug. Commands must be copy-pasteable.
 
 If the pipeline stopped early (a stage gate failed), present a shorter summary covering only the stages that completed. Include the `### Notes` section if there are operational caveats from the partial run. End with a clear `### Stop Reason` section stating: the decision name, which stage triggered it, why the pipeline cannot continue, and what the user must do next.
 
