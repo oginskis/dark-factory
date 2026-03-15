@@ -54,16 +54,7 @@ Read and follow the agent instructions in `agents/scraper-generator.md`.
 - **Probe execution:** Run probes using `uv run docs/scraper-generator/{slug}/scraper.py --probe <URL>`. The scraper fetches the page internally, runs the real extraction code, and prints the result as formatted JSON to stdout. Examine the output to verify extraction quality — no web fetch tools are needed for probing.
 - No web search or Playwright browser tools are needed.
 - The knowledgebase write (Step 6) uses file write/edit tools to create or append to the platform knowledgebase file.
-
-## Data persistence
-
-Current backend: **NDJSON files on disk**. Read the persist hook implementations file (see File locations table) for the `setup`/`persist`/`teardown` functions to include in the generated scraper.
-
-The agent defines the data contract and the persist hook call pattern. The reference file defines what those hooks do for the current disk backend. To switch to a different backend, replace the hook implementations — the agent's scraping logic and data contract remain unchanged.
-
-- After the agent completes the full test (Step 5 succeeds), persist the scraper code to the scraper script path.
-- After the agent prepares config metadata (Step 7), persist it as JSON to the config metadata path.
-- Run the dry-run test with `uv run docs/scraper-generator/{slug}/scraper.py --limit 20` as directed by the agent in Step 5.
+- **Data persistence:** Current backend is NDJSON files on disk. Read the persist hook implementations file (see File locations table) for the `setup`/`persist`/`teardown` functions to include in the generated scraper. The agent defines the data contract and hook call pattern; the reference file defines what the hooks do. After the agent completes the full test (Step 5 succeeds), persist the scraper code to the scraper script path. After the agent prepares config metadata (Step 7), persist it as JSON to the config metadata path. Run the dry-run test with `uv run docs/scraper-generator/{slug}/scraper.py --limit 20` as directed by the agent in Step 5.
 
 ## Notes
 

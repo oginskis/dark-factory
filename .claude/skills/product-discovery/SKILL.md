@@ -3,7 +3,7 @@ name: product-discovery
 description: >
   End-to-end product discovery pipeline for a company.
   Takes a company URL or name and runs all four stages sequentially: classify, detect catalog, generate scraper, generate eval.
-  Produces a company report, catalog assessment, scraper.py, config.json, and eval.py.
+  Produces a company report, catalog assessment, scraper.py, config.json, and eval_config.json.
   Use this skill when the user wants the complete pipeline —
   "discover products for X", "run product discovery on X", "set up scraping for X",
   "I want to start tracking products from X", or any company URL/name with intent to build a full scraper pipeline.
@@ -91,7 +91,7 @@ If no SKU schema exists but the subcategory is valid, the scraper-generator will
 
 Read file locations from `.claude/skills/eval-generator/SKILL.md`, then read and follow `agents/eval-generator.md` in full.
 
-This stage generates a standalone eval script that validates scrape quality using nine weighted checks.
+This stage generates an eval config that the shared eval script uses to validate scrape quality using nine weighted checks.
 
 **Stop the pipeline if:**
 - The company's subcategory is not found in the product taxonomy categories file (same gate as Stage 3 — should not occur if Stage 3 already generated the schema)

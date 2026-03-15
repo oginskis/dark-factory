@@ -98,9 +98,19 @@ Produce the eval config file with all 7 required fields:
 
 ---
 
-## Step 5: Run and Self-Verification
+## Step 5: Run Eval Script
 
 Run the shared eval script with the generated config file. The script reads the scraper output and produces an eval result file.
+
+If the shared eval script fails to run or produces an error, review the config file for issues. Common problems:
+
+- Scraper output does not exist yet — the scraper must run before the eval. If no scraper output is found, note this and confirm the config is valid by inspecting its structure.
+- Attribute names in `type_map` do not match what the scraper actually writes — cross-check against the scraper source.
+- `expected_top_level_categories` values do not match the category names the scraper uses in `category_path` — compare with actual scraper output if available.
+
+---
+
+## Step 6: Self-Verification
 
 After the run completes, read the eval result file and verify all 9 checks appear in the output:
 
@@ -117,12 +127,6 @@ After the run completes, read the eval result file and verify all 9 checks appea
 | 9 | `row_count_trend` | Present, weight 10, threshold 0.80 (or skipped on limited/first run) |
 
 Skipped checks have `"value": null` and `"skipped": true` — this is expected behavior, not an error.
-
-If the shared eval script fails to run or produces an error, review the config file for issues. Common problems:
-
-- Scraper output does not exist yet — the scraper must run before the eval. If no scraper output is found, note this and confirm the config is valid by inspecting its structure.
-- Attribute names in `type_map` do not match what the scraper actually writes — cross-check against the scraper source.
-- `expected_top_level_categories` values do not match the category names the scraper uses in `category_path` — compare with actual scraper output if available.
 
 If the eval runs successfully and all 9 checks appear in the result, the config is verified.
 
