@@ -1,0 +1,42 @@
+---
+name: product-classifier
+description: >
+  Research and classify a company's physical products into the project taxonomy.
+  Produces a company profile report with classification, product lines, and preliminary catalog analysis.
+  Use this skill whenever the user provides a company name or URL for investigation — "research this company",
+  "what does X make", "classify this company", "look up [company name]", "what products does X sell",
+  or any company name/URL given with intent to understand what physical goods a company offers.
+  Also trigger when the user pastes a company URL without further context.
+  If the user wants the full pipeline (classify + detect catalog + generate scraper + eval), use /product-discovery instead.
+user-invocable: true
+---
+
+# Product Classifier
+
+Read and follow the agent instructions in `agents/product-classifier.md`.
+
+## Input
+
+`$ARGUMENTS` is a company URL or company name.
+
+## File locations
+
+| Resource | Path |
+|----------|------|
+| Product taxonomy | `docs/product-taxonomy/categories.md` |
+| Company reports dir | `docs/product-classifier/` |
+| Company report (output) | `docs/product-classifier/{slug}.md` |
+
+## Claude Code wiring
+
+- When the agent reaches an escalation point, present it using the standard escalation format (see orchestrator) and **wait for the user's response** before continuing. User options per escalation:
+  - `ambiguous_company` — 1) Pick a candidate by name or number, 2) Provide additional context to narrow the search, 3) Stop
+  - `tangible_ambiguous` — 1) Include the company and proceed with classification, 2) Exclude the company and stop the pipeline
+  - `category_not_found` — 1) Suggest a new subcategory to add to the taxonomy, 2) Stop
+- The agent may also stop autonomously without escalation — if the company fails the tangible goods gate (no physical products) or is rejected as a general retailer/marketplace. In these cases the agent produces no report. Report the outcome to the user.
+- Use web search, web fetch, and Playwright browser tools to investigate company websites as the agent directs.
+- Provide the file paths from the table above when the agent references logical resources (e.g., "the product taxonomy categories file", "the company reports directory", "write the company report").
+
+## Notes
+
+File-driven skill — no database or external services required.

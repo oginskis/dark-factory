@@ -1,0 +1,10 @@
+# Pipeline output — generated per-company, not tracked in git
+docs/*
+!docs/platform-knowledgebase/
+!docs/product-taxonomy/
+
+# Local Claude Code settings (user-specific permissions)
+.claude/settings.local.json
+
+# Playwright MCP logs
+.playwright-mcp/
