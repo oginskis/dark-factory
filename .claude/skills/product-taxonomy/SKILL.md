@@ -28,7 +28,7 @@ The taxonomy is stored in two places:
 
 1. **Category list**: `docs/product-taxonomy/categories.md` — the master taxonomy of all categories and subcategories. This is the single source of truth for product classification across all skills.
 
-2. **SKU schema files**: `docs/product-taxonomy/sku-schemas/{subcategory-slug}.md` — one file per **subcategory**, documenting the typical attributes for products in that specific subcategory. This keeps each schema focused (20-40 attributes) rather than cramming unrelated product types into one file.
+2. **SKU schema files**: `docs/product-taxonomy/sku-schemas/{subcategory-slug}.md` — one file per **subcategory**, documenting the typical attributes for products in that specific subcategory. This keeps each schema focused (15-30 attributes split into Core and Extended) rather than cramming unrelated product types into one file.
 
 **Strictly per-subcategory.** Never create a schema file for a top-level category. Each file maps to exactly one subcategory from `categories.md`. If the user asks to research a top-level category (e.g., "Machinery & Industrial Equipment"), ask them to pick a specific subcategory within it. Attribute duplication across sibling subcategory files is expected and acceptable — each schema should stand on its own.
 
@@ -77,6 +77,15 @@ This is how schemas improve over time. The existing file is the baseline — you
 
 The schema evolves with each run — every time the skill is invoked for an existing subcategory, it gets a little better.
 
+### Evolution mode (scraper-generator feedback loop)
+
+When this skill is invoked by the scraper-generator feedback loop (evolution mode), follow these additional constraints:
+
+- **Can only ADD new attributes to Extended** — do not add directly to Core.
+- **Can PROMOTE extended → core** when an attribute appears in scraper output from 3+ different companies.
+- **Never delete or rename existing attributes** — append-only, same as regular evolution runs.
+- **Evaluate significance broadly** — when the scraper-generator proposes new attributes, research whether they are genuinely significant for the subcategory by checking other companies, not just the triggering one. An attribute that only one company uses is not a good candidate.
+
 ### If starting fresh
 
 Investigate 3-5 companies selling products in the subcategory. The methodology file explains how to pick a mix of manufacturers, distributors, and retailers for breadth.
@@ -85,22 +94,34 @@ The goal is to identify the **most significant attributes** for the subcategory 
 
 ## Phase 3: Synthesize the Schema
 
-After researching multiple companies, synthesize a **single, flat attribute list** for the subcategory. The schema should cover most products in the subcategory without drilling into sub-subcategories.
+After researching multiple companies, synthesize a **two-tier attribute schema** for the subcategory. The schema should cover most products in the subcategory without drilling into sub-subcategories.
 
-### One flat list
+### Two-tier attribute split
 
-Produce a single attribute table — no Core/Common/Specialized split, no sub-sections by product type. Just one list of attributes for the subcategory.
+Produce two attribute tables — **Core Attributes** and **Extended Attributes** — not a single flat list.
+
+**Core attributes (5-10):** Attributes meaningful for cross-company comparison. Selection criteria:
+- **Identity**: what kind of product (tool_type, fastener_type, dosage_form)
+- **Material/composition**: what it's made of (material, primary_ingredient)
+- **Primary dimension**: the key size/capacity metric (voltage, thread_size, capacity_oz)
+- **Identification/provenance**: model number, country of origin
+
+**Extended attributes (10-15):** Real but product-type-specific or rarely published. Everything that doesn't fit core.
 
 **Which attributes to include:** the ones that are most significant for the subcategory AND commonly appear on pricelists and product catalogs. The test is: "Would this attribute appear on a typical pricelist or product comparison sheet for this subcategory?" If yes, include it. If it's only on deep spec sheets or niche enthusiast sites, leave it out.
 
 Use this as a calibration guide:
-- **Under 20** — too thin, misses important attributes
-- **20-40** — what you'd see on a real pricelist or product comparison sheet
-- **Over 40** — drifting into deep spec sheet territory, trim back
+- **Core under 5** — too thin
+- **Core 5-10** — right
+- **Core over 10** — too many, demote to extended
+- **Extended under 10** — too thin
+- **Extended 10-15** — right
+- **Extended over 15** — trim back
+- **Total 15-30**
 
 ### Mandatory attributes
 
-Every schema must include these 5 attributes. They appear in every schema regardless of category. Descriptions and example values should be tailored to the category, but the attribute names and data types are fixed.
+Every schema must include these 5 attributes as the first rows of the **Core Attributes** table. They appear in every schema regardless of category. Descriptions and example values should be tailored to the category, but the attribute names and data types are fixed.
 
 | Attribute | Data Type | Why mandatory |
 |-----------|-----------|---------------|
@@ -110,7 +131,9 @@ Every schema must include these 5 attributes. They appear in every schema regard
 | Price | number | Numeric price value, no currency symbol |
 | Currency | text | ISO 4217 currency code, always separate from Price |
 
-Start the attribute table with these 5, then add category-specific attributes discovered through research.
+Start the Core Attributes table with these 5, then add category-specific core attributes discovered through research.
+
+**Note on Brand:** Brand is NOT included in SKU schemas — it is a universal top-level field on the product record, handled outside the taxonomy.
 
 ### Synthesis steps
 
@@ -158,8 +181,9 @@ Write to `docs/product-taxonomy/sku-schemas/{subcategory-slug}.md` using the **e
 
 **Last updated:** {today's date}
 **Parent category:** {Top-Level Category Name}
+**Taxonomy ID:** {taxonomy_id}
 
-## Attributes
+## Core Attributes
 
 | Attribute | Data Type | Description | Example Values |
 |-----------|-----------|-------------|----------------|
@@ -168,15 +192,24 @@ Write to `docs/product-taxonomy/sku-schemas/{subcategory-slug}.md` using the **e
 | URL | text | {category-specific description} | {examples} |
 | Price | number | {category-specific description} | {examples} |
 | Currency | text | {category-specific description} | {examples} |
-| {category-specific attr} | {type} | {description} | {examples} |
+| {core attr} | {type} | {description} | {examples} |
+| ... | ... | ... | ... |
+
+## Extended Attributes
+
+| Attribute | Data Type | Description | Example Values |
+|-----------|-----------|-------------|----------------|
+| {extended attr} | {type} | {description} | {examples} |
 | ... | ... | ... | ... |
 
 ## Changelog
 
 | Date | Change | Sources |
 |------|--------|---------|
-| {today} | Initial schema — {N} attributes from {companies} | [{Company 1}]({URL}), [{Company 2}]({URL}) |
+| {today} | Initial schema — {N} core + {M} extended attributes from {companies} | [{Company 1}]({URL}), [{Company 2}]({URL}) |
 ```
+
+The **Taxonomy ID** must be looked up from `docs/product-taxonomy/categories.md`. Each subcategory line has the format `- Subcategory Name \`taxonomy.id\``. Parse it using the regex: `re.match(r'^- (.+?) \x60([a-z][a-z0-9_.]+)\x60$', line.strip())` — group 2 is the taxonomy ID.
 
 #### Strict format rules
 
@@ -186,7 +219,7 @@ These rules are non-negotiable. Every schema must comply exactly.
 |------|---------|-------|
 | **Table has exactly 4 columns** | `\| Attribute \| Data Type \| Description \| Example Values \|` | `\| # \| Attribute \| Data Type \| ...` (no row-number column) |
 | **No backticks in table cells** | `9x19mm, 5.56x45mm NATO` | `` `9x19mm`, `5.56x45mm NATO` `` |
-| **Only two `##` sections** | `## Attributes` then `## Changelog` | No `## Notes`, `## Summary`, or other sections |
+| **Only three `##` sections** | `## Core Attributes` then `## Extended Attributes` then `## Changelog` | No `## Notes`, `## Summary`, or other sections |
 | **Example values are comma-separated plain text** | `Red, Blue, Green` | `Red \| Blue \| Green` or bullet lists |
 | **Data types use lowercase** | `text`, `number`, `enum`, `boolean`. Append unit in parentheses when relevant: `number (kg)`, `number (kW)`, `text (mm)`. Use `text (list)` for multi-value fields. | `Text`, `Number`, `integer`, compound types without parentheses like `currency` |
 | **No markdown formatting in table cells** | Plain text descriptions | No bold, italic, links, or code blocks inside cells (except **DEPRECATED** markers) |
@@ -204,9 +237,10 @@ Before presenting results, re-read the schema file you just wrote and check it a
 
 | # | Check | Pass criteria |
 |---|-------|---------------|
-| 1 | **Mandatory attributes present and first** | SKU, Product Name, URL, Price, Currency are rows 1-5 |
-| 2 | **Attribute count in range** | 20-40 attributes total — no exceptions, trim if over 40 |
-| 3 | **Single flat table** | Only `## Attributes` and `## Changelog` sections — no `## Notes`, no Core/Common/Specialized split, no sub-sections |
+| 1 | **Mandatory attributes present and first** | SKU, Product Name, URL, Price, Currency are rows 1-5 in Core Attributes |
+| 2 | **Attribute count in range** | Core: 5-10, Extended: 10-15, Total: 15-30 |
+| 3 | **Two table sections** | `## Core Attributes` and `## Extended Attributes`, plus `## Changelog` — no `## Notes`, no other sections |
+| 3a | **Taxonomy ID present** | `**Taxonomy ID:**` is in the header and matches an ID found in `categories.md` |
 | 4 | **Currency separate from Price** | Price is `number`, Currency is `text` — two distinct rows |
 | 5 | **Descriptions are company-neutral** | No company names in the Description column (Brand/Manufacturer example values are fine) |
 | 6 | **Compliance is international** | Compliance and certification attributes use only international standards (ISO, CE, GHS, HACCP, IEC). No country-specific regulatory bodies (no EPA, FDA, FCC). Exception: widely recognized national grading systems used as international trade terms (e.g., USDA beef grades) are acceptable as product attributes — they describe the product, not regulatory compliance |
@@ -215,7 +249,7 @@ Before presenting results, re-read the schema file you just wrote and check it a
 | 9 | **Pricelist test** | Could you hand this attribute list to a procurement team and they'd recognize every field from real pricelists? If any attribute would only appear on a deep spec sheet, remove it. |
 | 10 | **Format compliance** | Table has exactly 4 columns (no `#` row-number column), no backticks in any table cell, no markdown formatting in cells (except **DEPRECATED** markers), example values are comma-separated plain text, data types are lowercase |
 
-If all 10 pass, proceed to the summary.
+If all checks pass, proceed to the summary.
 
 ## Phase 6: Summary
 
