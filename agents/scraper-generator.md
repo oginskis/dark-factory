@@ -372,6 +372,35 @@ Once the test passes, the scraper code is final. The harness persists it to the 
 
 ---
 
+## Step 5a: Taxonomy Feedback
+
+After the scraper passes its `--limit 20` test, analyze the test output for potential schema improvements.
+
+1. **Collect** all unique attribute keys from `extra_attributes` across all test products.
+2. **Evaluate significance** — for each extra attribute, count how many products include it. If an attribute appears on >80% of test products, it is a candidate for schema addition.
+3. **Check schema coverage** — verify the candidate is not already in the schema under a different name (synonym check).
+4. **Trigger taxonomy update** — if there are significant candidates, invoke `/product-taxonomy` in evolution mode for the company's subcategory. Pass the candidate attribute names and example values. The taxonomy skill evaluates whether they are genuinely significant for the subcategory (researches other companies, not just this one).
+5. **Log** — report which attributes were proposed to the taxonomy. The feedback does NOT re-map the current scraper's output. Newly added attributes take effect when this or another company's scraper is regenerated in the future.
+
+### File locking for concurrency
+
+Before modifying any schema file, the feedback step must acquire a file lock:
+- Lock file: `{schema-filename}.lock` next to the schema file in `docs/product-taxonomy/sku-schemas/`
+  - Example: `power-tools-drills-saws-sanders.md.lock`
+- If the lock file exists and is less than 10 minutes old: skip the feedback step, log a warning ("Another agent is updating this schema, skipping feedback")
+- If the lock file exists but is older than 10 minutes: consider it stale, delete it, and proceed (the holding agent likely crashed)
+- Create the lock file before invoking `/product-taxonomy`
+- Delete the lock file after the taxonomy update completes (or fails)
+
+### When to skip
+
+Skip this step entirely when:
+- There are no attributes in `extra_attributes` across any test products
+- No extra attribute appears on >80% of test products
+- The scraper test failed (feedback only runs after a successful test)
+
+---
+
 ## Step 6: Write Back to Platform Knowledgebase
 
 After a successful test, write discoveries back to the platform knowledgebase. This step only runs when the platform is an enumerated value (`woocommerce`, `shopify`, `magento`, `prestashop`) — skip for `unknown` or `custom` platforms.
