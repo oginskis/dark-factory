@@ -17,8 +17,8 @@ Read the company report, catalog assessment, scraper source, and SKU schema to u
 
 Read the scraper source to determine:
 
-- Which attributes it extracts (both universal top-level fields and category-specific attributes inside the `attributes` object)
-- What output structure it produces (product records with top-level fields and nested `attributes`)
+- Which attributes it extracts (both universal top-level fields and category-specific attributes)
+- What output format the scraper produces — v1 (flat `attributes` object) or v2 (`_format: 2` with `core_attributes`, `extended_attributes`, `extra_attributes`)
 - Which attributes are strings, numbers, lists, or booleans
 - Whether it extracts prices
 
@@ -45,8 +45,9 @@ If the catalog assessment does not contain an estimated product count, handle gr
 
 Read the SKU schema for the company's category. Extract:
 
-- Core attributes — category-specific attributes that every product should have populated. These live inside the product's `attributes` object. Do not include universal fields (`sku`, `name`, `url`, `price`, `currency`, `scraped_at`) — those are hardcoded in the shared eval script.
-- All attributes the scraper extracts (core and optional) with their expected types
+- Core attributes — category-specific attributes that every product must have populated. In v2 format these live inside `core_attributes`; in v1 format they are inside the flat `attributes` object. Do not include universal fields (`sku`, `name`, `url`, `price`, `currency`, `scraped_at`) — those are hardcoded in the shared eval script.
+- Extended attributes — additional category-specific attributes that are useful but not mandatory. In v2 format these live inside `extended_attributes`.
+- All attributes the scraper extracts (core, extended, and extra) with their expected types
 - Enum constraints — attributes with a known set of allowed values
 
 If no SKU schema exists for the company's category, check the product taxonomy categories file to verify the subcategory exists — see the `no_sku_schema` decision.
@@ -55,7 +56,7 @@ If no SKU schema exists for the company's category, check the product taxonomy c
 
 ## Step 4: Generate the Eval Config
 
-Produce the eval config file with all 7 required fields:
+Produce the eval config file with all 9 required fields:
 
 ```json
 {
@@ -63,9 +64,11 @@ Produce the eval config file with all 7 required fields:
   "expected_product_count": <number>,
   "expected_top_level_categories": ["<category>", ...],
   "core_attributes": ["<attr>", ...],
+  "extended_attributes": ["<attr>", ...],
   "type_map": {"<attr>": "<type>", ...},
   "enum_attributes": {"<attr>": ["<value>", ...], ...},
-  "has_prices": <boolean>
+  "has_prices": <boolean>,
+  "output_format": <1 or 2>
 }
 ```
 
@@ -76,25 +79,87 @@ Produce the eval config file with all 7 required fields:
 | `company_slug` | Company report | The slug from the company report |
 | `expected_product_count` | Catalog assessment | The estimated product count. If missing, see the `missing_product_count_estimate` decision. |
 | `expected_top_level_categories` | Catalog assessment | The top-level category names from the category structure section. These are the catalog's own category names (e.g., "Riga Wood"), not taxonomy categories. |
-| `core_attributes` | SKU schema + scraper source | Category-specific attributes (inside the `attributes` object) that every product should have populated. Only include attributes the scraper actually extracts. Universal fields (`sku`, `name`, `url`, `price`, `currency`, `scraped_at`) are handled by the shared eval script — do not include them here. |
-| `type_map` | SKU schema + scraper source | Maps every attribute name inside the `attributes` object to its expected type: `"str"`, `"number"`, `"list"`, or `"bool"`. Covers all attributes the scraper extracts, both core and optional. |
+| `core_attributes` | SKU schema + scraper source | Category-specific attributes that every product must have populated. In v2 these come from `core_attributes`; in v1 these are the mandatory subset of the flat `attributes` object. Only include attributes the scraper actually extracts. Universal fields (`sku`, `name`, `url`, `price`, `currency`, `scraped_at`) are handled by the shared eval script — do not include them here. |
+| `extended_attributes` | SKU schema + scraper source | Additional category-specific attributes that are useful but not mandatory. In v2 these come from `extended_attributes`. For v1 scrapers, set to an empty array `[]`. |
+| `type_map` | SKU schema + scraper source | Maps every attribute name (across core, extended, and extra) to its expected type: `"str"`, `"number"`, `"list"`, or `"bool"`. Covers all attributes the scraper extracts. |
 | `enum_attributes` | SKU schema + scraper source | Maps attributes that have a closed set of allowed values to their value arrays. Only include attributes where the allowed values are known from the SKU schema or clearly enumerable from the scraper logic. Use an empty object `{}` when no enum constraints apply. |
 | `has_prices` | Catalog assessment + scraper source | `true` if the catalog has prices and the scraper extracts them, `false` otherwise. When `false`, the shared eval script skips the price sanity check. |
+| `output_format` | Scraper source | `2` if the scraper writes v2 records (with `_format: 2`, `core_attributes`, `extended_attributes`, `extra_attributes`). `1` if the scraper writes v1 records (flat `attributes` object). |
+
+### v1/v2 format handling
+
+The eval script supports two scraper output formats:
+
+- **v1** (no `_format` field): Products have a flat `attributes` dict. The eval applies a single `attribute_coverage` check that treats all attributes as one bucket. The `extended_attribute_coverage` and `extra_attributes_ratio` checks are skipped. Set `output_format` to `1` and `extended_attributes` to `[]`.
+- **v2** (`_format: 2`): Products have `core_attributes`, `extended_attributes`, and `extra_attributes` dicts. The eval applies the split checks: `core_attribute_coverage` (on `core_attributes`), `extended_attribute_coverage` (on `extended_attributes`), and `extra_attributes_ratio` (on `extra_attributes` relative to core + extended counts). Set `output_format` to `2`.
+
+When reading scraper output, detect the format from the first record. If `_format` is present and equals `2`, use v2 logic; otherwise use v1 logic.
+
+### Checks (12 total)
+
+The shared eval script implements 12 weighted checks. Weights sum to 100:
+
+| Check | Weight | Threshold | What it catches |
+|-------|--------|-----------|-----------------|
+| `core_attribute_coverage` | 20 | 0.90 | Core attributes missing — selector changes, schema drift |
+| `extended_attribute_coverage` | 5 | 0.50 | Extended attributes missing — less critical but tracked |
+| `pagination_completeness` | 10 | 0.70 | Broken pagination, removed categories |
+| `category_diversity` | 5 | 0.50 | Broken category traversal, sitemap gaps |
+| `category_classification` | 10 | 0.95 | Products with `_unclassified` product_category |
+| `price_sanity` | 10 | 1.00 | Parser errors, currency confusion |
+| `data_freshness` | 5 | 1.00 | Stale cache, broken upsert |
+| `schema_conformance` | 5 | 1.00 | Site redesign, new data format |
+| `row_count_trend` | 5 | 0.80 | Category removal, pagination break |
+| `duplicate_detection` | 10 | 0.99 | Duplicate products by SKU |
+| `field_level_regression` | 10 | 0.50 | Per-field fill rate drops vs previous run |
+| `extra_attributes_ratio` | 5 | 0.50 | Too many unmapped attributes — schema inadequate |
+
+### Check implementation details
+
+**core_attribute_coverage** (weight 20, threshold 0.90): For v2 format records, count how many core schema attributes are present and non-empty in `core_attributes`. Compute per-product coverage, measure fraction of products above 80%. For v1 format, this check uses the flat `attributes` dict with the `core_attributes` list from config. Threshold: 0.90 (90% of products must have >80% of core attributes filled).
+
+**extended_attribute_coverage** (weight 5, threshold 0.50): Same logic as core but applied to `extended_attributes`. Lighter threshold: 0.50 (50% of products must have >50% of extended attributes filled). Skipped for v1 format.
+
+**pagination_completeness** (weight 10, threshold 0.70): Compares actual product count to `expected_product_count`. Skipped on limited runs.
+
+**category_diversity** (weight 5, threshold 0.50): Checks that scraped products span the `expected_top_level_categories`. Skipped on limited runs.
+
+**category_classification** (weight 10, threshold 0.95): Count products where `product_category` is not `_unclassified` and is a valid taxonomy ID. Ratio must be >= 0.95. Skipped on limited runs.
+
+**price_sanity** (weight 10, threshold 1.00): Validates price values are positive numbers with valid currency codes. Skipped when `has_prices` is false.
+
+**data_freshness** (weight 5, threshold 1.00): Checks `scraped_at` timestamps are recent (within expected window).
+
+**schema_conformance** (weight 5, threshold 1.00): Validates attribute types match `type_map` and enum values match `enum_attributes`.
+
+**row_count_trend** (weight 5, threshold 0.80): Compares current row count to previous run baseline. Skipped on first run or limited runs.
+
+**duplicate_detection** (weight 10, threshold 0.99): Checks for duplicate products by SKU. Ratio of unique SKUs to total must be >= 0.99.
+
+**field_level_regression** (weight 10, threshold 0.50): Compares per-field fill rates against previous run baseline. Flags fields where fill rate dropped significantly. Skipped when no baseline exists.
+
+**extra_attributes_ratio** (weight 5, threshold 0.50): Computes `1 - (extra_count / (core_count + extended_count))` averaged across all products. Higher is better (fewer unmapped extras). Threshold: 0.50. This flags schemas that are inadequate for the company. Skipped for v1 format.
+
+### Weight redistribution
+
+When checks are skipped (e.g., no baseline for `field_level_regression`, limited run for `pagination_completeness`, v1 format for `extended_attribute_coverage`), their weights are redistributed proportionally among the remaining active checks. This ensures the total always sums to 100.
 
 ### Strict format rules
 
 | Rule | Correct | Wrong |
 |------|---------|-------|
 | **Valid JSON** | Single JSON object, parseable | Trailing commas, comments, multiple objects |
-| **All 7 fields present** | Every field from the schema above | Missing fields, extra fields |
+| **All 9 fields present** | Every field from the schema above | Missing fields, extra fields |
 | **`company_slug` is a string** | `"finieris"` | Missing or numeric |
 | **`expected_product_count` is a positive integer** | `31` | `0`, negative, string, float |
 | **`expected_top_level_categories` is a non-empty array of strings** | `["Riga Wood"]` | Empty array, array of numbers |
 | **`core_attributes` contains only category-specific attributes** | `["brand", "manufacturer"]` | Includes `"sku"`, `"name"`, `"url"`, `"price"`, `"currency"`, or `"scraped_at"` |
+| **`extended_attributes` is an array of strings** | `["color", "finish"]` or `[]` | Missing, null, array of numbers |
 | **`type_map` values use exact type strings** | `"str"`, `"number"`, `"list"`, `"bool"` | `"string"`, `"int"`, `"float"`, `"array"`, `"boolean"` |
-| **`type_map` covers all attributes in `core_attributes`** | Every core attribute has a type entry | Core attribute missing from type_map |
+| **`type_map` covers all attributes in `core_attributes` and `extended_attributes`** | Every core and extended attribute has a type entry | Attribute missing from type_map |
 | **`enum_attributes` values are arrays of strings** | `{"surface_treatment": ["Uncoated", "Film-faced"]}` | Values as a single string, nested objects |
 | **`has_prices` is a boolean** | `true` or `false` | `"true"`, `"false"`, `0`, `1` |
+| **`output_format` is 1 or 2** | `1` or `2` | `"1"`, `"v2"`, missing |
 
 ---
 
@@ -112,23 +177,26 @@ If the shared eval script fails to run or produces an error, review the config f
 
 ## Step 6: Self-Verification
 
-After the run completes, read the eval result file and verify all 9 checks appear in the output:
+After the run completes, read the eval result file and verify all 12 checks appear in the output:
 
 | # | Check name | Verify |
 |---|------------|--------|
-| 1 | `attribute_coverage` | Present, weight 20, threshold 0.90 |
-| 2 | `duplicate_detection` | Present, weight 15, threshold 0.99 |
-| 3 | `price_sanity` | Present, weight 10, threshold 1.0 (or skipped if `has_prices` is false) |
-| 4 | `schema_conformance` | Present, weight 10, threshold 1.0 |
-| 5 | `data_freshness` | Present, weight 10, threshold 1.0 |
-| 6 | `field_level_regression` | Present, weight 10, threshold 0.50 (or skipped if no baseline) |
-| 7 | `pagination_completeness` | Present, weight 10, threshold 0.70 (or skipped on limited run) |
-| 8 | `category_diversity` | Present, weight 5, threshold 0.50 (or skipped on limited run) |
-| 9 | `row_count_trend` | Present, weight 10, threshold 0.80 (or skipped on limited/first run) |
+| 1 | `core_attribute_coverage` | Present, weight 20, threshold 0.90 |
+| 2 | `extended_attribute_coverage` | Present, weight 5, threshold 0.50 (or skipped for v1 format) |
+| 3 | `pagination_completeness` | Present, weight 10, threshold 0.70 (or skipped on limited run) |
+| 4 | `category_diversity` | Present, weight 5, threshold 0.50 (or skipped on limited run) |
+| 5 | `category_classification` | Present, weight 10, threshold 0.95 (or skipped on limited run) |
+| 6 | `price_sanity` | Present, weight 10, threshold 1.0 (or skipped if `has_prices` is false) |
+| 7 | `data_freshness` | Present, weight 5, threshold 1.0 |
+| 8 | `schema_conformance` | Present, weight 5, threshold 1.0 |
+| 9 | `row_count_trend` | Present, weight 5, threshold 0.80 (or skipped on limited/first run) |
+| 10 | `duplicate_detection` | Present, weight 10, threshold 0.99 |
+| 11 | `field_level_regression` | Present, weight 10, threshold 0.50 (or skipped if no baseline) |
+| 12 | `extra_attributes_ratio` | Present, weight 5, threshold 0.50 (or skipped for v1 format) |
 
 Skipped checks have `"value": null` and `"skipped": true` — this is expected behavior, not an error.
 
-If the eval runs successfully and all 9 checks appear in the result, the config is verified.
+If the eval runs successfully and all 12 checks appear in the result, the config is verified.
 
 ---
 
