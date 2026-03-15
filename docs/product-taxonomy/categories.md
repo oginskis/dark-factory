@@ -225,6 +225,15 @@ This file is edited manually — the `product-taxonomy` skill reads from it but 
 - Shelving, Display Units & Filing Systems
 - Institutional Furniture (School, Hospital, Restaurant)
 
+## Kitchenware, Tableware & Housewares
+- Cookware (Pots, Pans, Bakeware)
+- Cutlery & Flatware
+- Drinkware & Glassware (Wine Glasses, Tumblers, Decanters)
+- Dinnerware & Serveware (Plates, Bowls, Platters)
+- Kitchen Utensils & Gadgets
+- Food Storage Containers
+- Table Linens & Accessories
+
 ## Consumer Goods (Personal Care & Household)
 - Soap, Shampoo & Body Care Products
 - Cosmetics & Color Cosmetics
