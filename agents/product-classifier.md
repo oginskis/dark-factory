@@ -68,14 +68,17 @@ If the company's relationship to physical goods is unclear, escalate — see the
 
 Read the product taxonomy categories file. This file is the single source of truth for all category and subcategory values. Every value used in classification must appear in this file verbatim -- no paraphrasing, no invented categories, no abbreviations.
 
-**Hard limit: one primary, at most one secondary.** A company gets exactly one `Category > Subcategory` primary classification and at most one secondary. No company gets two secondaries. If the company genuinely spans three or more product areas, choose the two most significant and discard the rest.
+Each subcategory line in the taxonomy file has a display name and a taxonomy ID in backticks. Extract taxonomy IDs using this regex pattern: `re.match(r'^- (.+?) \x60([a-z][a-z0-9_.]+)\x60$', line.strip())` — group 1 is the display name, group 2 is the taxonomy ID (e.g., `machinery.power_tools`).
+
+**Unlimited subcategories.** A company gets one **Primary** subcategory and may have additional subcategories listed in **Subcategories**. There is no hard limit on the number of subcategories. Add every subcategory that genuinely describes a distinct product line the company offers — but do not pad the list with marginal matches or subcategories that merely overlap with the primary.
 
 **Classification steps:**
 
 1. Read the full product taxonomy categories file.
-2. Identify the **primary classification** -- the single `Category > Subcategory` pair that best represents what the company is most known for or where it earns the most revenue. Use the exact category heading and the exact subcategory bullet text from the product taxonomy categories file, joined with ` > `. Example: `Furniture & Home Furnishings > Cabinetry & Storage Furniture`.
-3. If the company has a significant second product area, optionally identify **one secondary classification** -- a single additional `Category > Subcategory` pair from the product taxonomy categories file. Only add a secondary when the company has a genuinely distinct second product line, not just product variety within its primary subcategory.
-4. Determine business model (B2B, B2C, B2B2C, marketplace, etc.), target market, and geographic focus.
+2. List all subcategories that describe the company's product lines. For each, record the taxonomy ID and display name.
+3. Identify the **primary** -- the single subcategory (by taxonomy ID) that best represents what the company is most known for or where it earns the most revenue.
+4. Classification values must use the taxonomy ID with the display name in parentheses for readability. Example: `machinery.power_tools` (Power Tools (Drills, Saws, Sanders)).
+5. Determine business model (B2B, B2C, B2B2C, marketplace, etc.), target market, and geographic focus.
 
 If no existing category or subcategory fits the company's primary products, escalate — see the `category_not_found` decision.
 
@@ -116,8 +119,8 @@ Use this exact structure. Every section is required -- if information is unavail
 
 | Attribute | Value |
 |-----------|-------|
-| Primary | {Category > Subcategory -- exact values from product taxonomy categories file} |
-| Secondary | {Category > Subcategory, or "None"} |
+| Subcategories | `{id1}` ({Display Name 1}), `{id2}` ({Display Name 2}) |
+| Primary | `{id}` ({Display Name}) |
 | Business model | {B2B / B2C / B2B2C / etc.} |
 | Target market | {who they sell to} |
 | Geographic focus | {where they operate} |
@@ -169,10 +172,10 @@ This is a surface-level scan — the catalog-detector performs the deep technica
 | Rule | Correct | Wrong |
 |------|---------|-------|
 | **Canonical sections only** | `## Overview`, `## Business Classification`, `## Products`, `## Product Catalog Analysis (Preliminary)`, `## Findings`, `## References` | Extra sections, missing sections, renamed sections |
-| **Primary is one `Category > Subcategory` pair** | `Machinery & Industrial Equipment > Power Tools (Drills, Saws, Sanders)` | `Power Tools`, `Machinery`, `Power Tools (Drills, Saws, Sanders)` without category |
-| **Secondary is one pair or "None"** | `Tools & Hardware > Hand Tools` or `None` | Two pairs, comma-separated list, blank cell |
-| **Classification values are verbatim from the product taxonomy categories file** | Exact category heading + exact subcategory bullet text from the file | Paraphrased, abbreviated, invented, or reworded values |
-| **Category and subcategory joined with ` > `** | `Food & Beverage > Dairy Products` | `Food & Beverage / Dairy Products`, `Food & Beverage: Dairy Products` |
+| **Subcategories lists all taxonomy IDs** | `` `safety.head_protection` (Head Protection), `safety.respiratory_protection` (Respiratory Protection) `` | Display names only, missing backticks, IDs not from categories.md |
+| **Primary is one taxonomy ID** | `` `safety.respiratory_protection` (Respiratory Protection) `` | Two IDs, display name without ID, ID not in categories.md |
+| **Taxonomy IDs are verbatim from categories.md** | Exact ID from the file in backticks + display name in parentheses | Paraphrased, abbreviated, invented, or reworded IDs |
+| **Primary must appear in Subcategories** | Primary ID is also listed in the Subcategories row | Primary ID absent from Subcategories |
 | **Product lines use `###` subsections** | `### Power Tools` under `## Products` | Bullet lists, numbered lists, flat paragraphs |
 | **Catalog categories use nested bullet lists** | `- **Level 1**` → `  - Level 2` → `    - Level 3` | Tables, flat lists, heading-based hierarchy |
 | **References use markdown links** | `[Products page](https://example.com/products)` | Plain URLs without link text |
@@ -186,15 +189,14 @@ Before presenting results, re-read the report you just wrote and check it agains
 | # | Check | Pass criteria |
 |---|-------|---------------|
 | 1 | **All canonical sections present** | Overview, Business Classification, Products, Product Catalog Analysis (Preliminary), Findings, References — no extras, none missing |
-| 2 | **Primary classification is a valid `Category > Subcategory` pair** | Both the category heading and the subcategory bullet text appear verbatim in the product taxonomy categories file |
-| 3 | **Secondary classification is valid or "None"** | Either a single valid `Category > Subcategory` pair from the product taxonomy categories file, or the literal text `None` |
-| 4 | **No invented categories** | Every category and subcategory value used in Primary and Secondary exists word-for-word in the product taxonomy categories file — no paraphrasing, no abbreviations, no synonyms |
-| 5 | **At most one secondary** | The Secondary row contains at most one `Category > Subcategory` pair, never two or more |
-| 6 | **Slug is correct** | Matches the algorithm from Step 1 — derived from domain, not display name |
-| 7 | **Product lines described** | At least one `###` subsection under `## Products` |
-| 8 | **References populated** | At least two URLs visited during investigation are listed with markdown links |
+| 2 | **Primary is a valid taxonomy ID** | The taxonomy ID in the Primary row exists in categories.md and the display name in parentheses matches |
+| 3 | **Subcategories contain valid taxonomy IDs** | Every taxonomy ID in the Subcategories row exists in categories.md with a matching display name |
+| 4 | **All taxonomy IDs exist in categories.md** | No invented, paraphrased, or abbreviated IDs — every ID used in Subcategories and Primary appears verbatim in categories.md |
+| 5 | **Slug is correct** | Matches the algorithm from Step 1 — derived from domain, not display name |
+| 6 | **Product lines described** | At least one `###` subsection under `## Products` |
+| 7 | **References populated** | At least two URLs visited during investigation are listed with markdown links |
 
-If all 8 pass, the report is complete.
+If all 7 pass, the report is complete.
 
 ---
 
