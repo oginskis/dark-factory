@@ -36,9 +36,34 @@ If no catalog assessment exists (meaning the catalog-detector has not run yet), 
 
 Read the SKU schema for the company's product category.
 
-The schema defines category-specific attributes — their names, data types, descriptions, and example values. These attributes go into the `attributes` object of each product record, alongside the six universal attributes that every scraper must extract.
+The schema defines category-specific attributes — their names, data types, descriptions, and example values. These attributes are split into **core** and **extended** lists within the schema. The scraper uses these lists to route extracted attributes into the correct bucket of the product record (see Step 2a).
 
 If no SKU schema exists for the company's category, check the product taxonomy categories file to verify the subcategory exists — see the `no_sku_schema` decision.
+
+**Backward compatibility for company reports:** The scraper-generator must handle both old and new company report formats:
+- **Old format:** `Primary` and `Secondary` rows with `Category > Subcategory` display names
+- **New format:** `Subcategories` and `Primary` rows with taxonomy IDs (e.g., `machinery.power_tools`)
+- **Detection:** If the report has a `Subcategories` row, use the new format; otherwise fall back to the old format.
+
+---
+
+## Step 2a: Map Attributes to Schema
+
+After loading the SKU schema, determine how each attribute the scraper extracts will be routed into the three-bucket product record format.
+
+The scraper-generator MUST:
+
+1. Read the SKU schema for the company's subcategory — specifically the **core** and **extended** attribute lists.
+2. For each attribute the scraper extracts, match it against schema attribute names (exact `snake_case` match).
+3. Matched **core** → `core_attributes`
+4. Matched **extended** → `extended_attributes`
+5. No match → `extra_attributes`
+6. The scraper code must use the **EXACT attribute names** from the schema — no inventing names, no renaming.
+
+**`extra_attributes` governance:**
+- Keys must be `snake_case`
+- Values must be primitives (`string`, `number`, `boolean`) or arrays of primitives
+- No nested objects
 
 ---
 
@@ -64,15 +89,18 @@ Choose based on the scraping strategy from the catalog assessment:
 
 The generated scraper must:
 
-1. **Extract universal attributes for every product:**
+1. **Extract universal top-level fields for every product:**
+   - `_format` — always `2` (identifies the three-bucket format)
    - `sku` — the retailer or manufacturer identifier
    - `name` — full product name
    - `url` — direct link to the product page
-   - `price` — numeric price (float, no currency symbols)
-   - `currency` — ISO 4217 currency code
+   - `price` — numeric price (float, no currency symbols), or `null` if unavailable
+   - `currency` — ISO 4217 currency code, or `null` if unavailable
+   - `brand` — the product's brand name (promoted to top-level, not inside attribute buckets)
+   - `product_category` — the taxonomy ID for the product's subcategory (e.g., `machinery.power_tools`). Use the company's primary taxonomy ID from the company report. For old-format reports without taxonomy IDs, derive the ID from the `Category > Subcategory` display name.
    - `scraped_at` — ISO 8601 timestamp of when this product was extracted
 
-2. **Extract category-specific attributes** as defined in the SKU schema. Map site elements to schema attributes using the descriptions and example values in the schema as guidance. Not every attribute will be present on every site — extract what is available, skip what is not.
+2. **Extract category-specific attributes** as defined in the SKU schema and route them into the correct bucket per Step 2a. Map site elements to schema attributes using the descriptions and example values in the schema as guidance. Not every attribute will be present on every site — extract what is available, skip what is not.
 
 3. **Handle pagination completely** — follow all pages, not just the first. Support whichever pagination pattern the site uses (page numbers, next buttons, cursor-based, infinite scroll). Never stop at an arbitrary page limit.
 
@@ -82,24 +110,45 @@ The generated scraper must:
 
    ```json
    {
-     "sku": "871WAR1926F",
-     "name": "8 oz. Frozen Coulotte Steak - 20/Case",
-     "url": "https://example.com/product/871WAR1926F",
-     "price": 224.99,
-     "currency": "USD",
-     "scraped_at": "2026-03-15T12:34:56Z",
-     "attributes": {
-       "brand": "Warrington Farm Meats",
-       "protein_type": "Beef",
-       "cut_form": "Steak",
-       "storage_type": "Frozen",
-       "net_weight": 8,
-       "net_weight_uom": "oz",
-       "case_pack_size": 20
+     "_format": 2,
+     "sku": "2904-20",
+     "name": "M18 FUEL 1/2\" Hammer Drill/Driver",
+     "url": "https://www.milwaukeetool.com/...",
+     "price": null,
+     "currency": null,
+     "brand": "Milwaukee Tool",
+     "product_category": "machinery.power_tools",
+     "scraped_at": "2026-03-15T14:43:46+00:00",
+     "core_attributes": {
+       "tool_type": "Hammer Drill",
+       "power_source": "Cordless",
+       "voltage": 18,
+       "motor_type": "Brushless",
+       "tool_weight": 3.3,
+       "model_number": "2904-20",
+       "country_of_origin": "USA"
      },
-     "category_path": "Meat & Seafood > Beef > Steaks"
+     "extended_attributes": {
+       "chuck_size": 13,
+       "chuck_type": "All Metal Ratcheting",
+       "number_of_speed_settings": 2,
+       "max_torque": 158
+     },
+     "extra_attributes": {
+       "badge_branding": "FUEL",
+       "warranty": "5 Year Limited Warranty",
+       "image_url": "https://..."
+     },
+     "category_path": "Products > Power Tools > Drilling > Hammer Drills"
    }
    ```
+
+   Universal top-level fields: `_format`, `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`.
+
+   Three attribute buckets:
+   - `core_attributes` — attributes matching **core** names in the SKU schema (exact `snake_case` match)
+   - `extended_attributes` — attributes matching **extended** names in the SKU schema
+   - `extra_attributes` — everything else that doesn't match any schema name
 
    This is the data contract — the agent defines what the scraper produces, not how or where it is persisted. The harness provides the persistence mechanism (file format, storage destination).
 
@@ -224,7 +273,7 @@ Select probe pages from **at least 3 different top-level categories** in the cat
 
 ### Extraction validation
 
-For each probe page, run the scraper's `--probe` mode with that URL. Examine the JSON output to verify: universal attributes (sku, name, url, price, currency) are populated, category-specific attributes are present in the `attributes` object, and no extraction errors are reported. This executes the real extraction code path — do not manually simulate selectors or JSON parsing.
+For each probe page, run the scraper's `--probe` mode with that URL. Examine the JSON output to verify: universal top-level fields (`_format`, `sku`, `name`, `url`, `brand`, `product_category`, `scraped_at`) are populated, `core_attributes` and `extended_attributes` contain schema-matched keys, `extra_attributes` keys are `snake_case` with primitive values, and no extraction errors are reported. This executes the real extraction code path — do not manually simulate selectors or JSON parsing.
 
 If extraction would fail for a given page:
 1. Identify the specific issue (wrong selector, unexpected JSON-LD structure, missing field)
@@ -271,7 +320,7 @@ The test must verify:
 
 1. **Scraper completes without crashing** — no unhandled exceptions
 2. **Summary is valid** — `total_products` is between 1 and 20, `errors_count` is 0
-3. **Product records are correct** — at least some records have the core universal attributes populated (sku, name, url, scraped_at). Price and currency should be populated when the catalog displays prices — when the catalog assessment notes that prices are unavailable (e.g., international sites without pricing), null values are acceptable. At least some records should have category-specific attributes in the `attributes` object.
+3. **Product records are correct** — all records have `_format: 2`, `brand` as a top-level field (not inside attribute buckets), and `product_category` as a valid taxonomy ID. At least some records have the core universal fields populated (sku, name, url, scraped_at). Price and currency should be populated when the catalog displays prices — when the catalog assessment notes that prices are unavailable (e.g., international sites without pricing), null values are acceptable. At least some records should have attributes in `core_attributes` and/or `extended_attributes` matching the SKU schema names.
 4. **Persist hook worked** — the harness received batches and the output destination has product data
 5. **Category diversity** — the extracted products span at least 2 distinct `category_path` top-level values. The probe (Step 4) validates extraction logic across at least 3 categories; this gate verifies that the scraper traverses multiple categories in a real run with pagination and batching. If all 20 products come from a single category, the test coverage is insufficient. If the catalog has only one category, this check passes automatically.
 
@@ -309,6 +358,10 @@ Produce config metadata for the scraper:
   "sku_schema": "{category-slug}",
   "scraping_strategy": "static_html",
   "expected_product_count": 1200,
+  "category_mapping": {
+    "default": "machinery.power_tools"
+  },
+  "default_category": "machinery.power_tools",
   "generated_at": "2026-03-14T12:00:00Z"
 }
 ```
@@ -317,6 +370,8 @@ Produce config metadata for the scraper:
 - `sku_schema` — the slug of the SKU schema file that was used
 - `scraping_strategy` — the strategy the scraper implements
 - `expected_product_count` — from the catalog assessment estimate, updated with the actual count found during testing if it is higher
+- `category_mapping` — a dict mapping site category paths or identifiers to taxonomy IDs. At minimum, includes a `"default"` key with the company's primary taxonomy ID.
+- `default_category` — the company's primary taxonomy ID, used as the fallback `product_category` value when no specific mapping applies
 - `generated_at` — ISO 8601 timestamp of when the scraper was generated
 
 ### Strict format rules
@@ -324,10 +379,15 @@ Produce config metadata for the scraper:
 | Rule | Correct | Wrong |
 |------|---------|-------|
 | **Product data is a flat list of records** | One record per product, all at same level | Nested grouping by category, hierarchical structures |
+| **`_format` is always `2`** | `"_format": 2` | Missing, `1`, `"2"` (string) |
+| **`brand` is a top-level field** | `"brand": "Milwaukee Tool"` at root | `"brand"` inside `core_attributes` or any attribute bucket |
+| **`product_category` is a valid taxonomy ID** | `"product_category": "machinery.power_tools"` | Display names like `"Machinery > Power Tools"`, missing field |
 | **Price is a float, no currency symbols** | `224.99` | `"$224.99"`, `"224.99"`, `"USD 224.99"` |
 | **Currency is ISO 4217** | `"USD"`, `"EUR"`, `"GBP"` | `"$"`, `"dollars"`, `"us"` |
 | **SKU is a string** | `"871WAR1926F"` | `871` (numeric), `null` |
-| **Category-specific attributes go in `attributes` object** | `"attributes": {"brand": "..."}` | Flat at product root level |
+| **Core attributes match schema core list** | `"core_attributes": {"voltage": 18}` with `voltage` in schema core | Invented names, extended attrs in core bucket |
+| **Extended attributes match schema extended list** | `"extended_attributes": {"chuck_size": 13}` with `chuck_size` in schema extended | Core attrs in extended bucket, invented names |
+| **Extra attributes are governed** | `snake_case` keys, primitive values (string/number/boolean/array of primitives) | camelCase keys, nested objects |
 | **`category_path` uses ` > ` separator** | `"Tools > Saws > Plunge-Cut Saws"` | `"Tools / Saws"`, `"Tools>Saws"` (no spaces) |
 | **Config metadata matches schema** | All fields present with correct types | Missing fields, wrong types |
 
@@ -340,19 +400,24 @@ Before presenting results, verify the scraper and config against these quality g
 | # | Check | Pass criteria |
 |---|-------|---------------|
 | 1 | **Scraper is standalone** | Single .py file, no imports from the codebase, only allowed libraries |
-| 2 | **Dry-run test passed** | Products extracted successfully with all 6 universal attributes populated |
-| 3 | **Product data contract correct** | Flat list of product records with all required fields per the schema |
-| 4 | **Pagination handled** | Scraper follows all pages, not hardcoded to first page |
-| 5 | **Error handling present** | Retries, timeouts, and graceful skipping of failed products |
-| 6 | **Config metadata complete** | All required fields present with correct values |
-| 7 | **Logging implemented** | JSON lines to stderr with required events |
-| 8 | **Code quality** | PEP 723 inline script metadata present at top of file, `from __future__ import annotations` follows, all functions typed, no bare `except:`, constants at module level, single `httpx.Client` reused |
-| 9 | **Persist hook present** | setup/persist/teardown functions exist, persist is called after each batch of up to 100 records, teardown is always called |
-| 10 | **Platform knowledgebase updated** | Platform knowledgebase was written or updated after a successful test (when platform is an enumerated value — not `unknown` or `custom`) |
-| 11 | **Category diversity in test** | Dry-run test produced products from at least 2 distinct top-level categories (or the catalog has only one category) |
-| 12 | **Product discovery strategy is robust** | Scraper uses the most comprehensive discovery source available (sitemap, JSON API, or exhaustive category traversal). For `custom`/`unknown` platforms, scraper uses URL-pattern-based link discovery rather than platform-specific CSS selectors. Deduplication by URL or SKU is present. |
+| 2 | **Dry-run test passed** | Products extracted successfully with all universal top-level fields populated |
+| 3 | **Product data contract correct** | Flat list of product records with `_format: 2` and the three-bucket attribute structure |
+| 4 | **`brand` is top-level** | `brand` appears as a top-level field in every product record, not inside any attribute bucket |
+| 5 | **`product_category` is valid** | `product_category` is a valid taxonomy ID from `categories.md` |
+| 6 | **`core_attributes` keys match schema** | Every key in `core_attributes` appears in the SKU schema's core attribute list |
+| 7 | **`extended_attributes` keys match schema** | Every key in `extended_attributes` appears in the SKU schema's extended attribute list |
+| 8 | **`extra_attributes` keys are governed** | Keys are `snake_case`, values are primitives (string, number, boolean) or arrays of primitives, no nested objects |
+| 9 | **Pagination handled** | Scraper follows all pages, not hardcoded to first page |
+| 10 | **Error handling present** | Retries, timeouts, and graceful skipping of failed products |
+| 11 | **Config metadata complete** | All required fields present with correct values, including `category_mapping` and `default_category` |
+| 12 | **Logging implemented** | JSON lines to stderr with required events |
+| 13 | **Code quality** | PEP 723 inline script metadata present at top of file, `from __future__ import annotations` follows, all functions typed, no bare `except:`, constants at module level, single `httpx.Client` reused |
+| 14 | **Persist hook present** | setup/persist/teardown functions exist, persist is called after each batch of up to 100 records, teardown is always called |
+| 15 | **Platform knowledgebase updated** | Platform knowledgebase was written or updated after a successful test (when platform is an enumerated value — not `unknown` or `custom`) |
+| 16 | **Category diversity in test** | Dry-run test produced products from at least 2 distinct top-level categories (or the catalog has only one category) |
+| 17 | **Product discovery strategy is robust** | Scraper uses the most comprehensive discovery source available (sitemap, JSON API, or exhaustive category traversal). For `custom`/`unknown` platforms, scraper uses URL-pattern-based link discovery rather than platform-specific CSS selectors. Deduplication by URL or SKU is present. |
 
-If all 12 pass, the scraper is complete.
+If all 17 pass, the scraper is complete.
 
 ---
 
