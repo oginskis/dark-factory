@@ -34,6 +34,8 @@ Generate a production-ready Python scraper for a company's product catalog, vali
 | Config metadata (output) | `docs/scraper-generator/{slug}/config.json` |
 | Product data (output) | `docs/scraper-generator/{slug}/output/products.jsonl` |
 | Run summary (output) | `docs/scraper-generator/{slug}/output/summary.json` |
+| Label discovery diagnostics (output) | `docs/scraper-generator/{slug}/output/label-discovery.json` |
+| Validation diagnostics (output) | `docs/scraper-generator/{slug}/output/validation.json` |
 
 ### Slug derivation
 
@@ -59,6 +61,7 @@ Read and follow `references/orchestrator.md`.
 - No web search or Playwright browser tools are needed.
 - The knowledgebase write (Step 3) uses file write/edit tools to create or append to the platform knowledgebase file.
 - Data persistence: read the persist hook implementations file for the `setup`/`persist`/`teardown` functions to include in the generated scraper. Write the scraper code to the scraper script path before running tests (so `uv run` can execute it). The scraper code is final once the validator returns `pass`. After config metadata is prepared (Step 4), persist it as JSON to the config metadata path.
+- Diagnostic persistence: after the label discoverer returns (non-English sites only), write its output plus `site_language` and `generated_at` as JSON to the label discovery diagnostics path. After the validator returns (any status, any language), write its output plus `generated_at` as JSON to the validation diagnostics path. On re-dispatch, overwrite the previous file.
 - The canonical product record format definition lives in `references/code-generator.md`.
 
 ## Escalation handling

@@ -180,6 +180,14 @@ Skip for English-language sites.
 - `coverage_sufficient = false`, `extension_attempts < 3` → re-dispatch, passing `extension_attempts` so the sub-agent continues from where it left off.
 - `coverage_sufficient = false`, `extension_attempts = 3` → escalate — see the `label_coverage_insufficient` decision.
 
+### Diagnostic persistence
+
+After the label discoverer returns (regardless of `coverage_sufficient`), persist its output as the label discovery diagnostic file. Include all output contract fields verbatim (including `value_translation_dicts`), plus two orchestrator-added fields:
+- `site_language` — the ISO 639-1 code from the catalog assessment
+- `generated_at` — ISO 8601 timestamp
+
+On re-dispatch (coverage retry), overwrite the file with the updated results.
+
 ---
 
 ## Dispatch: Code Generation
@@ -260,6 +268,13 @@ A single standalone Python file (scraper.py).
 "test_failed" / "timeout" (second failure)
   → ESCALATE: scraper_test_failed
 ```
+
+### Diagnostic persistence
+
+After the validator returns (any status, including failures), persist its output as the validation diagnostic file. Include all output contract fields verbatim, plus:
+- `generated_at` — ISO 8601 timestamp
+
+On re-dispatch (after code-generator fix), overwrite the file with the new attempt's results. The file always reflects the last validation run. Write this file for both English and non-English sites.
 
 ---
 

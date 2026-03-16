@@ -167,6 +167,7 @@ Return a structured result to the caller:
 | `inventory_size` | int | Total unique labels found before discards |
 | `extension_attempts` | int | Number of extension cycles performed (0–3) |
 | `coverage_sufficient` | bool | `true` if coverage ≥ 70%, `false` otherwise |
+| `value_translation_dicts` | dict | Static translation dicts for closed value sets (e.g., `{"SPECIES_MAP": {"Egle": "Spruce", "Furu": "Pine"}}`). Empty dict if no closed value sets found. |
 
 The caller uses `coverage_sufficient` to decide whether to proceed to scraper generation or escalate. This sub-agent does not make that decision.
 
