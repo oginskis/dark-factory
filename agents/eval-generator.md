@@ -82,19 +82,19 @@ Produce the eval config file with all 8 required fields:
 | `expected_top_level_categories` | Catalog assessment | The top-level category names from the category structure section. These are the catalog's own category names (e.g., "Riga Wood"), not taxonomy categories. |
 | `core_attributes` | SKU schema + scraper source | **Key** values from the schema's Core Attributes table (excluding universal keys `sku`, `product_name`, `url`, `price`, `currency`). Only include keys the scraper actually extracts. Universal fields (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) are handled by the shared eval script — do not include them here. |
 | `extended_attributes` | SKU schema + scraper source | **Key** values from the schema's Extended Attributes table. Only include keys the scraper actually extracts. |
-| `type_map` | SKU schema + scraper source | Maps every attribute **Key** (across core, extended, and extra) to its expected eval type: `"str"`, `"number"`, `"list"`, or `"bool"`. Use the Key values as dict keys (e.g., `"charging_power_kw"`, not `"Charging Power (kW)"`). Covers all attributes the scraper extracts. |
+| `type_map` | SKU schema + scraper source | Maps every attribute **Key** (across core, extended, and extra) to its expected eval type: `"str"`, `"number"`, `"list"`, or `"bool"`. The SKU schema `Data Type` column maps directly — `text`/`enum` → `"str"`, `number` → `"number"`, `text (list)` → `"list"`, `boolean` → `"bool"`. Covers all attributes the scraper extracts. |
 | `enum_attributes` | SKU schema + scraper source | Maps attributes that have a closed set of allowed values to their value arrays. Only include attributes where the allowed values are known from the SKU schema or clearly enumerable from the scraper logic. Use an empty object `{}` when no enum constraints apply. |
 | `has_prices` | Catalog assessment + scraper source | `true` if the catalog has prices and the scraper extracts them, `false` otherwise. When `false`, the shared eval script skips the price sanity check. |
 
 ### SKU schema → eval type mapping
 
-The SKU schema uses descriptive data types; the eval config uses a closed set of 4 type strings. Convert using this table:
+The SKU schema `Data Type` column contains clean types (units are in the separate `Unit` column). Map directly:
 
 | SKU schema Data Type | Eval `type_map` value |
 |---------------------|----------------------|
-| `text`, `text (mm)`, `text (deg C)`, `text (list)` with single values, `enum` | `"str"` |
-| `number`, `number (kg)`, `number (kW)`, `number (A)`, `number (m)`, `number (N)` | `"number"` |
-| `text (list)` when the scraper outputs an array | `"list"` |
+| `text`, `enum` | `"str"` |
+| `number` | `"number"` |
+| `text (list)` | `"list"` |
 | `boolean` | `"bool"` |
 
 When in doubt, check the scraper source to see what Python type the attribute actually produces.

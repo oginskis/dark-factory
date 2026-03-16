@@ -124,7 +124,7 @@ When all four stages complete successfully, present a structured summary to the 
   - {URL 2}
 
 ### Scraper
-- **Output format:** four-level (universal top-level fields + `core_attributes`, `extended_attributes`, `extra_attributes`)
+- **Output format:** four-level with attribute_units (universal top-level fields + `core_attributes`, `extended_attributes`, `extra_attributes` + `attribute_units`)
 - **Test result:** {passed / failed} ({N} products extracted, {errors} errors, {duration}s)
 - **SKU schema:** {subcategory-slug}
 - **Category-specific attributes extracted:** {comma-separated list of attribute names found in test products}
