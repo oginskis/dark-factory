@@ -1,4 +1,4 @@
-# Catalog Detector Agent
+# Catalog Detector Workflow
 
 **Input:** Company URL + category classification from the company report
 **Output:** Catalog assessment report, including scraping strategy
@@ -17,9 +17,9 @@ This context shapes where to look for product listings and what catalog structur
 
 ### Investigation vs. scraping constraint
 
-This agent can use any available tools during investigation — including rendering pages in a browser, observing network requests, and inspecting JavaScript behavior. The purpose is to discover how the site delivers product data.
+This workflow can use any available tools during investigation — including rendering pages in a browser, observing network requests, and inspecting JavaScript behavior. The purpose is to discover how the site delivers product data.
 
-However, the **scraping strategy recommended by this agent** must be executable with simple HTTP request libraries (httpx, requests) plus HTML/JSON/PDF parsing. The downstream scraper cannot use a headless browser. So the investigation goal is: find a path to product data that works without JavaScript rendering — static HTML, JSON-LD, an internal API, or a downloadable file.
+However, the **scraping strategy recommended by this workflow** must be executable with simple HTTP request libraries (httpx, requests) plus HTML/JSON/PDF parsing. The downstream scraper cannot use a headless browser. So the investigation goal is: find a path to product data that works without JavaScript rendering — static HTML, JSON-LD, an internal API, or a downloadable file.
 
 ---
 
@@ -95,7 +95,7 @@ Identify the CMS or e-commerce platform powering the site. Check these signals:
 
 Record the platform using one of these values: `woocommerce`, `shopify`, `magento`, `prestashop`, `opencart`, `bigcommerce`, `squarespace`, `wix`, `drupal`, `custom`, `unknown`. This is a closed enumeration — if the platform is recognizable but not on this list, record `custom`. The slug is always lowercase, no spaces or special characters.
 
-After identifying the platform, read the platform knowledgebase for the detected platform (if it exists). The knowledgebase contains extraction patterns, CSS selectors, and pitfalls discovered from previous scraper runs on the same platform. Use this knowledge to inform the structured data and anti-bot assessments that follow. The knowledgebase is maintained by the scraper-generator — this agent only reads it.
+After identifying the platform, read the platform knowledgebase for the detected platform (if it exists). The knowledgebase contains extraction patterns, CSS selectors, and pitfalls discovered from previous scraper runs on the same platform. Use this knowledge to inform the structured data and anti-bot assessments that follow. The knowledgebase is maintained by the scraper-generator — this workflow only reads it.
 
 ### Rendering Method
 Load a product listing page and determine how content is delivered:
@@ -132,7 +132,7 @@ Assess the difficulty of automated access:
 
 ## Step 5: Product Attribute Extractability Check
 
-The downstream scraper extracts four levels of product data (see scraper-generator skill for the canonical definition):
+The downstream scraper extracts four levels of product data (see `.claude/skills/scraper-generator/references/code-generator.md` for the canonical definition):
 
 1. **Universal top-level fields** (sku, name, url, price, etc.) — mandatory for every product
 2. **`core_attributes`** — the most important category-specific attributes, defined by the SKU schema. Scrapers put high effort into extracting these.
@@ -295,6 +295,14 @@ Before presenting results, re-read the catalog assessment you just wrote and che
 | 3 | **Findings explain why** | `## Findings` section describes what was found and why scraping is not viable |
 
 If all gates pass, the report is complete.
+
+---
+
+## Boundaries
+
+- This workflow assesses catalog scrapability only — it does not classify companies (product-classifier) or generate scrapers (scraper-generator).
+- It does not test actual data extraction — it evaluates whether the site structure supports scraping.
+- It does not modify the product taxonomy or SKU schemas.
 
 ---
 

@@ -12,7 +12,7 @@ user-invocable: true
 
 # Catalog Detector
 
-Read and follow the agent instructions in `agents/catalog-detector.md`.
+Detect whether a company has a public product catalog and determine the best scraping strategy.
 
 ## Input
 
@@ -28,14 +28,16 @@ Read and follow the agent instructions in `agents/catalog-detector.md`.
 
 ## Role in the four-level product record
 
-The catalog-detector determines whether a site can support the four-level product record format (see scraper-generator skill for the canonical definition). Specifically, Step 5 (Product Attribute Extractability Check) verifies that the catalog exposes enough structured data to support at least the universal top-level fields and core attributes. A site that only shows product names and images — without structured specs — cannot produce meaningful core_attributes and is stopped via `attributes_not_extractable`.
+The catalog-detector determines whether a site can support the four-level product record format (see `.claude/skills/scraper-generator/references/code-generator.md` for the canonical definition). Specifically, Step 5 (Product Attribute Extractability Check) verifies that the catalog exposes enough structured data to support at least the universal top-level fields and core attributes. A site that only shows product names and images — without structured specs — cannot produce meaningful core_attributes and is stopped via `attributes_not_extractable`.
 
-## Claude Code wiring
+## Workflow
+
+Read and follow `references/workflow.md`.
 
 - Read the company report first for the company URL, categories, and business model context.
-- Provide the file paths from the table above when the agent references logical resources (e.g., "the company report", "write the catalog assessment report", "the platform knowledgebase").
-- Use web search, web fetch, and Playwright browser tools to investigate catalog pages as the agent directs.
-- This agent does not escalate — all decisions are autonomous stops. If the agent determines scraping is not viable (`no_public_catalog`, `auth_required`, `anti_bot_severe`, `requires_headless_browser`, `spa_not_scrapable`, or `attributes_not_extractable`), it writes a minimal catalog assessment and stops. Report the outcome to the user.
+- Provide the file paths from the table above when the workflow references logical resources (e.g., "the company report", "write the catalog assessment report", "the platform knowledgebase").
+- Use web search, web fetch, and Playwright browser tools to investigate catalog pages as the workflow directs.
+- This skill does not escalate — all decisions are autonomous stops. If the workflow determines scraping is not viable (`no_public_catalog`, `auth_required`, `anti_bot_severe`, `requires_headless_browser`, `spa_not_scrapable`, or `attributes_not_extractable`), it writes a minimal catalog assessment and stops. Report the outcome to the user.
 - Reading the platform knowledgebase is optional — the file may not exist for platforms not yet encountered. If it does not exist, proceed without it.
 
 ## Notes

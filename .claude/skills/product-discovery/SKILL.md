@@ -13,11 +13,11 @@ user-invocable: true
 
 # Product Discovery Pipeline
 
-You are the orchestrator for the product discovery pipeline. You run four stages sequentially, each defined by its own agent markdown and skill file. You do not improvise the stages — you read and follow each agent document exactly, in order.
+You are the orchestrator for the product discovery pipeline. You run four stages sequentially, each implemented as its own skill. You do not improvise the stages — you invoke each skill in order and follow its instructions exactly.
 
-Some agents escalate decisions that require user input (product-classifier, scraper-generator, eval-generator). The catalog-detector does not escalate — all its decisions are autonomous stops.
+Some stages escalate decisions that require user input (product-classifier, scraper-generator, eval-generator). The catalog-detector does not escalate — all its decisions are autonomous stops.
 
-When an agent escalates, present the decision to the user using this format and wait for their response before continuing:
+When a stage escalates, present the decision to the user using this format and wait for their response before continuing:
 
 ```
 **Escalation: `{decision_name}`**
@@ -26,7 +26,7 @@ When an agent escalates, present the decision to the user using this format and 
 
 {One-sentence summary of what was encountered — from the decision's Context field.}
 
-{Escalation payload — the specific evidence, candidates, or details the agent gathered.}
+{Escalation payload — the specific evidence, candidates, or details the workflow gathered.}
 
 **Your options:**
 1. {Primary action the user can take to resolve and continue}
@@ -36,7 +36,7 @@ When an agent escalates, present the decision to the user using this format and 
 
 Each stage's skill wrapper defines the specific user options per escalation — use those. The format ensures the user always knows what happened, sees the evidence, and has clear actions to choose from.
 
-Each stage has a corresponding skill file (`.claude/skills/{skill-name}/SKILL.md`) that defines the file locations for that stage. Use those paths when providing files to the agent — the agents themselves are harness-agnostic and use logical resource names.
+Each stage is a self-contained skill. Invoke it and follow its instructions.
 
 ## Input
 
@@ -44,11 +44,11 @@ The user provides a company URL or name as the argument: `$ARGUMENTS`
 
 If no URL or name is provided, ask for one before proceeding.
 
-The slug is derived from the company's primary domain name — see the slug derivation algorithm in `agents/product-classifier.md` Step 1. This slug is the file key across all stages.
+The slug is derived from the company's primary domain name — see the slug derivation algorithm in `.claude/skills/product-classifier/references/workflow.md` Step 1. This slug is the file key across all stages.
 
 ## Stage 1: Product Classifier
 
-Read file locations from `.claude/skills/product-classifier/SKILL.md`, then read and follow `agents/product-classifier.md` in full.
+Invoke `/product-classifier` with the company URL or name from $ARGUMENTS.
 
 This stage resolves the company identity, applies the tangible goods gate, classifies it into the taxonomy using taxonomy IDs (e.g., `machinery.power_tools`), and produces the company profile report. The report lists all matching subcategories (not limited to two) and identifies one as the primary.
 
@@ -61,7 +61,7 @@ This stage resolves the company identity, applies the tangible goods gate, class
 
 ## Stage 2: Catalog Detector
 
-Read file locations from `.claude/skills/catalog-detector/SKILL.md`, then read and follow `agents/catalog-detector.md` in full.
+Invoke `/catalog-detector {slug}`.
 
 This stage examines the company's website for a public product catalog, analyzes its structure, and determines the scraping strategy.
 
@@ -75,22 +75,23 @@ This stage examines the company's website for a public product catalog, analyzes
 
 ## Stage 3: Scraper Generator
 
-Read file locations from `.claude/skills/scraper-generator/SKILL.md`, then read and follow `agents/scraper-generator.md` in full.
+Invoke `/scraper-generator {slug}`.
 
-This stage generates a standalone Python scraper based on the catalog assessment, SKU schema, and platform knowledgebase (if available). Scrapers output the four-level product record format (see scraper-generator skill for the canonical definition). For multi-subcategory companies, the scraper classifies products by URL-prefix to taxonomy ID mapping at runtime. It validates the scraper via probe testing and a full test before finalizing.
+This stage generates a standalone Python scraper based on the catalog assessment, SKU schema, and platform knowledgebase (if available). Scrapers output the four-level product record format (see `.claude/skills/scraper-generator/references/code-generator.md` for the canonical definition). For multi-subcategory companies, the scraper classifies products by URL-prefix to taxonomy ID mapping at runtime. It validates the scraper via probe testing and a full test before finalizing.
 
 **Stop the pipeline if:**
 - No catalog assessment exists for the company (defensive — Stage 2 ensures this)
 - The company's subcategory is not found in the product taxonomy categories file (taxonomy integrity issue — should not happen if Stage 1 validated against the taxonomy)
 - A URL prefix cannot be mapped to any taxonomy subcategory (unmapped_url_prefix escalation)
+- Non-English label coverage stays below 70% after 3 extension attempts (label_coverage_insufficient escalation)
 - Probe extraction fails after 5 fix cycles (extraction logic cannot match the live site)
-- The scraper fails testing twice after adjustment
+- The scraper fails testing twice after adjustment (includes attribute fill rate failures — ≥30% of products must have non-empty core_attributes)
 
 If no SKU schema exists but the subcategory is valid, the scraper-generator will automatically invoke `/product-taxonomy` to generate it before continuing. **Before concluding a schema is missing, always list `docs/product-taxonomy/sku-schemas/` and search for the subcategory name** — never guess the filename from a partial slug.
 
 ## Stage 4: Eval Generator
 
-Read file locations from `.claude/skills/eval-generator/SKILL.md`, then read and follow `agents/eval-generator.md` in full.
+Invoke `/eval-generator {slug}`.
 
 This stage generates an eval config that the shared eval script uses to validate scrape quality using twelve weighted checks.
 

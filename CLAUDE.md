@@ -5,15 +5,14 @@ Product discovery pipeline that takes a company name or URL and produces continu
 ## Architecture
 
 Two-tier cost model:
-- **Expensive tier** — LLM agents classify companies, detect catalogs, generate scrapers and evals. Runs once per company and on degradation.
+- **Expensive tier** — LLM skills classify companies, detect catalogs, generate scrapers and evals. Runs once per company and on degradation.
 - **Cheap tier** — Generated Python scripts (scraper.py) + eval configs (eval_config.json) run as daily K8s CronJobs via the shared eval script. No LLM involved.
 
 Pipeline stages: product-classifier → catalog-detector → scraper-generator → eval-generator.
 
 ## Key Directories
 
-- `agents/` — Harness-agnostic agent files (shared reasoning, no tool names or file paths)
-- `.claude/skills/` — Claude Code skill wrappers (file paths, tool wiring, escalation handling)
+- `.claude/skills/` — Pipeline skills (SKILL.md + references/ for each stage)
 - `docs/product-taxonomy/` — Canonical taxonomy (`categories.md`) and SKU schemas (`sku-schemas/`)
 - `docs/product-classifier/` — Company reports (output of product-classifier)
 - `docs/catalog-detector/` — Catalog assessments (output of catalog-detector)
@@ -56,13 +55,12 @@ Per-company pipeline output under `docs/` is gitignored — only shared knowledg
 | | `docs/scraper-generator/` |
 | | `docs/eval-generator/` |
 
-`.claude/` (skills, settings) and `agents/` are always tracked — never gitignore them.
+`.claude/` (skills, settings) is always tracked — never gitignore it.
 
 ## Conventions
 
-- **After every change to any skill or agent file**, run `/skill-creator-local deep review` to verify convention compliance. This is not optional.
-- Skill wrappers and agent files are a paired two-file pattern. See `/skill-creator-local` for the full convention spec.
+- **After every change to any skill file**, run `/skill-creator-local deep review` to verify convention compliance. This is not optional.
+- Each pipeline skill is self-contained under `.claude/skills/{name}/` with SKILL.md + references/. See `/skill-creator-local` for conventions.
 - Run `uv run python .claude/skills/skill-creator-local/scripts/verify_skill.py --all` to check convention compliance.
 - Taxonomy IDs (e.g., `machinery.power_tools`) are the canonical identifiers — always from `docs/product-taxonomy/categories.md`.
-- Agent files must be harness-agnostic: no tool names, no file paths, no user-facing language.
 - The product taxonomy categories file is read-only for all skills except product-taxonomy.

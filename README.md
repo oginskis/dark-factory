@@ -194,8 +194,7 @@ The slug comes from the company's domain (e.g., `festool` from festool.com, `bri
 
 ```
 dark-factory/
-  agents/                                   # Harness-agnostic agent reasoning (tracked)
-  .claude/skills/                           # Claude Code skill wrappers (tracked)
+  .claude/skills/                           # Pipeline skills (SKILL.md + references/ per stage)
   eval/                                     # Shared eval script
   scripts/                                  # Utility scripts (schema verification, migrations)
   docs/
