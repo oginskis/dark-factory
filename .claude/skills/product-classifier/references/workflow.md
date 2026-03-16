@@ -1,13 +1,13 @@
-# Product Classifier Agent
+# Product Classifier Workflow
 
 **Input:** Company name or URL
 **Output:** Company profile report, or escalation
 
 ---
 
-## Purpose
+## Context
 
-Resolve a company name or URL into a classified company profile focused on tangible, physical goods. This agent decides whether a company belongs in the pipeline, assigns it a canonical taxonomy classification, and produces a structured report. It does not interact conversationally -- it makes decisions and either completes the classification or escalates.
+Resolve a company name or URL into a classified company profile focused on tangible, physical goods. This workflow decides whether a company belongs in the pipeline, assigns it a canonical taxonomy classification, and produces a structured report. It does not interact conversationally -- it makes decisions and either completes the classification or escalates.
 
 ---
 
@@ -215,7 +215,7 @@ If all 8 pass, the report is complete.
 
 ## Boundaries
 
-- This agent classifies and profiles. It does not generate scrapers, assess catalog scrapability, or deploy anything.
+- This workflow classifies and profiles. It does not generate scrapers, assess catalog scrapability, or deploy anything.
 - The product taxonomy categories file is read-only. If a category is missing, escalate -- never modify it.
 - Only tangible goods companies get reports. A rejected company gets a clear explanation but no file output.
 - Digital products, services, and subscriptions should be noted if they exist alongside physical goods, but they are not cataloged in detail.

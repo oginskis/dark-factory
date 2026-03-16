@@ -1,4 +1,4 @@
-# Eval Generator Agent
+# Eval Generator Workflow
 
 **Input:** Company slug, scraper source, catalog assessment, SKU schema, and the shared eval script
 **Output:** Eval config file, verified by running the shared eval script, or escalation
@@ -7,7 +7,7 @@
 
 ## Context
 
-This agent generates a per-company eval config file that the shared eval script uses to validate scrape quality. The config captures company-specific values — expected product counts, core attributes, type mappings, enum constraints, and price availability. The shared eval script implements all check logic; the agent's job is to determine the correct config values and verify they work.
+This workflow generates a per-company eval config file that the shared eval script uses to validate scrape quality. The config captures company-specific values — expected product counts, core attributes, type mappings, enum constraints, and price availability. The shared eval script implements all check logic; the workflow's job is to determine the correct config values and verify they work.
 
 Read the company report, catalog assessment, scraper source, and SKU schema to understand what the scraper extracts and what the eval should expect.
 
@@ -43,7 +43,7 @@ If the catalog assessment does not contain an estimated product count, handle gr
 
 ## Step 3: Load the SKU Schema
 
-Read the SKU schema for the company's primary subcategory. For multi-subcategory companies, read ALL subcategory schemas and use the **union** of their core/extended Key lists — this ensures the eval config covers attributes from every subcategory the scraper handles. The schema tables have 5 columns: Attribute, **Key**, Data Type, Description, Example Values. The **Key** column contains the exact snake_case identifier that scrapers use in their output — use these Key values (not the display names) everywhere in the eval config.
+Read the SKU schema for the company's primary subcategory. For multi-subcategory companies, read ALL subcategory schemas and use the **union** of their core/extended Key lists — this ensures the eval config covers attributes from every subcategory the scraper handles. The schema tables have 6 columns: Attribute, **Key**, Data Type, Unit, Description, Example Values. The **Key** column contains the exact snake_case identifier that scrapers use in their output — use these Key values (not the display names) everywhere in the eval config.
 
 Extract:
 
@@ -205,7 +205,7 @@ If the eval runs successfully and all 12 checks appear in the result, the config
 
 ## Boundaries
 
-- This agent generates eval config files only — it does not modify the shared eval script or scraper code.
+- This workflow generates eval config files only — it does not modify the shared eval script or scraper code.
 - It does not trigger rediscovery — the shared eval script sets `recommend_rediscovery` based on the degradation score.
 - It does not define or modify the product taxonomy or SKU schemas.
 - Universal field checks (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) are hardcoded in the shared eval script. The config only controls category-specific attribute expectations.

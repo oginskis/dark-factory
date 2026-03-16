@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Verify a skill-wrapper + agent pair follows the dark-factory pipeline conventions.
+Verify a skill follows the dark-factory pipeline conventions (pure-skills pattern).
 
 Usage:
     python verify_skill.py <skill-name>
@@ -9,11 +9,12 @@ Usage:
 
 Checks:
   1. Skill wrapper structure (required sections, frontmatter)
-  2. Agent file structure (required sections, ordering)
-  3. Cross-file reference integrity (logical names, decisions, file locations)
-  4. Orchestrator alignment (stop conditions)
-  5. Report template compliance (heading, date, sections)
-  6. Decision-step references (steps must point to decisions by name)
+  2. Skill structure (summary line, workflow delegation, escalation template, notes)
+  3. Workflow reference structure (heading, Context/Boundaries/Decisions sections, steps, ordering)
+  4. Cross-file reference integrity (logical names, decisions, file locations, escalation template markers)
+  5. Orchestrator alignment (stop conditions)
+  6. Report template compliance (heading, date, sections)
+  7. Decision-step references (steps must point to decisions by name)
 
 Exit code 0 = all checks pass, 1 = failures found.
 """
@@ -24,21 +25,26 @@ from pathlib import Path
 
 
 def find_repo_root():
-    """Walk up from script location to find the repo root (directory containing agents/)."""
+    """Walk up from script location to find the repo root (directory containing .claude/skills/)."""
     path = Path(__file__).resolve().parent
     for _ in range(10):
-        if (path / "agents").is_dir() and (path / ".claude" / "skills").is_dir():
+        if (path / ".claude" / "skills").is_dir():
             return path
         path = path.parent
-    raise RuntimeError("Cannot find repo root (directory with agents/ and .claude/skills/)")
+    raise RuntimeError("Cannot find repo root (directory with .claude/skills/)")
 
 
 REPO_ROOT = find_repo_root()
 SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
-AGENTS_DIR = REPO_ROOT / "agents"
 ORCHESTRATOR = SKILLS_DIR / "product-discovery" / "SKILL.md"
 
-# Skills that follow the standalone pattern (no agent file, reduced checks)
+
+def references_dir(skill_name):
+    """Return the references/ directory for a skill."""
+    return SKILLS_DIR / skill_name / "references"
+
+
+# Skills that follow the standalone pattern (no workflow reference, reduced checks)
 STANDALONE_SKILLS = {"product-taxonomy", "product-discovery", "skill-creator-local"}
 
 
@@ -78,7 +84,7 @@ def extract_h2_sections(content):
 
 
 def extract_decisions(content):
-    """Extract Decision: names from agent file."""
+    """Extract Decision: names from workflow reference."""
     return re.findall(r"^### Decision: (\w+)", content, re.MULTILINE)
 
 
@@ -121,7 +127,7 @@ def extract_file_locations(content):
 def extract_wiring_examples(content):
     """Extract logical resource name examples from wiring section."""
     examples = []
-    wiring_match = re.search(r"## Claude Code wiring\n(.*?)(?=\n## |\Z)", content, re.DOTALL)
+    wiring_match = re.search(r"## Workflow\n(.*?)(?=\n## |\Z)", content, re.DOTALL)
     if wiring_match:
         wiring = wiring_match.group(1)
         examples = re.findall(r'"([^"]+)"', wiring)
@@ -147,8 +153,8 @@ def is_inside_code_block(content, position):
     return fences_before % 2 == 1
 
 
-def extract_logical_refs_from_agent(content):
-    """Extract logical resource name references from agent file.
+def extract_logical_refs_from_workflow(content):
+    """Extract logical resource name references from workflow reference.
 
     Looks for patterns like:
     - "Read the company report"
@@ -175,7 +181,7 @@ def extract_logical_refs_from_agent(content):
 
 
 def check_standalone_skill(skill_name, content, issues):
-    """Check standalone skill structure (no agent file, single-file pattern)."""
+    """Check standalone skill structure (no workflow reference, single-file pattern)."""
     check = "standalone-structure"
 
     # Frontmatter
@@ -212,14 +218,15 @@ def check_skill_wrapper(skill_name, content, issues):
 
     # Required sections
     sections = extract_h2_sections(content)
-    required = ["Input", "File locations", "Claude Code wiring", "Notes"]
+    required = ["Input", "File locations", "Workflow", "Notes"]
     for req in required:
         if not any(req.lower() in s.lower() for s in sections):
             issues.append(Issue("critical", check, f"Missing required section: ## {req}"))
 
-    # Agent reference
-    if f"agents/{skill_name}.md" not in content:
-        issues.append(Issue("critical", check, f"Missing agent reference: agents/{skill_name}.md"))
+    # Workflow reference (references/workflow.md or references/orchestrator.md)
+    has_workflow_ref = "references/workflow.md" in content or "references/orchestrator.md" in content
+    if not has_workflow_ref:
+        issues.append(Issue("critical", check, "Missing workflow reference (references/workflow.md or references/orchestrator.md)"))
 
     # Notes line
     if "File-driven skill" not in content:
@@ -233,13 +240,101 @@ def check_skill_wrapper(skill_name, content, issues):
             issues.append(Issue("moderate", check, "Description should mention pipeline redirect or independence"))
 
 
-def check_agent_file(skill_name, content, issues):
-    """Check agent file structure."""
-    check = "agent-structure"
+def check_skill_structure(skill_name, content, issues):
+    """Check SKILL.md section order and content consistency."""
+    check = "skill-structure"
 
-    # Header
-    if not re.search(r"^# .+ Agent$", content, re.MULTILINE):
-        issues.append(Issue("moderate", check, "Missing '# {Name} Agent' heading"))
+    # (a) One-line summary after # Title
+    # After the first # heading, the next non-empty line should NOT be ## (meaning there's a summary)
+    lines = content.split("\n")
+    found_title = False
+    for i, line in enumerate(lines):
+        if not found_title and re.match(r"^# ", line) and not line.startswith("# ---"):
+            found_title = True
+            # Find next non-empty line after the title
+            for j in range(i + 1, len(lines)):
+                if lines[j].strip():
+                    if lines[j].startswith("## "):
+                        issues.append(Issue("moderate", check,
+                            "Missing one-line summary between # Title and first ## section"))
+                    break
+            break
+
+    # (b) Workflow delegation line
+    # The ## Workflow section must start with "Read and follow `references/workflow.md`."
+    # or "Read and follow `references/orchestrator.md`." as its first content line
+    workflow_match = re.search(r"^## Workflow\n(.*?)(?=\n## |\Z)", content, re.MULTILINE | re.DOTALL)
+    if workflow_match:
+        workflow_body = workflow_match.group(1)
+        # Find first non-empty line in the workflow section
+        first_content_line = ""
+        for line in workflow_body.split("\n"):
+            if line.strip():
+                first_content_line = line.strip()
+                break
+        expected_lines = [
+            "Read and follow `references/workflow.md`.",
+            "Read and follow `references/orchestrator.md`.",
+        ]
+        if first_content_line not in expected_lines:
+            issues.append(Issue("critical", check,
+                "## Workflow must start with 'Read and follow `references/workflow.md`.' or 'Read and follow `references/orchestrator.md`.'"))
+
+    # (c) Escalation template consistency
+    # If ## Escalation handling exists, the template should say "the workflow gathered" not "the agent gathered"
+    esc_match = re.search(r"^## Escalation handling\n(.*?)(?=\n## |\Z)", content, re.MULTILINE | re.DOTALL)
+    if esc_match:
+        esc_body = esc_match.group(1)
+        if "the agent gathered" in esc_body:
+            issues.append(Issue("moderate", check,
+                "Escalation template says 'the agent gathered' — should say 'the workflow gathered'"))
+
+    # (d) Standard Notes line — "File-driven skill"
+    notes_match = re.search(r"^## Notes\n(.*?)(?=\n## |\Z)", content, re.MULTILINE | re.DOTALL)
+    if notes_match:
+        if "File-driven skill" not in notes_match.group(1):
+            issues.append(Issue("minor", check, "## Notes section missing 'File-driven skill' line"))
+    else:
+        # No Notes section at all — already caught by check_skill_wrapper
+        pass
+
+
+def check_workflow_reference(skill_name, content, issues):
+    """Check workflow reference file structure."""
+    check = "workflow-structure"
+
+    # Header — must say "Workflow" not "Agent"
+    heading_match = re.search(r"^# (.+)$", content, re.MULTILINE)
+    if heading_match:
+        heading = heading_match.group(1)
+        if heading.endswith(" Agent"):
+            issues.append(Issue("moderate", check,
+                f"Heading says '# {heading}' — should end with 'Workflow' not 'Agent'"))
+        elif not heading.endswith(" Workflow"):
+            issues.append(Issue("moderate", check,
+                f"Heading '# {heading}' does not end with 'Workflow'"))
+    else:
+        issues.append(Issue("moderate", check, "Missing # heading"))
+
+    # Must have ## Context section (not ## Purpose)
+    h2_sections = extract_h2_sections(content)
+    if "Purpose" in h2_sections:
+        issues.append(Issue("moderate", check,
+            "Has '## Purpose' — workflow/orchestrator files should use '## Context' instead"))
+    if "Context" not in h2_sections:
+        issues.append(Issue("moderate", check, "Missing '## Context' section"))
+
+    # Must have ## Boundaries section
+    if "Boundaries" not in h2_sections:
+        issues.append(Issue("moderate", check, "Missing '## Boundaries' section"))
+
+    # Must have ## Decisions section as last ## section
+    if "Decisions" not in h2_sections:
+        issues.append(Issue("critical", check, "Missing '## Decisions' section"))
+    elif h2_sections[-1] != "Decisions":
+        issues.append(Issue("moderate", check,
+            f"'## Decisions' should be the last ## section, but '## {h2_sections[-1]}' comes after it"))
+
     if "**Input:**" not in content:
         issues.append(Issue("moderate", check, "Missing **Input:** field"))
     if "**Output:**" not in content:
@@ -299,46 +394,28 @@ def check_agent_file(skill_name, content, issues):
         if f"`{dec}`" not in steps_content and dec not in steps_content.split("## Decisions")[0]:
             issues.append(Issue("moderate", check, f"Decision '{dec}' is defined but never referenced in any step"))
 
-    # Environment agnosticism
-    tool_names = ["WebSearch", "WebFetch", "Read tool", "Edit tool", "Bash tool"]
-    for tool in tool_names:
+    # Advisory: prefer capability-focused language over tool names
+    tool_names_advisory = ["WebSearch", "WebFetch", "Playwright", "Bash tool"]
+    for tool in tool_names_advisory:
         if tool in content:
-            issues.append(Issue("critical", check, f"Agent references specific tool name '{tool}' — must be harness-agnostic"))
-
-    # Hardcoded paths — check outside code blocks
-    path_pattern = r"(?:docs/|\.claude/)[a-z-]+/[a-z-]+"
-    for match in re.finditer(path_pattern, content):
-        if not is_inside_code_block(content, match.start()):
-            # Also allow paths in table cells (report templates use tables)
-            line_start = content.rfind("\n", 0, match.start()) + 1
-            line = content[line_start:content.find("\n", match.end())]
-            if not line.strip().startswith("|"):
-                issues.append(Issue("critical", check, f"Agent contains hardcoded path: '{match.group()}' — use logical resource names"))
-                break  # Report only first occurrence
-
-    # Skill name references (e.g., `/product-taxonomy`) — must use capability-based language
-    # Require at least one hyphen to distinguish skill names from URL path segments like `/products`
-    for match in re.finditer(r'`/([a-z][a-z0-9]+-[a-z][a-z0-9-]*)`', content):
-        if not is_inside_code_block(content, match.start()):
-            issues.append(Issue("moderate", check,
-                f"Agent references skill name '/{match.group(1)}' — use capability-based language instead"))
+            issues.append(Issue("minor", check, f"Workflow reference mentions tool name '{tool}' — prefer capability-focused language"))
 
     # Taxonomy reference consistency
     if "taxonomy file" in content.lower() and "product taxonomy categories file" not in content:
         issues.append(Issue("moderate", check, "Uses shortened 'taxonomy file' — should use full name 'product taxonomy categories file'"))
 
 
-def check_cross_references(skill_name, skill_content, agent_content, issues):
+def check_cross_references(skill_name, skill_content, workflow_content, issues):
     """Check cross-file reference integrity."""
     check = "cross-references"
 
     # Extract data from both files
     file_locations = extract_file_locations(skill_content)
     wiring_examples = extract_wiring_examples(skill_content)
-    decision_blocks = extract_decision_blocks(agent_content)
+    decision_blocks = extract_decision_blocks(workflow_content)
 
-    # Check: every agent logical resource name should appear in wiring examples
-    logical_refs = extract_logical_refs_from_agent(agent_content)
+    # Check: every workflow logical resource name should appear in wiring examples
+    logical_refs = extract_logical_refs_from_workflow(workflow_content)
     for ref in logical_refs:
         ref_lower = ref.lower().strip()
         # Normalize: strip leading adjectives like "full" and trailing qualifiers like "for an existing report"
@@ -352,7 +429,7 @@ def check_cross_references(skill_name, skill_content, agent_content, issues):
                 matched = True
                 break
         if not matched:
-            issues.append(Issue("moderate", check, f"Agent references '{ref}' but it's not in wrapper wiring examples"))
+            issues.append(Issue("moderate", check, f"Workflow references '{ref}' but it's not in wrapper wiring examples"))
 
     # Check: every decision should be reflected in wrapper wiring
     escalating = [name for name, block in decision_blocks.items() if block["escalates"]]
@@ -366,7 +443,7 @@ def check_cross_references(skill_name, skill_content, agent_content, issues):
     # Non-escalating decisions should be covered by stop behavior description
     if non_escalating:
         # Check for explicit stop/autonomous language in the wiring section
-        wiring_match = re.search(r"## Claude Code wiring\n(.*?)(?=\n## |\Z)", skill_content, re.DOTALL)
+        wiring_match = re.search(r"## Workflow\n(.*?)(?=\n## |\Z)", skill_content, re.DOTALL)
         wiring_text = wiring_match.group(1) if wiring_match else ""
         has_stop_description = any(phrase in wiring_text.lower() for phrase in [
             "does not escalate",
@@ -381,15 +458,29 @@ def check_cross_references(skill_name, skill_content, agent_content, issues):
         ])
         if not has_stop_description:
             issues.append(Issue("moderate", check,
-                f"Agent has autonomous stops ({', '.join(non_escalating)}) but wrapper wiring doesn't describe stop behavior"))
+                f"Workflow has autonomous stops ({', '.join(non_escalating)}) but wrapper wiring doesn't describe stop behavior"))
 
-    # Check: file locations cover agent's read/write needs
+    # Check: file locations cover workflow's read/write needs
     if not file_locations:
         issues.append(Issue("critical", check, "Wrapper has no File locations table"))
 
+    # Check: escalation template cross-consistency
+    # If SKILL.md has ## Escalation handling, verify the template has the key structural markers
+    esc_match = re.search(r"^## Escalation handling\n(.*?)(?=\n## |\Z)", skill_content, re.MULTILINE | re.DOTALL)
+    if esc_match:
+        esc_body = esc_match.group(1)
+        required_markers = [
+            ("**Stage:**", "Missing '**Stage:**' marker in escalation template"),
+            ("**Escalation:", "Missing '**Escalation:**' marker in escalation template"),
+            ("**Your options:**", "Missing '**Your options:**' marker in escalation template"),
+        ]
+        for marker, msg in required_markers:
+            if marker not in esc_body:
+                issues.append(Issue("moderate", check, msg))
 
-def check_orchestrator_alignment(skill_name, agent_content, orchestrator_content, issues):
-    """Check that orchestrator stop conditions match agent decisions."""
+
+def check_orchestrator_alignment(skill_name, workflow_content, orchestrator_content, issues):
+    """Check that orchestrator stop conditions match workflow decisions."""
     check = "orchestrator-alignment"
 
     if not orchestrator_content:
@@ -415,20 +506,119 @@ def check_orchestrator_alignment(skill_name, agent_content, orchestrator_content
 
     # Extract stop conditions
     stops = extract_orchestrator_stops(orchestrator_content, stage_name)
-    decisions = extract_decisions(agent_content)
+    decisions = extract_decisions(workflow_content)
 
     if not stops and decisions:
-        issues.append(Issue("critical", check, f"Orchestrator has no stop conditions for '{stage_name}' but agent has {len(decisions)} decisions"))
+        issues.append(Issue("critical", check, f"Orchestrator has no stop conditions for '{stage_name}' but workflow has {len(decisions)} decisions"))
 
 
-def check_report_template(agent_content, issues):
+def check_subagent_pattern(skill_name, skill_content, issues):
+    """Check sub-agent decomposition pattern when references/ contains an orchestrator."""
+    check = "subagent-pattern"
+
+    refs = references_dir(skill_name)
+    if not refs.is_dir():
+        return
+
+    orchestrator_path = refs / "orchestrator.md"
+    if not orchestrator_path.exists():
+        return  # Not a decomposed skill
+
+    # Sub-agent files are .md files in references/ that are NOT workflow.md, orchestrator.md, or persist-hooks.md
+    excluded = {"workflow.md", "orchestrator.md", "persist-hooks.md"}
+    subagent_files = sorted(
+        f for f in refs.glob("*.md")
+        if f.name not in excluded
+    )
+
+    if not subagent_files:
+        return
+
+    # Every sub-agent file should be referenced in the wrapper
+    for subagent_file in subagent_files:
+        ref = f"references/{subagent_file.name}"
+        if subagent_file.name not in skill_content and ref not in skill_content:
+            issues.append(Issue("critical", check,
+                f"Sub-agent file '{subagent_file.name}' exists but is not referenced in wrapper"))
+
+    # Sub-agent files: check contents
+    tool_names_advisory = ["WebSearch", "WebFetch", "Playwright", "Bash tool", "Read tool", "Edit tool", "Agent tool"]
+
+    for subagent_file in subagent_files:
+        sa_content = read_file(subagent_file)
+        if not sa_content:
+            continue
+
+        # Tool names (advisory/minor)
+        for tool in tool_names_advisory:
+            if tool in sa_content:
+                issues.append(Issue("minor", check,
+                    f"Sub-agent '{subagent_file.name}' references tool name '{tool}' — prefer capability-focused language"))
+
+        # Input/Output one-liners
+        if "**Input:**" not in sa_content:
+            issues.append(Issue("moderate", check,
+                f"Sub-agent '{subagent_file.name}' missing **Input:** field"))
+        if "**Output:**" not in sa_content:
+            issues.append(Issue("moderate", check,
+                f"Sub-agent '{subagent_file.name}' missing **Output:** field"))
+
+        # Input/Output contract tables
+        sa_sections = extract_h2_sections(sa_content)
+        if "Input Contract" not in sa_sections:
+            issues.append(Issue("moderate", check,
+                f"Sub-agent '{subagent_file.name}' missing '## Input Contract' section"))
+        if "Output Contract" not in sa_sections:
+            issues.append(Issue("moderate", check,
+                f"Sub-agent '{subagent_file.name}' missing '## Output Contract' section"))
+
+        # Heading should say "Sub-Agent"
+        heading_match = re.search(r"^# (.+)$", sa_content, re.MULTILINE)
+        if heading_match and "Sub-Agent" not in heading_match.group(1):
+            issues.append(Issue("moderate", check,
+                f"Sub-agent '{subagent_file.name}' heading should contain 'Sub-Agent'"))
+
+        # Decision blocks (critical — decisions belong in the orchestrator)
+        decisions = extract_decisions(sa_content)
+        if decisions:
+            issues.append(Issue("critical", check,
+                f"Sub-agent '{subagent_file.name}' has Decision blocks ({', '.join(decisions)}) — decisions belong in the orchestrator"))
+
+        # Word count
+        word_count = len(sa_content.split())
+        if word_count > 2500:
+            issues.append(Issue("moderate", check,
+                f"Sub-agent '{subagent_file.name}' is {word_count} words (target: ≤2,500)"))
+
+
+def check_word_count(skill_name, workflow_content, issues):
+    """Check workflow reference word count and warn about decomposition needs."""
+    check = "word-count"
+
+    word_count = len(workflow_content.split())
+    refs = references_dir(skill_name)
+    has_subagents = refs.is_dir() and (refs / "orchestrator.md").exists()
+
+    if word_count > 3000 and not has_subagents:
+        issues.append(Issue("minor", check,
+            f"Workflow is {word_count} words (>3,000) with no sub-agent decomposition — consider splitting"))
+    elif word_count > 3000:
+        # Has sub-agents but orchestrator is still large
+        issues.append(Issue("minor", check,
+            f"Orchestrator is {word_count} words (>3,000) despite having sub-agents — consider trimming"))
+    else:
+        # Info-level — print but don't count as issue
+        pass  # Word count OK
+
+
+def check_report_template(workflow_content, issues):
     """Check report template compliance."""
     check = "report-template"
 
     # Check for H1 heading in template — only inside code blocks
-    templates = re.findall(r"```markdown\n(.*?)```", agent_content, re.DOTALL)
+    templates = re.findall(r"```markdown\n(.*?)```", workflow_content, re.DOTALL)
     if not templates:
-        templates = re.findall(r"```\n(.*?)```", agent_content, re.DOTALL)
+        templates = re.findall(r"```\n(.*?)```", workflow_content, re.DOTALL)
 
     for template in templates:
         if "# " in template and "**Slug:**" in template:
@@ -443,11 +633,10 @@ def check_report_template(agent_content, issues):
 
 
 def verify_skill(skill_name):
-    """Run all checks for a skill/agent pair."""
+    """Run all checks for a skill."""
     issues = []
 
     skill_path = SKILLS_DIR / skill_name / "SKILL.md"
-    agent_path = AGENTS_DIR / f"{skill_name}.md"
     orchestrator_content = read_file(ORCHESTRATOR)
 
     skill_content = read_file(skill_path)
@@ -456,23 +645,30 @@ def verify_skill(skill_name):
         issues.append(Issue("critical", "file-exists", f"Skill file not found: {skill_path}"))
         return issues
 
-    # Standalone skills get reduced checks (no agent file, no wrapper+agent conventions)
+    # Standalone skills get reduced checks (no workflow reference, no wrapper+workflow conventions)
     if skill_name in STANDALONE_SKILLS:
         check_standalone_skill(skill_name, skill_content, issues)
         return issues
 
-    agent_content = read_file(agent_path)
-    if not agent_content:
-        issues.append(Issue("critical", "file-exists", f"Agent file not found: {agent_path}"))
+    refs = references_dir(skill_name)
+    workflow_path = refs / "workflow.md"
+    orchestrator_path = refs / "orchestrator.md"
+
+    workflow_content = read_file(workflow_path) or read_file(orchestrator_path)
+    if not workflow_content:
+        issues.append(Issue("critical", "file-exists", f"Workflow reference not found: checked {workflow_path} and {orchestrator_path}"))
         # Still check skill wrapper
         check_skill_wrapper(skill_name, skill_content, issues)
         return issues
 
     check_skill_wrapper(skill_name, skill_content, issues)
-    check_agent_file(skill_name, agent_content, issues)
-    check_cross_references(skill_name, skill_content, agent_content, issues)
-    check_orchestrator_alignment(skill_name, agent_content, orchestrator_content, issues)
-    check_report_template(agent_content, issues)
+    check_skill_structure(skill_name, skill_content, issues)
+    check_workflow_reference(skill_name, workflow_content, issues)
+    check_cross_references(skill_name, skill_content, workflow_content, issues)
+    check_orchestrator_alignment(skill_name, workflow_content, orchestrator_content, issues)
+    check_report_template(workflow_content, issues)
+    check_subagent_pattern(skill_name, skill_content, issues)
+    check_word_count(skill_name, workflow_content, issues)
 
     return issues
 
