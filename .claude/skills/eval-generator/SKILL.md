@@ -54,7 +54,18 @@ The eval validates scraper output against the four-level product record format (
 ## Claude Code wiring
 
 - Provide the file paths from the table above when the agent references logical resources (e.g., "the scraper source", "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the scrape output file", "the scrape run summary", "the shared eval script", "the eval config file", "the eval result file", "the eval history file", "the eval baseline file").
-- When the agent reaches an escalation point, present it using the standard escalation format (see orchestrator) and **wait for the user's response** before continuing. User options per escalation:
+- When the agent reaches an escalation point, present it to the user using this format and **wait for their response** before continuing:
+  ```
+  **Escalation: `{decision_name}`**
+  **Stage:** Eval Generator
+  {One-sentence summary — from the decision's Context field.}
+  {Escalation payload — the specific evidence the agent gathered.}
+  **Your options:**
+  1. {Action to resolve and continue}
+  2. {Alternative action, if applicable}
+  3. Stop — skip this company and end the pipeline
+  ```
+  User options per escalation:
   - `no_sku_schema` (taxonomy issue) — 1) Add the missing subcategory to `docs/product-taxonomy/categories.md` and retry, 2) Stop
   - `scraper_output_format_unclear` — 1) Fix the scraper and retry, 2) Describe the expected output format so the eval can be generated, 3) Stop
 - The `no_sku_schema` decision has an autonomous resolution path: when the subcategory exists in the taxonomy but the SKU schema hasn't been created yet, invoke `/product-taxonomy` for that subcategory to generate the schema, then continue. Only escalate if the subcategory itself is missing from the taxonomy.

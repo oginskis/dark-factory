@@ -29,9 +29,20 @@ Read and follow the agent instructions in `agents/product-classifier.md`.
 
 ## Claude Code wiring
 
-- When the agent reaches an escalation point, present it using the standard escalation format (see orchestrator) and **wait for the user's response** before continuing. User options per escalation:
+- When the agent reaches an escalation point, present it to the user using this format and **wait for their response** before continuing:
+  ```
+  **Escalation: `{decision_name}`**
+  **Stage:** Product Classifier
+  {One-sentence summary — from the decision's Context field.}
+  {Escalation payload — the specific evidence or candidates the agent gathered.}
+  **Your options:**
+  1. {Action to resolve and continue}
+  2. {Alternative action, if applicable}
+  3. Stop — skip this company and end the pipeline
+  ```
+  User options per escalation:
   - `ambiguous_company` — 1) Pick a candidate by name or number, 2) Provide additional context to narrow the search, 3) Stop
-  - `tangible_ambiguous` — 1) Include the company and proceed with classification, 2) Exclude the company and stop the pipeline
+  - `tangible_ambiguous` — 1) Include the company and proceed with classification, 2) Exclude the company and stop the pipeline, 3) Stop
   - `category_not_found` — 1) Suggest a new subcategory to add to the taxonomy, 2) Stop
 - The agent may also stop autonomously without escalation — if the company fails the tangible goods gate (no physical products) or is rejected as a general retailer/marketplace. In these cases the agent produces no report. Report the outcome to the user.
 - Use web search, web fetch, and Playwright browser tools to investigate company websites as the agent directs.

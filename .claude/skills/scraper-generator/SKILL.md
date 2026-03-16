@@ -44,7 +44,18 @@ Read and follow the agent instructions in `agents/scraper-generator.md`.
 ## Claude Code wiring
 
 - Provide the file paths from the table above when the agent references logical resources (e.g., "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the platform knowledgebase").
-- When the agent reaches an escalation point, present it using the standard escalation format (see orchestrator) and **wait for the user's response** before continuing. User options per escalation:
+- When the agent reaches an escalation point, present it to the user using this format and **wait for their response** before continuing:
+  ```
+  **Escalation: `{decision_name}`**
+  **Stage:** Scraper Generator
+  {One-sentence summary — from the decision's Context field.}
+  {Escalation payload — the specific evidence the agent gathered.}
+  **Your options:**
+  1. {Action to resolve and continue}
+  2. {Alternative action, if applicable}
+  3. Stop — skip this company and end the pipeline
+  ```
+  User options per escalation:
   - `missing_catalog_assessment` — 1) Run `/catalog-detector {slug}` first, then retry, 2) Stop
   - `no_sku_schema` (taxonomy issue, only escalates when subcategory is missing from taxonomy) — 1) Add the missing subcategory to `docs/product-taxonomy/categories.md` and retry, 2) Stop
   - `probe_extraction_failed` — 1) Provide guidance on how to extract from this site, 2) Stop
