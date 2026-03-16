@@ -29,7 +29,7 @@
 | Shade/Color | shadecolor | text | — | Product color or dental shade designation | A1, A2, A3, B1, C2, Translucent, Universal |
 | Imaging Technology | imaging_technology | enum | — | Detection method for diagnostic imaging products | Digital Sensor (CMOS/CCD), Phosphor Plate (PSP), Panoramic, CBCT (Cone Beam CT), Intraoral Camera |
 | Image Resolution | image_resolution | text | — | Sensor or detector resolution specification | 20 lp/mm, 33 lp/mm, 96 x 96 um pixel |
-| FOV | fov | text | mm | Field of view for CBCT and panoramic imaging systems | 5 x 5 cm, 8 x 8 cm, 13 x 16 cm, 23 x 17 cm |
+| FOV | fov | text | cm | Field of view for CBCT and panoramic imaging systems | 5 x 5 cm, 8 x 8 cm, 13 x 16 cm, 23 x 17 cm |
 | Sterilization Method | sterilization_method | enum | — | Compatible or recommended sterilization process | Steam Autoclave (134 C), Chemical Vapor, Ethylene Oxide, Cold Sterilant, Single-Use Disposable |
 | Light Intensity | light_intensity | number | mW/cm2 | Irradiance output for curing lights | 1000, 1600, 2000, 3200 |
 | Working Time | working_time | text | — | Open time or handling window before material sets | 60 seconds, 90 seconds, 2 minutes, 3.5 minutes |

@@ -36,8 +36,8 @@
 | Engine Time SMOH | engine_time_smoh | number | hr | Engine hours since major overhaul | 50, 520, 1200, 2000 |
 | Propeller Time SPOH | propeller_time_spoh | number | hr | Propeller hours since propeller overhaul | 100, 500, 1850 |
 | TBO | tbo | number | hr | Manufacturer recommended time between overhauls | 1800, 2000, 3500 |
-| Wingspan | wingspan | number | ft-in | Wingtip to wingtip measurement | 36 ft 1 in, 47 ft 9 in, 53 ft 4 in |
-| Overall Height | overall_height | number | ft-in | Ground to highest point measurement | 8 ft 11 in, 9 ft 3 in, 14 ft 8 in |
+| Wingspan | wingspan | text | ft-in | Wingtip to wingtip measurement | 36 ft 1 in, 47 ft 9 in, 53 ft 4 in |
+| Overall Height | overall_height | text | ft-in | Ground to highest point measurement | 8 ft 11 in, 9 ft 3 in, 14 ft 8 in |
 
 ## Changelog
 

@@ -25,7 +25,7 @@
 | Attribute | Key | Data Type | Unit | Description | Example Values |
 |--------|--------|--------|--------|--------|--------|
 | System Configuration | system_configuration | enum | — | Installation and ductwork configuration | Split System, Packaged System, Ductless Mini-Split, Multi-Zone Mini-Split, PTAC, VRF |
-| Tonnage | tonnage | number | — | Cooling capacity in tons (1 ton = 12000 BTU/h) | 1.5, 2, 2.5, 3, 4, 5 |
+| Tonnage | tonnage | number | ton | Cooling capacity in tons (1 ton = 12000 BTU/h) | 1.5, 2, 2.5, 3, 4, 5 |
 | SEER2 | seer2 | number | — | Seasonal Energy Efficiency Ratio 2 rating | 14, 16, 18, 20, 23.6 |
 | EER2 | eer2 | number | — | Energy Efficiency Ratio 2 at 95F outdoor temperature | 7.8, 9.0, 11.0, 12.5 |
 | HSPF2 | hspf2 | number | — | Heating Seasonal Performance Factor 2 for heat pumps | 6.6, 7.8, 8.6, 10.0 |

@@ -18,7 +18,7 @@
 | Wax Sub-Type | wax_sub-type | text | — | Further classification within wax categories | Scale Wax, Slab Wax, Pellet, Pastille, Board, Low Melt, Medium Melt, High Melt |
 | Physical Form | physical_form | enum | — | Form in which the product is sold | Slab, Pellet, Pastille, Flake, Liquid, Bulk Liquid |
 | Country of Origin | country_of_origin | text | — | Country where the product was refined or produced | USA, China, Germany, India, South Korea |
-| Molecular Weight | molecular_weight | number | — | Average molecular weight of the hydrocarbon mixture | 280, 350, 420, 600, 800 |
+| Molecular Weight | molecular_weight | number | g/mol | Average molecular weight of the hydrocarbon mixture | 280, 350, 420, 600, 800 |
 
 ## Extended Attributes
 

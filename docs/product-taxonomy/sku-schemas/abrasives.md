@@ -31,7 +31,7 @@
 | Wheel Hardness Grade | wheel_hardness_grade | text | — | Hardness of the bond in bonded abrasives (A=soft to Z=hard) | F, H, J, M, P, R, T |
 | Country of Origin | country_of_origin | text | — | Country where the product was manufactured | USA, Germany, Italy, China, Brazil |
 | Thickness | thickness | number | in | Thickness of the wheel or disc | 0.045, 0.090, 0.25, 0.50, 1.0 |
-| Maximum RPM | maximum_rpm | number | — | Maximum safe operating speed in revolutions per minute | 4140, 8600, 13300, 15200 |
+| Maximum RPM | maximum_rpm | number | rpm | Maximum safe operating speed in revolutions per minute | 4140, 8600, 13300, 15200 |
 | Attachment Method | attachment_method | enum | — | How the product mounts to the tool | Arbor Hole, Quick-Change (SAIT-LOK), Hook and Loop, PSA, Snap-On, Threaded Hub |
 | Density | density | enum | — | Grain density for flap discs and non-woven products | Regular, High Density |
 | Structure Number | structure_number | text | — | Grain spacing in bonded abrasives (1=dense to 15=open) | 5, 7, 8, 10, 12 |
