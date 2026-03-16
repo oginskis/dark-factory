@@ -139,6 +139,8 @@ The generated scraper must:
    - **`extended_attributes`** — moderate effort. Extract when available on the page, but do not invent complex parsing for marginal gains.
    - **`extra_attributes`** — low effort / opportunistic. Capture what is naturally available during extraction, but do not put significant effort into finding these. They serve as a feedback signal for future schema evolution.
 
+   **Unit extraction:** For attributes where the SKU schema's `Unit` column is not `—`, extract the unit from the source site and include it in `attribute_units`. The key in `attribute_units` must exactly match the corresponding key in the attribute bucket. Units are site-derived — pass through what the site shows, no conversions. When the site does not explicitly state a unit, infer from context (e.g., regional conventions) and include as a static value in the generated code. When units vary per product within the same site, use per-product extraction logic. For `extra_attributes` (not in schema), include units in `attribute_units` when the site content makes them unambiguous.
+
    **Non-English sites:** When generating a scraper for a site in a non-English language, the generated Python script must map non-English attribute labels to English keys. Include a static `LABEL_MAP` dict that maps the site's attribute labels to the corresponding SKU schema Key values (e.g., `"Biezums": "thickness"`, `"Suga": "species"`). For known closed value sets (species names, material types, grade labels), include a static translation dict (e.g., `"Egle": "Spruce"`). Extra attribute keys must also be English `snake_case` — derive them from the non-English labels at code-generation time, not at runtime. Values that cannot be statically mapped pass through in the original language.
 
 3. **Handle pagination completely** — follow all pages, not just the first. Support whichever pagination pattern the site uses (page numbers, next buttons, cursor-based, infinite scroll). Never stop at an arbitrary page limit.
@@ -177,11 +179,20 @@ The generated scraper must:
        "warranty": "5 Year Limited Warranty",
        "image_url": "https://..."
      },
+     "attribute_units": {
+       "voltage": "V",
+       "tool_weight": "lb",
+       "chuck_size": "mm",
+       "max_torque": "N m"
+     },
      "category_path": "Products > Power Tools > Drilling > Hammer Drills"
    }
    ```
 
    Universal top-level fields (always present, never change): `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`.
+
+   Unit metadata:
+   - `attribute_units` — maps attribute keys to their unit of measure as found on the source site. Keys must exactly match keys in `core_attributes`, `extended_attributes`, or `extra_attributes`. Only attributes with a physical unit are included; dimensionless attributes are omitted. Values are strings (e.g., `"mm"`, `"in"`, `"kg"`, `"V"`).
 
    Category-specific attribute buckets:
    - `core_attributes` — attributes whose keys match the **Key** column in the SKU schema's Core Attributes table (high extraction effort)
@@ -527,8 +538,9 @@ Before presenting results, verify the scraper and config against these quality g
 | 17 | **Product discovery strategy is robust** | Scraper uses the most comprehensive discovery source available (sitemap, JSON API, or exhaustive category traversal). For `custom`/`unknown` platforms, scraper uses URL-pattern-based link discovery rather than platform-specific CSS selectors. Deduplication by URL or SKU is present. |
 | 18 | **Multi-subcategory mapping correct** | For multi-subcategory companies: category mapping covers all URL prefixes from catalog assessment, scraper uses per-subcategory SKU schemas for attribute routing, and `product_category` varies correctly across products from different sections. For single-subcategory companies: all products use the primary taxonomy ID. |
 | 19 | **Final verification passed** | Final verification run (Step 5b) completed with 0 errors, or was correctly skipped because `sample_size <= 20`. The output from the final verification (or the smoke test if skipped) is ready for eval. |
+| 20 | **`attribute_units` correct** | `attribute_units` is a top-level dict. Every key appears in exactly one of `core_attributes`, `extended_attributes`, or `extra_attributes`. Values are strings. Attributes with schema Unit `—` do not appear. |
 
-If all 19 pass, the scraper is complete.
+If all 20 pass, the scraper is complete.
 
 ---
 
