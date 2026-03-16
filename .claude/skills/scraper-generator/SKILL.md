@@ -34,7 +34,8 @@ Generate a production-ready Python scraper for a company's product catalog, vali
 | Config metadata (output) | `docs/scraper-generator/{slug}/config.json` |
 | Product data (output) | `docs/scraper-generator/{slug}/output/products.jsonl` |
 | Run summary (output) | `docs/scraper-generator/{slug}/output/summary.json` |
-| Label discovery diagnostics (output) | `docs/scraper-generator/{slug}/output/label-discovery.json` |
+| Generator input (pre-processed) | `docs/scraper-generator/{slug}/generator_input.json` |
+| Language seed (non-English) | `docs/platform-knowledgebase/labels-{lang}.json` |
 | Validation diagnostics (output) | `docs/scraper-generator/{slug}/output/validation.json` |
 
 ### Slug derivation
@@ -47,21 +48,20 @@ Generate a production-ready Python scraper for a company's product catalog, vali
 
 Read and follow `references/orchestrator.md`.
 
-- Provide the file paths from the table above when the workflow references logical resources (e.g., "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the platform knowledgebase").
-- Dispatch sub-agents using the Agent tool as directed by the orchestrator. Sub-agent files in `.claude/skills/scraper-generator/references/`:
-  - `label-discoverer.md` — non-English label discovery
-  - `code-generator.md` — scraper.py generation
-  - `validator.md` — probe testing and smoke tests
-  The orchestrator specifies what data to pass to each sub-agent and when to dispatch them.
+- Provide the file paths from the table above when the workflow references logical resources (e.g., "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the platform knowledgebase", "the persist hooks reference file").
+- Dispatch the validator sub-agent using the Agent tool as directed by the orchestrator. Sub-agent file: `.claude/skills/scraper-generator/references/validator.md` — probe testing and smoke tests. The orchestrator specifies what data to pass and when to dispatch.
+- The orchestrator handles label mapping and code generation inline (no sub-agent dispatch for these). Reference file `references/code-generator.md` defines the canonical product record format — the orchestrator reads it during code generation but does not dispatch it as a sub-agent.
+- Before starting the orchestrator, run the pre-processing script to build routing tables: `uv run python .claude/skills/scraper-generator/scripts/prepare_generator_input.py --schemas {taxonomy_ids} --output docs/scraper-generator/{slug}/generator_input.json` where `{taxonomy_ids}` are the space-separated subcategory taxonomy IDs from the company report.
+- For non-English sites, check for a language seed file at `docs/platform-knowledgebase/labels-{lang}.json` where `{lang}` is the ISO 639-1 language code from the catalog assessment. If it exists, provide it to the orchestrator. After successful scraper generation, save the updated label map back to the seed file.
 - The `no_sku_schema` decision has an autonomous resolution path: when the subcategory exists in the taxonomy but the SKU schema file hasn't been created yet, automatically invoke `/product-taxonomy` for that subcategory to generate the schema, then continue without user interaction. Before concluding a schema is missing, **list the `docs/product-taxonomy/sku-schemas/` directory** and search for the subcategory name — never guess the filename from a partial slug.
 - Run the scraper using `uv run` (not `uv run python`). The PEP 723 inline metadata in the script declares its own dependencies, so `uv` resolves them automatically.
-- Smoke test: `uv run docs/scraper-generator/{slug}/scraper.py --limit 20 2>docs/scraper-generator/{slug}/output/debug.log` with a 2-minute timeout (Bash tool timeout: 120000ms).
+- Smoke test: `uv run docs/scraper-generator/{slug}/scraper.py --limit 10 2>docs/scraper-generator/{slug}/output/debug.log` with a 2-minute timeout (Bash tool timeout: 120000ms).
 - Final verification: `uv run docs/scraper-generator/{slug}/scraper.py --limit {sample_size} 2>docs/scraper-generator/{slug}/output/debug.log` with timeout `max(120, sample_size * 6)` seconds (Bash tool timeout: `max(120000, sample_size * 6000)` ms).
 - Probe: `uv run docs/scraper-generator/{slug}/scraper.py --probe <URL>` — the scraper fetches the page internally, prints JSON to stdout. No web fetch tools needed for probing.
 - No web search or Playwright browser tools are needed.
 - The knowledgebase write (Step 3) uses file write/edit tools to create or append to the platform knowledgebase file.
 - Data persistence: read the persist hook implementations file for the `setup`/`persist`/`teardown` functions to include in the generated scraper. Write the scraper code to the scraper script path before running tests (so `uv run` can execute it). The scraper code is final once the validator returns `pass`. After config metadata is prepared (Step 4), persist it as JSON to the config metadata path.
-- Diagnostic persistence: after the label discoverer returns (non-English sites only), write its output plus `site_language` and `generated_at` as JSON to the label discovery diagnostics path. After the validator returns (any status, any language), write its output plus `generated_at` as JSON to the validation diagnostics path. On re-dispatch, overwrite the previous file.
+- Diagnostic persistence: after the validator returns (any status, any language), write its output plus `generated_at` as JSON to the validation diagnostics path. On re-dispatch, overwrite the previous file.
 - The canonical product record format definition lives in `references/code-generator.md`.
 
 ## Escalation handling

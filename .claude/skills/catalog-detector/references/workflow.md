@@ -149,6 +149,49 @@ The test is whether a scraper can reliably extract structured key-value attribut
 
 If product pages expose structured attributes as parseable text, proceed.
 
+### Extraction metadata (collected from the same 3-5 product pages)
+
+While inspecting product pages for extractability, also record these details for the extraction blueprint:
+
+**Price extraction method** — check in this order on the raw HTML (before JavaScript runs):
+1. Check for `<script type="application/ld+json">` blocks containing Product schema with a `price` field
+2. Check whether elements with price-related CSS classes (`.price`, `.product-price`, `.current-price`) contain actual numeric price text in the raw HTML
+3. Search the raw HTML for `dataLayer.push(` containing a `"price"` field
+4. If using Playwright, check network requests for API calls returning price data
+
+Record which method succeeded and the specific extraction pattern (CSS selector, JSON path, or regex).
+
+**Spec table selectors** — identify the CSS selector path to the product attribute table:
+- Container element (e.g., `table`, `dl`, `div.specifications`)
+- Row iterator (e.g., `table tr`)
+- Label cell (e.g., `td:first-child`)
+- Value cell (e.g., `td:nth-child(2)`)
+
+**Product name selector** — the CSS selector for the main product heading (e.g., `h1`).
+
+**SKU/reference location** — where the product identifier appears (spec table label, JSON-LD field, or dedicated element).
+
+**Breadcrumb selector** — the CSS selector for the category breadcrumb navigation.
+
+**Sample attribute labels** — collect every unique attribute label from the spec tables across all inspected pages. Record: exact label text, frequency (how many pages include it), one example value.
+
+---
+
+## Step 5a: Verified Category Tree
+
+After Step 5 confirms that product attributes are extractable, crawl the full category tree to produce a verified URL inventory for the extraction blueprint.
+
+Starting from each top-level category discovered in Step 3:
+1. Fetch the category page
+2. Identify child category links (URLs that extend the current path, e.g., `/{parent-id}-{parent-slug}/{child-id}-{child-slug}`)
+3. If children exist, recurse into each child (branch node)
+4. If no children exist, this is a leaf node — count the product links on the page
+5. Record every node: category path (human-readable breadcrumb), exact URL, product count (0 for branch nodes), and depth level
+
+Output as a table for the extraction blueprint. Include only nodes that are part of the scraper-relevant categories — skip categories that do not map to any taxonomy subcategory (e.g., promotions, services).
+
+**Circuit breaker:** If the tree exceeds 100 nodes or depth 5, stop recursion and log a warning.
+
 ---
 
 ## Step 6: Determine Scraping Strategy
@@ -231,6 +274,45 @@ Write the catalog assessment report. Use one of the two templates below dependin
 
 ## Notes
 {Anything unusual: geo-restrictions, A/B testing on layouts, seasonal catalogs, etc.}
+
+## Extraction Blueprint
+
+### Verified Category Tree
+
+| Category Path | URL | Product Count | Depth |
+|---|---|---|---|
+| {Level 1} > {Level 2} > {Leaf} | {exact URL path} | {count} | {depth} |
+
+### Price Extraction Method
+- **Primary method:** {static_html_css | json_ld | dataLayer | api_endpoint}
+- **Static HTML price:** {yes: selector | no: reason}
+- **dataLayer price:** {yes: event name and JSON path | no}
+- **JSON-LD price:** {yes | no}
+- **Verified on:** {2-3 product URLs with actual extracted prices}
+- **Currency:** {ISO 4217}
+- **Price variants:** {description if applicable}
+
+### Spec Table Selectors
+- **Row selector:** {CSS selector for attribute rows}
+- **Label cell:** {CSS selector or position}
+- **Value cell:** {CSS selector or position}
+- **Verified on:** {2-3 product URLs with attribute counts}
+
+### Product Name Selector
+- **Selector:** {CSS selector}
+
+### SKU/Reference Location
+- **Source:** {spec table label | JSON-LD field | dedicated element}
+- **Label/field name:** {exact text or key}
+
+### Breadcrumb Selector
+- **Selector:** {CSS selector}
+
+### Sample Attribute Labels
+
+| Site Label | Frequency | Example Value |
+|---|---|---|
+| {exact label text} | {N/M pages} | {example} |
 ```
 
 ### Stop template (catalog not found or not scrapable)
@@ -285,6 +367,8 @@ Before presenting results, re-read the catalog assessment you just wrote and che
 | 6 | **Navigation Paths are actionable** | A scraper could follow the listed URL patterns to reach all products |
 | 7 | **Anti-bot severity uses exact value** | One of: `none`, `light`, `moderate`, `severe` |
 | 8 | **Platform field present and valid** | One of: `woocommerce`, `shopify`, `magento`, `prestashop`, `opencart`, `bigcommerce`, `squarespace`, `wix`, `drupal`, `custom`, `unknown` |
+| 9 | **Verified category tree is complete** | Every leaf category from Step 3 that maps to a taxonomy subcategory has a row in the Extraction Blueprint with a verified URL and product count > 0 |
+| 10 | **Price method is verified** | Extraction Blueprint lists at least 2 product URLs with actual extracted price values |
 
 ### Stop report gates
 

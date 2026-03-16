@@ -1,0 +1,65 @@
+{
+  "_language": "lv",
+  "_description": "Latvian attribute label translations for building materials sites",
+  "_updated": "2026-03-16",
+  "labels": {
+    "Platums": "width",
+    "Biezums": "thickness",
+    "Garums": "length",
+    "Suga": "species",
+    "Mitrums": "moisture_content",
+    "Kvalitāte": "grade",
+    "Kvalitātes grupa": "grade",
+    "Zāģējuma veids": "profile_pattern",
+    "Virsmas apstrāde": "finish",
+    "Krāsa/Tonis": "color",
+    "Krāsa": "color",
+    "Platība": "coverage_per_box",
+    "Iepakojuma izmērs": "pack_quantity",
+    "Iepakojums": "pack_quantity",
+    "Iepakojumā": "pack_quantity",
+    "Pielietojums": "application",
+    "Diametrs": "diameter",
+    "Galvas forma": "head_type",
+    "Korozijas izturības klase": "finishcoating",
+    "Vide": "interiorexterior",
+    "Lietošanas vide": "interiorexterior",
+    "Apstiprinājumi": "certification",
+    "Bitu tips": "drive_type",
+    "Savienotāja tips": "connector_type",
+    "Galvas diametrs": "head_diameter"
+  },
+  "category_aliases": {
+    "wood.softwood_hardwood_lumber": {
+      "width": "nominal_width",
+      "thickness": "nominal_thickness",
+      "grade": "appearance_grade"
+    },
+    "wood.flooring_decking": {
+      "width": "width",
+      "thickness": "thickness",
+      "grade": "grade"
+    },
+    "wood.millwork": {
+      "width": "width",
+      "thickness": "thickness"
+    },
+    "wood.plywood_engineered_panels": {
+      "width": "width",
+      "thickness": "thickness"
+    }
+  },
+  "value_translations": {
+    "species": {
+      "Egle": "Spruce",
+      "Priede": "Pine",
+      "Bērzs": "Birch",
+      "Melnalksnis": "Black Alder",
+      "Apse": "Aspen",
+      "Osis": "Ash",
+      "Akācija": "Acacia",
+      "Ozols": "Oak",
+      "Gumijkoks": "Rubber Wood"
+    }
+  }
+}

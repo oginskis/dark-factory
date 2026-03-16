@@ -525,7 +525,7 @@ def check_subagent_pattern(skill_name, skill_content, issues):
         return  # Not a decomposed skill
 
     # Sub-agent files are .md files in references/ that are NOT workflow.md, orchestrator.md, or persist-hooks.md
-    excluded = {"workflow.md", "orchestrator.md", "persist-hooks.md"}
+    excluded = {"workflow.md", "orchestrator.md", "persist-hooks.md", "code-generator.md"}
     subagent_files = sorted(
         f for f in refs.glob("*.md")
         if f.name not in excluded
