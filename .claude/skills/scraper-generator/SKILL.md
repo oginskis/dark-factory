@@ -81,10 +81,12 @@ Every product record has four attribute levels. This is the canonical definition
 | **`core_attributes`** | Attributes matching the **Key** column in the SKU schema's Core Attributes table | **High effort** — the agent must actively work to extract these. They define what makes a product identifiable and comparable within its subcategory. Target: >80% fill rate. | SKU schema (`docs/product-taxonomy/sku-schemas/`) |
 | **`extended_attributes`** | Attributes matching the **Key** column in the SKU schema's Extended Attributes table | **Moderate effort** — extract when available on the page, but do not invent complex parsing for marginal gains. Target: >50% fill rate. | SKU schema (`docs/product-taxonomy/sku-schemas/`) |
 | **`extra_attributes`** | Everything else discovered on the product page that doesn't match any Key in core or extended | **Low effort / opportunistic** — capture what is naturally available during extraction, but do not put significant effort into finding these. They serve as a feedback signal for future schema evolution. Keys must be `snake_case`, values must be primitives. | Discovered at runtime |
+| **`attribute_units`** | Maps attribute keys (from any bucket) to their unit of measure string as found on the source site. Only includes attributes with physical units. | Extract when the SKU schema's `Unit` column is not `—`. For `extra_attributes`, include when the site makes the unit unambiguous. | SKU schema `Unit` column + site content |
 
 Additional rules:
 - `brand` is a universal top-level field (not inside any attribute bucket)
 - `product_category` is the taxonomy ID (e.g., `machinery.power_tools`)
+- `attribute_units` is a top-level dict mapping attribute keys to unit strings. Keys must exactly match keys in `core_attributes`, `extended_attributes`, or `extra_attributes`. Site-derived — no conversions.
 
 ### Language rules for non-English sites
 
