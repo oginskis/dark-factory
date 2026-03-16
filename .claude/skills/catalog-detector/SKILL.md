@@ -26,10 +26,6 @@ Detect whether a company has a public product catalog and determine the best scr
 | Catalog assessment (output) | `docs/catalog-detector/{slug}.md` |
 | Platform knowledgebase | `docs/platform-knowledgebase/{platform-slug}.md` |
 
-## Role in the four-level product record
-
-The catalog-detector determines whether a site can support the four-level product record format (see `.claude/skills/scraper-generator/references/code-generator.md` for the canonical definition). Specifically, Step 5 (Product Attribute Extractability Check) verifies that the catalog exposes enough structured data to support at least the universal top-level fields and core attributes. A site that only shows product names and images — without structured specs — cannot produce meaningful core_attributes and is stopped via `attributes_not_extractable`.
-
 ## Workflow
 
 Read and follow `references/workflow.md`.

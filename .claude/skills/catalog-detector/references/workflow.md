@@ -19,7 +19,7 @@ This context shapes where to look for product listings and what catalog structur
 
 This workflow can use any available tools during investigation — including rendering pages in a browser, observing network requests, and inspecting JavaScript behavior. The purpose is to discover how the site delivers product data.
 
-However, the **scraping strategy recommended by this workflow** must be executable with simple HTTP request libraries (httpx, requests) plus HTML/JSON/PDF parsing. The downstream scraper cannot use a headless browser. So the investigation goal is: find a path to product data that works without JavaScript rendering — static HTML, JSON-LD, an internal API, or a downloadable file.
+However, the **scraping strategy recommended by this workflow** must be executable with simple HTTP request libraries (httpx, requests) plus HTML/JSON/PDF parsing. The recommended scraping strategy must work without a headless browser. So the investigation goal is: find a path to product data that works without JavaScript rendering — static HTML, JSON-LD, an internal API, or a downloadable file.
 
 ---
 
@@ -67,7 +67,7 @@ Once a catalog is located, analyze its structure thoroughly.
 - Map the full category tree: top-level categories, subcategories, any deeper nesting
 - Record the URL pattern for each category level
 - Note whether categories use path segments (`/furniture/chairs/`) or query parameters (`?category=chairs`)
-- Note the URL path structure — how product categories map to URL segments. The scraper-generator uses these patterns to classify products by taxonomy subcategory.
+- Note the URL path structure — how product categories map to URL segments. These URL patterns are part of the catalog structure finding.
 - Count the number of leaf categories (categories that contain products directly)
 
 ### Pagination
@@ -95,7 +95,7 @@ Identify the CMS or e-commerce platform powering the site. Check these signals:
 
 Record the platform using one of these values: `woocommerce`, `shopify`, `magento`, `prestashop`, `opencart`, `bigcommerce`, `squarespace`, `wix`, `drupal`, `custom`, `unknown`. This is a closed enumeration — if the platform is recognizable but not on this list, record `custom`. The slug is always lowercase, no spaces or special characters.
 
-After identifying the platform, read the platform knowledgebase for the detected platform (if it exists). The knowledgebase contains extraction patterns, CSS selectors, and pitfalls discovered from previous scraper runs on the same platform. Use this knowledge to inform the structured data and anti-bot assessments that follow. The knowledgebase is maintained by the scraper-generator — this workflow only reads it.
+After identifying the platform, read the platform knowledgebase for the detected platform (if it exists). The knowledgebase contains extraction patterns, CSS selectors, and pitfalls discovered from previous scraper runs on the same platform. Use this knowledge to inform the structured data and anti-bot assessments that follow. This workflow reads the knowledgebase but does not modify it.
 
 ### Rendering Method
 Load a product listing page and determine how content is delivered:
@@ -117,7 +117,7 @@ Check for machine-readable product data in this order:
    - Requests to CDN-hosted JSON files
    - Server-side rendering endpoints that return HTML fragments via AJAX
    - When you find an API call, test whether it works as a standalone HTTP request (without cookies, session tokens, or browser headers). If it responds with product data, this is the scraping path.
-4. **If an API endpoint is found:** Document its URL pattern, required parameters (pagination, category filters), authentication requirements (if any), and response structure. Verify it returns sufficient product data (name, price, attributes) for the downstream scraper.
+4. **If an API endpoint is found:** Document its URL pattern, required parameters (pagination, category filters), authentication requirements (if any), and response structure. Verify it returns sufficient product data (name, price, attributes).
 
 If the site is JS-rendered but an API endpoint or JSON-LD provides complete product data via direct HTTP request, the site IS scrapable — classify it as `structured_data` strategy. Only stop if no such fallback exists after thorough investigation.
 
@@ -132,14 +132,14 @@ Assess the difficulty of automated access:
 
 ## Step 5: Product Attribute Extractability Check
 
-The downstream scraper extracts four levels of product data (see `.claude/skills/scraper-generator/references/code-generator.md` for the canonical definition):
+Check whether product pages expose structured attributes — not just names and images.
 
-1. **Universal top-level fields** (sku, name, url, price, etc.) — mandatory for every product
-2. **`core_attributes`** — the most important category-specific attributes, defined by the SKU schema. Scrapers put high effort into extracting these.
-3. **`extended_attributes`** — secondary category-specific attributes from the SKU schema. Moderate extraction effort.
-4. **`extra_attributes`** — anything else discovered. Low effort / opportunistic.
-
-Before proceeding, verify that the catalog exposes enough structured data to support at least the universal fields and core attributes.
+| What to look for | Why it matters |
+|-------------------|---------------|
+| Spec table or attribute block with named properties (e.g., "Voltage: 18V", "Weight: 3.3 kg") | Indicates the site exposes structured attribute data |
+| Price visible on the page (or in structured data / API) | Required for price tracking |
+| SKU or model number visible | Required for product identification |
+| Additional properties beyond the basics (dimensions, materials, certifications) | Indicates rich attribute availability |
 
 Open 3-5 individual product pages across different categories and check:
 - Are product attributes present as structured text in the HTML or API responses — discrete fields like name, price, weight, material, dimensions?
@@ -188,7 +188,7 @@ Starting from each top-level category discovered in Step 3:
 4. If no children exist, this is a leaf node — count the product links on the page
 5. Record every node: category path (human-readable breadcrumb), exact URL, product count (0 for branch nodes), and depth level
 
-Output as a table for the extraction blueprint. Include only nodes that are part of the scraper-relevant categories — skip categories that do not map to any taxonomy subcategory (e.g., promotions, services).
+Output as a table for the extraction blueprint. Include only nodes that are part of the product categories — skip categories that do not map to any taxonomy subcategory (e.g., promotions, services).
 
 **Circuit breaker:** If the tree exceeds 100 nodes or depth 5, stop recursion and log a warning.
 
@@ -219,7 +219,7 @@ Estimate the total number of products available on the site using the most relia
 - Sum of product counts across all leaf categories
 - API response metadata (total count fields)
 
-Record the estimation method alongside the number so downstream agents can gauge confidence.
+Record the estimation method alongside the number so subsequent pipeline stages can gauge confidence.
 
 ---
 
@@ -249,7 +249,7 @@ Write the catalog assessment report. Use one of the two templates below dependin
 
 ## URL Path Patterns
 
-{Map the top-level URL path segments to their product categories. This informs the scraper-generator's category mapping.}
+{Map the top-level URL path segments to their product categories. }
 
 - `/Head-Protection/` → head protection products
 - `/Respiratory-Protection/` → respiratory protection products
@@ -415,7 +415,7 @@ If all gates pass, the report is complete.
 
 ### Decision: requires_headless_browser
 
-**Context:** The product catalog requires JavaScript rendering to display product data, and after thorough API discovery (observing network requests, checking JSON-LD, testing API endpoints), no structured data fallback was found that works via simple HTTP request. The only way to access products is through a headless browser — which the downstream scraper does not support. This also applies when anti-bot measures require JavaScript execution to resolve (cookie-based detection, JS challenges).
+**Context:** The product catalog requires JavaScript rendering to display product data, and after thorough API discovery (observing network requests, checking JSON-LD, testing API endpoints), no structured data fallback was found that works via simple HTTP request. The only way to access products is through a headless browser — which this pipeline does not support. This also applies when anti-bot measures require JavaScript execution to resolve (cookie-based detection, JS challenges).
 **Autonomous resolution:** Stop. Record the finding in the catalog assessment with `Catalog found: yes`, `Scraping strategy: none`, and `Stop reason: requires_headless_browser`. Describe what was investigated: which API endpoints were checked, what network requests were observed, and why none of them provide product data without a browser.
 **Escalate when:** Never. This is a definitive finding.
 **Escalation payload:** N/A
@@ -429,7 +429,7 @@ If all gates pass, the report is complete.
 
 ### Decision: attributes_not_extractable
 
-**Context:** The catalog exists and products are listable, but product attributes are not present in a scrapable form. Attributes may be trapped in images (spec sheets as JPG/PNG), locked inside downloadable PDFs, rendered as unstructured prose, or only visible after interactive product configuration. If the scraper cannot reliably extract structured attribute data from product pages, the pipeline cannot produce useful output.
+**Context:** The catalog exists and products are listable, but product attributes are not present in a scrapable form. Attributes may be trapped in images (spec sheets as JPG/PNG), locked inside downloadable PDFs, rendered as unstructured prose, or only visible after interactive product configuration. If structured attribute data cannot be reliably extracted from product pages, the pipeline cannot produce useful output.
 **Autonomous resolution:** Stop. Record the finding in the catalog assessment using the stop template with `Catalog found: yes`, `Scraping strategy: none`, and `Stop reason: attributes_not_extractable`. Describe what was found on product pages and why structured extraction is not feasible.
 **Escalate when:** Never. This is a definitive finding.
 **Escalation payload:** N/A
