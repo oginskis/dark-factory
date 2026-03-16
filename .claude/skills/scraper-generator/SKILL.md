@@ -3,7 +3,7 @@ name: scraper-generator
 description: >
   Generate a production-ready Python scraper for a company's product catalog.
   Produces a standalone scraper.py, config.json, and test output.
-  Scrapers output the three-bucket product record format with core_attributes, extended_attributes, and extra_attributes.
+  Scrapers output the four-level product record format with universal top-level fields, core_attributes, extended_attributes, and extra_attributes.
   Use this skill when the user wants to create a scraper for a company that already has a catalog assessment —
   "generate scraper for X", "create scraper for X", "build a scraper for X products", "scrape X's catalog".
   Requires both a company report from /product-classifier and a catalog assessment from /catalog-detector to exist first.
@@ -62,13 +62,29 @@ Read and follow the agent instructions in `agents/scraper-generator.md`.
 
 ### Product record format
 
-Scrapers output the **three-bucket format**:
-- **Top-level fields:** `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`, `category_path`
-- `brand` is a top-level field (not inside any attribute bucket)
+Every product record has four attribute levels. This is the canonical definition — all other skills reference it.
+
+| Level | What it contains | Extraction effort | Source |
+|-------|-----------------|-------------------|--------|
+| **Universal top-level fields** | `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`, `category_path` | Always extract — these are mandatory for every product regardless of category. Never change across taxonomy updates. | Hardcoded in scraper and eval script |
+| **`core_attributes`** | Attributes matching the **Key** column in the SKU schema's Core Attributes table | **High effort** — the agent must actively work to extract these. They define what makes a product identifiable and comparable within its subcategory. Target: >80% fill rate. | SKU schema (`docs/product-taxonomy/sku-schemas/`) |
+| **`extended_attributes`** | Attributes matching the **Key** column in the SKU schema's Extended Attributes table | **Moderate effort** — extract when available on the page, but do not invent complex parsing for marginal gains. Target: >50% fill rate. | SKU schema (`docs/product-taxonomy/sku-schemas/`) |
+| **`extra_attributes`** | Everything else discovered on the product page that doesn't match any Key in core or extended | **Low effort / opportunistic** — capture what is naturally available during extraction, but do not put significant effort into finding these. They serve as a feedback signal for future schema evolution. Keys must be `snake_case`, values must be primitives. | Discovered at runtime |
+
+Additional rules:
+- `brand` is a universal top-level field (not inside any attribute bucket)
 - `product_category` is the taxonomy ID (e.g., `machinery.power_tools`)
-- **`core_attributes`** — attributes matching the Key column in the SKU schema's Core Attributes table
-- **`extended_attributes`** — attributes matching the Key column in the SKU schema's Extended Attributes table
-- **`extra_attributes`** — everything else (snake_case keys, primitive values only)
+
+### Language rules for non-English sites
+
+| Level | Keys | Values |
+|-------|------|--------|
+| **Universal top-level** | English (fixed) | `name` may remain in the original language. Other values in English where a static mapping is feasible. |
+| **`core_attributes`** | English only — must match SKU schema Key column exactly | Map to English via static translation dicts for known value sets (species, materials, grades). Values without a mapping pass through in original language. |
+| **`extended_attributes`** | English only — must match SKU schema Key column exactly | Same as core — static mapping where feasible, pass-through otherwise. |
+| **`extra_attributes`** | English `snake_case` — derived from non-English labels at code-generation time | Values may remain in the original language. No translation required. |
+
+The generated Python scraper handles this via static `LABEL_MAP` and value translation dicts — not runtime AI translation. The scraper-generator agent builds these mappings into the code when generating a scraper for a non-English site.
 
 The `config.json` includes:
 - `category_mapping` (dict) — maps URL path prefixes to taxonomy IDs (e.g., `"/Head-Protection/": "safety.head_protection"`)

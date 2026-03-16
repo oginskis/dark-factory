@@ -77,7 +77,7 @@ This stage examines the company's website for a public product catalog, analyzes
 
 Read file locations from `.claude/skills/scraper-generator/SKILL.md`, then read and follow `agents/scraper-generator.md` in full.
 
-This stage generates a standalone Python scraper based on the catalog assessment, SKU schema, and platform knowledgebase (if available). Scrapers output the three-bucket product record format. For multi-subcategory companies, the scraper classifies products by URL-prefix to taxonomy ID mapping at runtime. It validates the scraper via probe testing and a full test before finalizing.
+This stage generates a standalone Python scraper based on the catalog assessment, SKU schema, and platform knowledgebase (if available). Scrapers output the four-level product record format (see scraper-generator skill for the canonical definition). For multi-subcategory companies, the scraper classifies products by URL-prefix to taxonomy ID mapping at runtime. It validates the scraper via probe testing and a full test before finalizing.
 
 **Stop the pipeline if:**
 - No catalog assessment exists for the company (defensive — Stage 2 ensures this)
@@ -124,7 +124,7 @@ When all four stages complete successfully, present a structured summary to the 
   - {URL 2}
 
 ### Scraper
-- **Output format:** three-bucket (`core_attributes`, `extended_attributes`, `extra_attributes`)
+- **Output format:** four-level (universal top-level fields + `core_attributes`, `extended_attributes`, `extra_attributes`)
 - **Test result:** {passed / failed} ({N} products extracted, {errors} errors, {duration}s)
 - **SKU schema:** {subcategory-slug}
 - **Category-specific attributes extracted:** {comma-separated list of attribute names found in test products}
@@ -139,8 +139,9 @@ When all four stages complete successfully, present a structured summary to the 
 - {Eval checks skipped and why — e.g., "Price sanity check skipped (no prices in output). Pagination completeness check skipped (limited test run)."}
 - {Catalog scope surprises — e.g., "Sitemap contains 7,887 URLs vs. ~1,000 estimate — includes spare parts and accessories beyond the main product catalog."}
 - {Regional or access limitations — e.g., "Geo-restricted content detected. Some categories may vary by region."}
-- {Uncovered product lines — when the company sells products that were not scraped because no matching taxonomy category exists. For each uncovered line, suggest a taxonomy category and provide the exact command to add it. Format:}
-  - {"**Uncovered:** {Product line description} at `{catalog URL path}` — no matching taxonomy category. To add coverage, create a new subcategory in `docs/product-taxonomy/categories.md` (e.g., `{suggested_parent}.{suggested_id}`) and re-run: `/product-discovery {company URL}`"}
+- {Uncovered product lines — when the company sells products that were not scraped. Before writing the note, check `docs/product-taxonomy/categories.md` to determine which case applies:}
+  - {**Case 1 — taxonomy category exists but was not in the company classification.** Use: "**Uncovered:** {Product line description} at `{catalog URL path}` — taxonomy `{existing.taxonomy_id}` exists but was not included in the company classification. To add coverage, add this subcategory to the company report and re-run: `/product-discovery {company URL}`"}
+  - {**Case 2 — no matching taxonomy category exists at all.** Use: "**Uncovered:** {Product line description} at `{catalog URL path}` — no matching taxonomy category. To add coverage, create a new subcategory in `docs/product-taxonomy/categories.md` (e.g., `{suggested_parent}.{suggested_id}`) and re-run: `/product-discovery {company URL}`"}
 - {Any other facts that would surprise or confuse someone reading the output without pipeline context}
 
 {If nothing noteworthy, write "No operational caveats." Do not omit this section.}

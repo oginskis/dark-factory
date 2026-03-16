@@ -77,7 +77,7 @@ If no SKU schema exists for any of the company's subcategories, check the produc
 
 ## Step 2a: Map Attributes to Schema
 
-After loading the SKU schema(s), determine how each attribute the scraper extracts will be routed into the three-bucket product record format.
+After loading the SKU schema(s), determine how each attribute the scraper extracts will be routed into the product record's attribute buckets.
 
 The scraper-generator MUST:
 
@@ -134,7 +134,12 @@ The generated scraper must:
    - `product_category` — the taxonomy ID for the product's subcategory (e.g., `machinery.power_tools`). For multi-subcategory companies, determine from the URL-based category mapping built in Step 1b. For single-subcategory companies, use the company's primary taxonomy ID.
    - `scraped_at` — ISO 8601 timestamp of when this product was extracted
 
-2. **Extract category-specific attributes** as defined in the SKU schema and route them into the correct bucket per Step 2a. Map site elements to schema attributes using the descriptions and example values in the schema as guidance. Not every attribute will be present on every site — extract what is available, skip what is not.
+2. **Extract category-specific attributes** as defined in the SKU schema and route them into the correct bucket per Step 2a. Extraction effort varies by bucket:
+   - **`core_attributes`** — high effort. These define what makes a product identifiable and comparable. Actively work to find and parse these even if they require navigating tabs, parsing spec tables, or combining multiple page elements.
+   - **`extended_attributes`** — moderate effort. Extract when available on the page, but do not invent complex parsing for marginal gains.
+   - **`extra_attributes`** — low effort / opportunistic. Capture what is naturally available during extraction, but do not put significant effort into finding these. They serve as a feedback signal for future schema evolution.
+
+   **Non-English sites:** When generating a scraper for a site in a non-English language, the generated Python script must map non-English attribute labels to English keys. Include a static `LABEL_MAP` dict that maps the site's attribute labels to the corresponding SKU schema Key values (e.g., `"Biezums": "thickness"`, `"Suga": "species"`). For known closed value sets (species names, material types, grade labels), include a static translation dict (e.g., `"Egle": "Spruce"`). Extra attribute keys must also be English `snake_case` — derive them from the non-English labels at code-generation time, not at runtime. Values that cannot be statically mapped pass through in the original language.
 
 3. **Handle pagination completely** — follow all pages, not just the first. Support whichever pagination pattern the site uses (page numbers, next buttons, cursor-based, infinite scroll). Never stop at an arbitrary page limit.
 
@@ -176,12 +181,12 @@ The generated scraper must:
    }
    ```
 
-   Universal top-level fields: `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`.
+   Universal top-level fields (always present, never change): `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`.
 
-   Three attribute buckets:
-   - `core_attributes` — attributes whose keys match the **Key** column in the SKU schema's Core Attributes table
-   - `extended_attributes` — attributes whose keys match the **Key** column in the SKU schema's Extended Attributes table
-   - `extra_attributes` — everything else that doesn't match any Key in either table
+   Category-specific attribute buckets:
+   - `core_attributes` — attributes whose keys match the **Key** column in the SKU schema's Core Attributes table (high extraction effort)
+   - `extended_attributes` — attributes whose keys match the **Key** column in the SKU schema's Extended Attributes table (moderate extraction effort)
+   - `extra_attributes` — everything else that doesn't match any Key in either table (low effort / opportunistic)
 
    This is the data contract — the agent defines what the scraper produces, not how or where it is persisted. The harness provides the persistence mechanism (file format, storage destination).
 
@@ -290,7 +295,7 @@ The generated scraper is production code that runs daily as a CronJob. Write it 
 
 **Data hygiene:**
 - Use `pathlib.Path` for file paths, not strings.
-- Filter empty/None values from product attribute dicts before output: `{k: v for k, v in d.items() if v}`.
+- Filter None values from product attribute dicts before output: `{k: v for k, v in d.items() if v is not None}`. Use `is not None` rather than truthiness to preserve valid falsy values like `0` and `False`.
 
 ---
 
@@ -343,7 +348,7 @@ The test run has a **hard time limit of 2 minutes**. A `--limit 20` scraper that
    | Redirect chains to different domain or language | Localized site redirect | Pin URL scheme, set Accept-Language, handle redirects manually |
    | Garbled product names or `json.dumps` failures | Encoding mismatch — non-UTF-8 content | Detect encoding from Content-Type or HTML meta, decode explicitly |
 
-3. **Fix the root cause** in the scraper code, then re-run the test. This counts as the first attempt — one more retry is allowed before escalating.
+3. **Fix the root cause** in the scraper code, then re-run the test. The timed-out run does not count toward the retry budget — after fixing, you have one run and one retry (two attempts total) before escalating.
 
 Do not assume the scraper is "just slow." A correctly working `--limit 20` test should complete in under 90 seconds for most sites. If it consistently exceeds 2 minutes after a fix attempt, escalate — see the `scraper_test_failed` decision.
 
@@ -353,7 +358,7 @@ The test must verify:
 
 1. **Scraper completes without crashing** — no unhandled exceptions
 2. **Summary is valid** — `total_products` is between 1 and 20, `errors_count` is 0
-3. **Product records are correct** — `brand` is a top-level field (not inside attribute buckets) and `product_category` is a valid taxonomy ID. At least some records have the core universal fields populated (sku, name, url, scraped_at). Price and currency should be populated when the catalog displays prices — when the catalog assessment notes that prices are unavailable (e.g., international sites without pricing), null values are acceptable. At least some records should have attributes in `core_attributes` and/or `extended_attributes` matching Key values from the SKU schema.
+3. **Product records are correct** — `brand` is a top-level field (not inside attribute buckets) and `product_category` is a valid taxonomy ID. Every record must have `sku`, `name`, `url`, and `scraped_at` populated (non-null). Price and currency should be populated when the catalog displays prices — when the catalog assessment notes that prices are unavailable (e.g., international sites without pricing), null values are acceptable. At least some records should have attributes in `core_attributes` and/or `extended_attributes` matching Key values from the SKU schema.
 4. **Persist hook worked** — the harness received batches and the output destination has product data
 5. **Category diversity** — the extracted products span at least 2 distinct `category_path` top-level values. The probe (Step 4) validates extraction logic across at least 3 categories; this gate verifies that the scraper traverses multiple categories in a real run with pagination and batching. If all 20 products come from a single category, the test coverage is insufficient. If the catalog has only one category, this check passes automatically.
 
@@ -372,7 +377,7 @@ After the scraper passes the smoke test (Step 5), analyze the test output for po
 1. **Collect** all unique attribute keys from `extra_attributes` across all test products.
 2. **Evaluate significance** — for each extra attribute, count how many products include it. If an attribute appears on >80% of test products, it is a candidate for schema addition.
 3. **Check schema coverage** — verify the candidate is not already in the schema under a different name (synonym check).
-4. **Trigger taxonomy update** — if there are significant candidates, trigger schema enrichment for the company's subcategory in evolution mode. Pass the candidate attribute names and example values. The enrichment process evaluates whether they are genuinely significant for the subcategory (researches other companies, not just this one).
+4. **Trigger taxonomy update** — if there are significant candidates, request that the subcategory's SKU schema be updated to consider the candidate attributes. Pass the candidate attribute names and example values. The enrichment process evaluates whether they are genuinely significant for the subcategory (researches other companies, not just this one).
 5. **Log** — report which attributes were proposed to the taxonomy. The feedback does NOT re-map the current scraper's output. Newly added attributes take effect when this or another company's scraper is regenerated in the future.
 
 ### File locking for concurrency
@@ -435,7 +440,7 @@ If the final verification fails, apply the same retry logic as the smoke test �
 
 ## Step 6: Write Back to Platform Knowledgebase
 
-After a successful test, write discoveries back to the platform knowledgebase. This step only runs when the platform is an enumerated value (`woocommerce`, `shopify`, `magento`, `prestashop`) — skip for `unknown` or `custom` platforms.
+After a successful test, write discoveries back to the platform knowledgebase. This step only runs when the platform is an enumerated value (`woocommerce`, `shopify`, `magento`, `prestashop`, `opencart`, `bigcommerce`, `squarespace`, `wix`, `drupal`) — skip for `unknown` or `custom` platforms.
 
 If the platform knowledgebase does not exist yet, create it. If it exists, append new discoveries without removing existing content.
 
@@ -505,7 +510,7 @@ Before presenting results, verify the scraper and config against these quality g
 |---|-------|---------------|
 | 1 | **Scraper is standalone** | Single .py file, no imports from the codebase, only allowed libraries |
 | 2 | **Smoke test passed** | `--limit 20` test: products extracted successfully with all universal top-level fields populated |
-| 3 | **Product data contract correct** | Flat list of product records with three-bucket attribute structure (`core_attributes`, `extended_attributes`, `extra_attributes`) |
+| 3 | **Product data contract correct** | Flat list of product records with universal top-level fields plus three attribute buckets (`core_attributes`, `extended_attributes`, `extra_attributes`) |
 | 4 | **`brand` is top-level** | `brand` appears as a top-level field in every product record, not inside any attribute bucket |
 | 5 | **`product_category` is valid** | `product_category` is a valid taxonomy ID from `categories.md` |
 | 6 | **`core_attributes` keys match schema** | Every key in `core_attributes` appears in the Key column of the SKU schema's Core Attributes table |

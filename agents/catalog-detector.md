@@ -93,9 +93,9 @@ Identify the CMS or e-commerce platform powering the site. Check these signals:
 - JavaScript globals and CSS class naming conventions
 - Response headers (`X-Powered-By`, `X-Shopify-Stage`)
 
-Record the platform using one of these values: `woocommerce`, `shopify`, `magento`, `prestashop`, `custom`, `unknown`. This is a closed enumeration — if the platform is recognizable but not on this list, record `custom`. The slug is always lowercase, no spaces or special characters.
+Record the platform using one of these values: `woocommerce`, `shopify`, `magento`, `prestashop`, `opencart`, `bigcommerce`, `squarespace`, `wix`, `drupal`, `custom`, `unknown`. This is a closed enumeration — if the platform is recognizable but not on this list, record `custom`. The slug is always lowercase, no spaces or special characters.
 
-After identifying the platform, read the platform knowledgebase for the detected platform (if it exists). The knowledgebase contains extraction patterns, CSS selectors, and pitfalls discovered from previous scraper runs on the same platform. Use this knowledge to inform the structured data and anti-bot assessments that follow.
+After identifying the platform, read the platform knowledgebase for the detected platform (if it exists). The knowledgebase contains extraction patterns, CSS selectors, and pitfalls discovered from previous scraper runs on the same platform. Use this knowledge to inform the structured data and anti-bot assessments that follow. The knowledgebase is maintained by the scraper-generator — this agent only reads it.
 
 ### Rendering Method
 Load a product listing page and determine how content is delivered:
@@ -125,14 +125,21 @@ If the site is JS-rendered but an API endpoint or JSON-LD provides complete prod
 Assess the difficulty of automated access:
 - **None detected:** Standard HTTP responses, no challenges
 - **Light:** Rate limiting, basic user-agent checks (manageable with respectful delays and proper headers)
-- **Moderate:** Cookie-based bot detection, JavaScript challenges that require a headless browser to resolve. Since the pipeline cannot use headless browsers, this is a stop condition — see the `requires_headless_browser` decision.
+- **Moderate:** Cookie-based bot detection, JavaScript challenges on the rendered page. If the only path to product data requires resolving these challenges (no structured-data fallback via API or JSON-LD), this is a stop condition — see the `requires_headless_browser` decision. If product data is accessible via API or JSON-LD without triggering these measures, record severity as `moderate` and proceed.
 - **Severe:** CAPTCHA walls, Cloudflare Under Attack mode, DataDome, PerimeterX, or similar commercial bot protection that actively blocks automated access. This is a stop condition — see the `anti_bot_severe` decision.
 
 ---
 
 ## Step 5: Product Attribute Extractability Check
 
-The downstream scraper will extract structured product attributes (name, price, specifications, dimensions, etc.) from product pages. Before proceeding, verify that the catalog actually exposes product data in a scrapable form.
+The downstream scraper extracts four levels of product data (see scraper-generator skill for the canonical definition):
+
+1. **Universal top-level fields** (sku, name, url, price, etc.) — mandatory for every product
+2. **`core_attributes`** — the most important category-specific attributes, defined by the SKU schema. Scrapers put high effort into extracting these.
+3. **`extended_attributes`** — secondary category-specific attributes from the SKU schema. Moderate extraction effort.
+4. **`extra_attributes`** — anything else discovered. Low effort / opportunistic.
+
+Before proceeding, verify that the catalog exposes enough structured data to support at least the universal fields and core attributes.
 
 Open 3-5 individual product pages across different categories and check:
 - Are product attributes present as structured text in the HTML or API responses — discrete fields like name, price, weight, material, dimensions?
@@ -188,7 +195,7 @@ Write the catalog assessment report. Use one of the two templates below dependin
 **Scraping strategy:** static_html | structured_data | pdf_pricelist
 **Estimated product count:** {number} ({estimation method})
 **Anti-bot severity:** none | light | moderate | severe
-**Platform:** {woocommerce | shopify | magento | prestashop | custom | unknown}
+**Platform:** {woocommerce | shopify | magento | prestashop | opencart | bigcommerce | squarespace | wix | drupal | custom | unknown}
 
 ## Catalog Entry Points
 - {URL or path to main product listing}
@@ -220,7 +227,7 @@ Write the catalog assessment report. Use one of the two templates below dependin
 
 ## Anti-Bot Details
 {Specific measures detected, if any}
-{Recommended mitigations: delays, headers, headless browser, etc.}
+{Recommended mitigations: delays, headers, rotating user-agents, etc.}
 
 ## Notes
 {Anything unusual: geo-restrictions, A/B testing on layouts, seasonal catalogs, etc.}
@@ -258,7 +265,7 @@ Use this when any stop decision is triggered (`no_public_catalog`, `auth_require
 | **Success reports include all sections** | All 8 sections present (Entry Points through Notes) | Missing sections, extra sections |
 | **Anti-bot severity uses exact values** | `none`, `light`, `moderate`, `severe` | Free-text descriptions, `low`/`high`/`medium` |
 | **Sections use `##` headings** | `## Catalog Entry Points` | `###` or other heading levels for top-level sections |
-| **Platform uses closed enumeration** | `woocommerce`, `shopify`, `magento`, `prestashop`, `custom`, `unknown` | Free-text platform names, `WordPress`, `WooCommerce` (wrong case) |
+| **Platform uses closed enumeration** | `woocommerce`, `shopify`, `magento`, `prestashop`, `opencart`, `bigcommerce`, `squarespace`, `wix`, `drupal`, `custom`, `unknown` | Free-text platform names, `WordPress`, `WooCommerce` (wrong case) |
 
 ---
 
@@ -277,7 +284,7 @@ Before presenting results, re-read the catalog assessment you just wrote and che
 | 5 | **Product count has estimation method** | Number followed by method in parentheses, e.g., `~2,400 (sitemap count)` |
 | 6 | **Navigation Paths are actionable** | A scraper could follow the listed URL patterns to reach all products |
 | 7 | **Anti-bot severity uses exact value** | One of: `none`, `light`, `moderate`, `severe` |
-| 8 | **Platform field present and valid** | One of: `woocommerce`, `shopify`, `magento`, `prestashop`, `custom`, `unknown` |
+| 8 | **Platform field present and valid** | One of: `woocommerce`, `shopify`, `magento`, `prestashop`, `opencart`, `bigcommerce`, `squarespace`, `wix`, `drupal`, `custom`, `unknown` |
 
 ### Stop report gates
 

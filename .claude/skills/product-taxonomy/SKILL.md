@@ -98,15 +98,15 @@ After researching multiple companies, synthesize a **two-tier attribute schema**
 
 ### Two-tier attribute split
 
-Produce two attribute tables — **Core Attributes** and **Extended Attributes** — not a single flat list.
+Produce two attribute tables — **Core Attributes** and **Extended Attributes** — not a single flat list. These two tiers drive how scrapers prioritize extraction effort (see scraper-generator skill for the full four-level product record format).
 
-**Core attributes (5-10):** Attributes meaningful for cross-company comparison. Selection criteria:
+**Core attributes (5-10):** The most important category-specific attributes — scrapers put **high effort** into extracting these. They define what makes a product identifiable and comparable within its subcategory. Selection criteria:
 - **Identity**: what kind of product (tool_type, fastener_type, dosage_form)
 - **Material/composition**: what it's made of (material, primary_ingredient)
 - **Primary dimension**: the key size/capacity metric (voltage, thread_size, capacity_oz)
 - **Identification/provenance**: model number, country of origin
 
-**Extended attributes (10-15):** Real but product-type-specific or rarely published. Everything that doesn't fit core.
+**Extended attributes (10-15):** Important but secondary — scrapers put **moderate effort** into extracting these. Real attributes that are product-type-specific or less commonly published. Everything that doesn't fit core.
 
 **Which attributes to include:** the ones that are most significant for the subcategory AND commonly appear on pricelists and product catalogs. The test is: "Would this attribute appear on a typical pricelist or product comparison sheet for this subcategory?" If yes, include it. If it's only on deep spec sheets or niche enthusiast sites, leave it out.
 

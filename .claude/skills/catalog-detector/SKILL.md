@@ -26,6 +26,10 @@ Read and follow the agent instructions in `agents/catalog-detector.md`.
 | Catalog assessment (output) | `docs/catalog-detector/{slug}.md` |
 | Platform knowledgebase | `docs/platform-knowledgebase/{platform-slug}.md` |
 
+## Role in the four-level product record
+
+The catalog-detector determines whether a site can support the four-level product record format (see scraper-generator skill for the canonical definition). Specifically, Step 5 (Product Attribute Extractability Check) verifies that the catalog exposes enough structured data to support at least the universal top-level fields and core attributes. A site that only shows product names and images — without structured specs — cannot produce meaningful core_attributes and is stopped via `attributes_not_extractable`.
+
 ## Claude Code wiring
 
 - Read the company report first for the company URL, categories, and business model context.

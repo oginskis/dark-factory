@@ -471,7 +471,7 @@ This skill and the generic `skill-creator:skill-creator` plugin are complementar
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `scripts/verify_skill.py` | Programmatic convention compliance checker | `uv run python scripts/verify_skill.py <skill-name>` or `--all` |
+| `scripts/verify_skill.py` | Programmatic convention compliance checker | `uv run python .claude/skills/skill-creator-local/scripts/verify_skill.py <skill-name>` or `--all` |
 
 The verification script checks:
 - Skill wrapper structure (frontmatter, required sections, agent reference)

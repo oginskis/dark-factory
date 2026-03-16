@@ -40,6 +40,17 @@ Read and follow the agent instructions in `agents/eval-generator.md`.
 - **`{slug}`** — the company slug from `$ARGUMENTS` (e.g., `festool`).
 - **`{category-slug}`** — derived from the subcategory display name corresponding to the company's Primary taxonomy ID. Look up the taxonomy ID in `categories.md` to find the display name, then slugify: lowercase, replace spaces with hyphens, drop special characters (`&`, `/`, `(`, `)`, `,`). Example: taxonomy ID `wood.softwood_hardwood_lumber` → display name "Softwood & Hardwood Lumber" → slug `softwood-hardwood-lumber`.
 
+## Eval and the four-level product record
+
+The eval validates scraper output against the four-level product record format (see scraper-generator skill for the canonical definition). Check weights reflect the extraction effort hierarchy:
+
+| Level | Eval check | Weight | Threshold | Rationale |
+|-------|-----------|--------|-----------|-----------|
+| Universal top-level | Hardcoded in eval script | — | — | Always validated (sku, name, url, price, etc.) |
+| `core_attributes` | `core_attribute_coverage` | 20 | 0.90 | High effort expected → strict validation |
+| `extended_attributes` | `extended_attribute_coverage` | 5 | 0.50 | Moderate effort → lighter validation |
+| `extra_attributes` | `extra_attributes_ratio` | 5 | 0.50 | Low effort / opportunistic → monitors schema adequacy |
+
 ## Claude Code wiring
 
 - Provide the file paths from the table above when the agent references logical resources (e.g., "the scraper source", "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the scrape output file", "the scrape run summary", "the shared eval script", "the eval config file", "the eval result file", "the eval history file", "the eval baseline file").

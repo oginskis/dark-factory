@@ -47,7 +47,7 @@ Read the SKU schema for the company's primary subcategory. For multi-subcategory
 
 Extract:
 
-- Core attributes — the **Key** values from the schema's Core Attributes table (excluding universal keys: `sku`, `product_name`, `url`, `price`, `currency`). Do not include universal fields (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) — those are hardcoded in the shared eval script.
+- Core attributes — the **Key** values from the schema's Core Attributes table (excluding universal keys: `sku`, `product_name`, `url`, `price`, `currency`). Do not include any universal/top-level fields (`sku`, `product_name`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`, `category_path`) — those are hardcoded in the shared eval script.
 - Extended attributes — the **Key** values from the schema's Extended Attributes table.
 - All attributes the scraper extracts (core, extended, and extra) with their expected types
 - Enum constraints — attributes with a known set of allowed values
@@ -120,9 +120,9 @@ The shared eval script implements 12 weighted checks. Weights sum to 100:
 
 ### Check implementation details
 
-**core_attribute_coverage** (weight 20, threshold 0.90): Count how many core schema attributes are present and non-empty in `core_attributes`. Compute per-product coverage, measure fraction of products above 80%. Threshold: 0.90 (90% of products must have >80% of core attributes filled).
+**core_attribute_coverage** (weight 20, threshold 0.90): Count how many core schema attributes are present and non-empty in `core_attributes`. Compute per-product coverage, measure fraction of products above 80%. Threshold: 0.90 (90% of products must have >80% of core attributes filled). Core attributes receive the highest weight because scrapers are expected to put high effort into extracting them — they define what makes a product identifiable and comparable.
 
-**extended_attribute_coverage** (weight 5, threshold 0.50): Same logic as core but applied to `extended_attributes`. Lighter threshold: 0.50 (50% of products must have >50% of extended attributes filled). Skipped when `extended_attributes` list is empty.
+**extended_attribute_coverage** (weight 5, threshold 0.50): Same logic as core but applied to `extended_attributes`. Lighter threshold: 0.50 (50% of products must have >50% of extended attributes filled). Lower weight and threshold reflect that scrapers put moderate effort into these — they are important but secondary to core. Skipped when `extended_attributes` list is empty.
 
 **pagination_completeness** (weight 10, threshold 0.70): Compares actual product count to `expected_product_count`. Skipped on limited runs.
 
