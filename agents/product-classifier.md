@@ -75,10 +75,12 @@ Each subcategory line in the product taxonomy categories file has a display name
 **Classification steps:**
 
 1. Read the full product taxonomy categories file.
-2. List all subcategories that describe the company's product lines. For each, record the taxonomy ID and display name.
-3. Identify the **primary** -- the single subcategory (by taxonomy ID) that best represents what the company is most known for or where it earns the most revenue.
-4. Classification values must use the taxonomy ID with the display name in parentheses for readability. Example: `machinery.power_tools` (Power Tools (Drills, Saws, Sanders)).
-5. Determine business model (B2B, B2C, B2B2C, marketplace, etc.), target market, and geographic focus.
+2. List every product category observed on the company's website during investigation — from navigation menus, category pages, and sitemaps. This is the exhaustive list of what the company sells. Do not filter yet.
+3. For each observed category from step 2, search the product taxonomy categories file for a matching subcategory. Record matches (taxonomy ID + display name). Only exclude a match if the products are truly marginal (branded swag, gift cards, services, or consumables sold only as accessories to the main product). A dedicated catalog section with real physical products for sale is never marginal — if it has its own navigation entry, it is a distinct product line.
+4. The **Subcategories** list is the union of all matches from step 3.
+5. Identify the **primary** -- the single subcategory (by taxonomy ID) that best represents what the company is most known for or where it earns the most revenue.
+6. Classification values must use the taxonomy ID with the display name in parentheses for readability. Example: `machinery.power_tools` (Power Tools (Drills, Saws, Sanders)).
+7. Determine business model (B2B, B2C, B2B2C, marketplace, etc.), target market, and geographic focus.
 
 If no existing category or subcategory fits the company's primary products, escalate — see the `category_not_found` decision.
 
@@ -195,8 +197,9 @@ Before presenting results, re-read the report you just wrote and check it agains
 | 5 | **Slug is correct** | Matches the algorithm from Step 1 — derived from domain, not display name |
 | 6 | **Product lines described** | At least one `###` subsection under `## Products` |
 | 7 | **References populated** | At least two URLs visited during investigation are listed with markdown links |
+| 8 | **Catalog categories covered** | Walk each Level 1 bullet in `## Product Catalog Analysis (Preliminary)`. For each, either a matching taxonomy ID appears in the Subcategories row, or `## Findings` explains why it was excluded (services, digital-only, no taxonomy entry). A catalog section selling tangible goods with a matching taxonomy entry must appear in Subcategories — omitting it is the most common classification error. |
 
-If all 7 pass, the report is complete.
+If all 8 pass, the report is complete.
 
 ---
 
