@@ -10,7 +10,7 @@ This creates real costs:
 - **Cross-directory references** — skills point to `agents/{name}.md`, agent files use logical names that skills must map
 - **Wiring boundary debates** — "does this belong in the wrapper or the agent?" is the most common source of misplacement (the scraper-generator wrapper had ballooned to 112 lines with reasoning content)
 
-The portability argument no longer holds. As of December 2025, Anthropic published Agent Skills as an open standard. SKILL.md is now natively supported by Claude Code, OpenAI Codex CLI, Google Gemini CLI, GitHub Copilot, Cursor, and Kiro (AWS). The skills format IS the portable format — separate "harness-agnostic" agent files are unnecessary indirection.
+The portability argument no longer justifies the cost. As of December 2025, Anthropic published Agent Skills as an open standard. The SKILL.md *format* (frontmatter, progressive disclosure, references/) is natively supported by Claude Code, OpenAI Codex CLI, Google Gemini CLI, GitHub Copilot, Cursor, and Kiro (AWS). The *execution wiring* (Agent tool dispatch, Bash tool timeouts, `/skill-name` invocation, `uv run` commands) remains Claude Code-specific and would need adaptation for other harnesses. We accept this trade-off: the format is portable for discoverability; the execution content targets Claude Code, which is our only harness. Maintaining a separate "harness-agnostic" layer for theoretical portability to harnesses we don't use is unnecessary indirection.
 
 ## Solution
 
@@ -80,7 +80,9 @@ Everything for a skill lives in one directory. No cross-directory references.
 │       └── research-methodology.md ← already exists
 │
 └── skill-creator-local/
-    ├── SKILL.md                    ← simplified conventions
+    ├── SKILL.md                    ← skill overview, workflows, script docs
+    ├── references/
+    │   └── conventions.md          ← detailed convention definitions (Conventions 1-4)
     └── scripts/
         └── verify_skill.py
 ```
@@ -135,11 +137,11 @@ Read and follow `references/workflow.md`.
 File-driven skill — no database or external services required.
 ```
 
-### Key change: no wiring boundary
+### Key change: soft boundary replaces hard boundary
 
 The old pattern had a hard boundary: "wrapper = HOW, agent = WHAT." This created constant misplacement debates.
 
-The new pattern has one simple rule: **progressive disclosure**. If SKILL.md stays under 500 lines, the instruction can go there. If it's getting long, move detail to `references/`. There's no purity question.
+The new pattern uses a **soft guideline**: SKILL.md focuses on wiring (file paths, tool instructions, execution commands, escalation presentation). `references/` focuses on reasoning (steps, decisions, verification gates). This is a guideline, not a hard rule — when a reference file benefits from a specific path or tool mention, that's fine. The primary organizing principle is **progressive disclosure**: keep SKILL.md under 500 lines, move detail to `references/`.
 
 ## Workflow Reference Structure
 
@@ -170,9 +172,11 @@ The `references/workflow.md` file (formerly the agent file) keeps the same inter
 
 The content of these files is unchanged from the current agent files — they just move from `agents/{name}.md` to `.claude/skills/{name}/references/workflow.md`.
 
-### References files CAN include harness-specific content
+### References files and harness-specific content
 
-Unlike agent files which had a strict "no tool names, no file paths" rule, references files have no such restriction. In practice, keeping them capability-focused is good for readability, but it's not a hard convention. If a reference file benefits from mentioning a specific tool or path, that's fine.
+Unlike agent files which had a strict "no tool names, no file paths" rule, references files have no hard restriction. The soft guideline is: **prefer capability-focused language in references/ files** (say "search the web" not "use WebSearch tool"), but include harness-specific details when they genuinely improve clarity. This keeps references/ files readable and broadly useful while eliminating the enforcement overhead of a hard rule.
+
+**Exception: sub-agent reference files** (like `label-discoverer.md`, `code-generator.md`, `validator.md`) that are dispatched via the Agent tool into isolated context windows still benefit strongly from being lean and tool-name-free. These files become the sub-agent's entire instruction set — polluting them with harness wiring wastes context tokens. The soft guideline applies more strictly here.
 
 ## Scraper Generator Decomposition
 
@@ -220,7 +224,13 @@ then read and follow `agents/product-classifier.md` in full.
 Invoke `/product-classifier {slug}`.
 ```
 
-**Invocation mechanism:** `/skill-name` is an inline skill invocation — it loads the stage skill's SKILL.md into the current conversation context. This is NOT a sub-agent dispatch. The orchestrator and stage skill share the same conversation, which preserves the current behavior: escalations bubble up to the user within the same session, stage outputs are visible to subsequent stages, and the orchestrator can inspect results before proceeding to the next stage.
+**Invocation mechanism:** The orchestrator uses the Skill tool to invoke each stage (e.g., `Skill: product-classifier, args: "{slug}"`). This loads the stage skill's SKILL.md into the current conversation context as an inline expansion — NOT a sub-agent dispatch. The orchestrator and stage skill share the same conversation, which preserves the current behavior: escalations bubble up to the user, stage outputs are visible to subsequent stages, and the orchestrator can inspect results before proceeding.
+
+**$ARGUMENTS passing:** When the orchestrator invokes a stage skill with args, the stage skill receives those args as its `$ARGUMENTS`. The slug flows through automatically.
+
+**Context management:** Each stage skill loads its SKILL.md + references/workflow.md into context. To prevent context pressure from accumulating across 4 stages, the orchestrator should treat each stage as a discrete unit — the model naturally processes one stage at a time since each skill invocation triggers reading and following the stage's workflow before returning to the orchestrator.
+
+**Risk note:** This invocation mechanism should be validated during Phase 3 implementation by testing a single stage invocation (e.g., `/product-classifier {slug}` from within a product-discovery session) before rewriting all 4 stages. If skill invocation causes unexpected behavior (competing instructions, context confusion), the fallback is explicit `Read` of the stage SKILL.md: "Read `.claude/skills/product-classifier/SKILL.md` and follow its instructions." This achieves the same colocation benefit without changing execution semantics.
 
 Each stage is a self-contained skill invocation. The orchestrator keeps:
 - Stage sequence and dependency logic
@@ -259,25 +269,40 @@ Plus: wiring boundary definition, sub-agent dispatch wiring, sub-agent reference
 - "Change Routing: What Goes Where" — gone (no wrapper vs agent decision)
 - The entire "Three rules of environment agnosticism" section — no longer a hard rule
 
-**Estimated new size:** ~350 lines (down from 567).
+**Estimated new size:** SKILL.md ~200 lines (skill overview, workflows, script docs) + `references/conventions.md` ~200 lines (convention definitions). Total ~400 lines of content (down from 567), split across two files for progressive disclosure. This leaves headroom for future convention additions without approaching the 500-line SKILL.md limit.
 
 ### verify_skill.py updates
 
-- Check for `references/workflow.md` (or `references/orchestrator.md` for decomposed skills) instead of `agents/{name}.md`
-- Sub-agent checks look in `references/` instead of `agents/{name}/`
-- Remove wrapper↔agent cross-reference checks
-- Keep: word count checks, escalation alignment, decision-step references, report template compliance
-- Add: check that all files listed in `references/` exist
+**Structural changes:**
+- `find_repo_root()` currently requires `agents/` to exist (line 30). Remove this check — locate repo root using `.claude/skills/` only.
+- Remove `AGENTS_DIR` constant. Add `REFERENCES_DIR` helper: `SKILLS_DIR / skill_name / "references"`.
+- `check_skill_wrapper()`: replace check for `agents/{skill_name}.md` in content with check for `references/workflow.md` or `references/orchestrator.md`.
+
+**Check function changes:**
+- `check_agent_file()` → rename to `check_workflow_reference()`. Read from `references/workflow.md` (or `references/orchestrator.md` for decomposed skills). Keep: step structure, decision blocks, self-verification, format rules, decision-step references. Remove: the hard environment agnosticism checks (no tool names, no hardcoded paths) — replace with an advisory-level note when tool names appear in workflow references.
+- `check_subagent_pattern()` → repoint from `AGENTS_DIR / skill_name` to `SKILLS_DIR / skill_name / "references"`. Keep: sub-agent files must not have Decision blocks, word count ≤2,500. Soften: tool name and path checks to advisory level for sub-agent files.
+- `check_cross_references()` → update to check `references/` paths instead of `agents/` paths. Validate that cross-skill references using full paths (`.claude/skills/{name}/references/{file}`) resolve to existing files.
+
+**Keep unchanged:** word count checks, escalation alignment, report template compliance, orchestrator alignment.
+**Add:** check that every file referenced as `references/{name}` in SKILL.md exists in the skill's `references/` directory.
 
 ## Cross-Reference Updates
 
 | File | Current reference | New reference |
 |---|---|---|
-| eval-generator SKILL.md | `agents/scraper-generator/code-generator.md` | `references/code-generator.md` in scraper-generator skill |
-| catalog-detector SKILL.md | `agents/scraper-generator/code-generator.md` | `references/code-generator.md` in scraper-generator skill |
-| product-taxonomy SKILL.md | "see scraper-generator skill for the full four-level product record format" | "see scraper-generator skill's `references/code-generator.md`" (make pointer specific) |
-| product-discovery SKILL.md | "see scraper-generator skill for the canonical definition" | "see scraper-generator skill's `references/code-generator.md`" (make pointer specific) |
-| CLAUDE.md | References `agents/` directory | Remove agents/ from Key Directories, update Git tracking table |
+| eval-generator SKILL.md | `agents/scraper-generator/code-generator.md` | `.claude/skills/scraper-generator/references/code-generator.md` |
+| catalog-detector SKILL.md | `agents/scraper-generator/code-generator.md` | `.claude/skills/scraper-generator/references/code-generator.md` |
+| product-taxonomy SKILL.md | "see scraper-generator skill for the full four-level product record format" | "see `.claude/skills/scraper-generator/references/code-generator.md`" |
+| product-discovery SKILL.md | "see scraper-generator skill for the canonical definition" | "see `.claude/skills/scraper-generator/references/code-generator.md`" |
+| product-discovery SKILL.md | "see the slug derivation algorithm in `agents/product-classifier.md` Step 1" | "see `.claude/skills/product-classifier/references/workflow.md` Step 1" |
+| CLAUDE.md Key Directories | `agents/` listed as key directory | Remove `agents/` entry |
+| CLAUDE.md Git table | "`agents/` are always tracked" | Remove `agents/` from tracking note |
+| CLAUDE.md Conventions | "Skill wrappers and agent files are a paired two-file pattern" | Rewrite for pure-skills pattern |
+| CLAUDE.md Conventions | "Agent files must be harness-agnostic: no tool names, no file paths" | Remove (no longer applicable) |
+
+**Note:** Cross-skill references use full paths (`.claude/skills/{name}/references/{file}`) rather than prose descriptions ("in {name} skill"). Full paths are unambiguous, grep-able, and verifiable by verify_skill.py.
+
+**Note:** Historical spec and plan files under `docs/superpowers/` that reference `agents/` paths are left as-is — they document the state at the time they were written.
 
 ## CLAUDE.md Updates
 
@@ -295,13 +320,42 @@ Update Git tracking table:
 `.claude/` (skills, settings) is always tracked
 ```
 
+Remove from Conventions:
+```
+- Skill wrappers and agent files are a paired two-file pattern. See `/skill-creator-local` for the full convention spec.
+- Agent files must be harness-agnostic: no tool names, no file paths, no user-facing language.
+```
+
+Replace with:
+```
+- Each pipeline skill is self-contained under `.claude/skills/{name}/` with SKILL.md + references/. See `/skill-creator-local` for conventions.
+```
+
 Update Architecture section to reflect pure-skills pattern.
+
+## What this refactor does NOT change
+
+- Pipeline stages, their inputs, outputs, and decision logic
+- The product record format (canonical definition moves files but content is identical)
+- The scraper-generator decomposition (orchestrator + 3 sub-agents — just relocated)
+- The product-discovery stage sequence and stop conditions
+- The escalation format and user options
+- Any generated output (scrapers, configs, eval configs, reports)
+- The product-taxonomy and its SKU schemas
+
+Only file layout, SKILL.md structure, and skill-creator-local conventions change.
 
 ## Migration Sequencing
 
+**Atomicity requirement:** All phases must be completed on a single feature branch and merged as one unit. Between Phase 1 (move files) and Phase 2 (rewrite SKILL.md references), the system is broken — SKILL.md files point to `agents/{name}.md` but those files no longer exist. There is no safe incremental migration.
+
+**Dependency:** The scraper-generator decomposition branch must be merged first (or completed simultaneously on the same branch), since this refactor moves the decomposed sub-agent files.
+
+**Git history:** `git mv` from `agents/{name}.md` to `.claude/skills/{name}/references/workflow.md` changes both directory and filename. Git's rename detection may not track this as a rename. `git log --follow` may lose history. This is an accepted trade-off.
+
 ### Phase 1: Move files (mechanical)
 
-Move all agent files to their new locations under `references/`. This is a pure file move — content unchanged.
+Move all agent files to their new locations under `references/`. This is a pure file move — content unchanged. Use `git mv` where possible.
 
 1. `agents/product-classifier.md` → `.claude/skills/product-classifier/references/workflow.md`
 2. `agents/catalog-detector.md` → `.claude/skills/catalog-detector/references/workflow.md`
