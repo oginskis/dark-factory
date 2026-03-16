@@ -7,38 +7,38 @@
 
 ## Core Attributes
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| SKU | sku | text | Distributor, veterinary supplier, or manufacturer product identifier | ZTS-APQ-16, MRK-NUF-250, ELN-GAL-INJ |
-| Product Name | product_name | text | Full product name including brand, active ingredient, strength, and dosage form | Apoquel 16 mg Film-Coated Tablets for Dogs, Nuflor 300 mg/mL Solution for Injection, Drontal Plus Taste Tablets for Dogs |
-| URL | url | text | Direct link to the product page | https://example.com/product/apoquel-16mg-tablets |
-| Price | price | number | Numeric price per unit or per package excluding currency symbol | 2.85, 125.00, 45.99 |
-| Currency | currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD, AUD |
-| Dosage Form | dosage_form | text | Physical form of the veterinary product | Tablet, Film-Coated Tablet, Injectable Solution, Oral Suspension, Paste, Topical Spot-On, Bolus, Intramammary Syringe, Pour-On, Premix |
-| Therapeutic Class | therapeutic_class | text | Pharmacologic or therapeutic category | Janus Kinase Inhibitor, Antimicrobial, Anthelmintic, NSAID, Antiparasitic, Corticosteroid |
-| Package Type | package_type | text | Container closure system | Bottle, Vial, Tube, Blister Pack, Sachet, Intramammary Syringe, Pour-On Container |
-| Active Ingredient | active_ingredient | text (list) | Chemical substance(s) responsible for the therapeutic effect | Oclacitinib Maleate, Florfenicol, Praziquantel and Pyrantel Pamoate and Febantel |
-| Inactive Ingredients | inactive_ingredients | text (list) | Excipients included in the formulation | Microcrystalline Cellulose, Polyethylene Glycol, Propylene Glycol, Artificial Beef Flavor |
+| Attribute | Key | Data Type | Unit | Description | Example Values |
+|--------|--------|--------|--------|--------|--------|
+| SKU | sku | text | — | Distributor, veterinary supplier, or manufacturer product identifier | ZTS-APQ-16, MRK-NUF-250, ELN-GAL-INJ |
+| Product Name | product_name | text | — | Full product name including brand, active ingredient, strength, and dosage form | Apoquel 16 mg Film-Coated Tablets for Dogs, Nuflor 300 mg/mL Solution for Injection, Drontal Plus Taste Tablets for Dogs |
+| URL | url | text | — | Direct link to the product page | https://example.com/product/apoquel-16mg-tablets |
+| Price | price | number | — | Numeric price per unit or per package excluding currency symbol | 2.85, 125.00, 45.99 |
+| Currency | currency | text | — | ISO 4217 currency code | USD, EUR, GBP, CAD, AUD |
+| Dosage Form | dosage_form | text | — | Physical form of the veterinary product | Tablet, Film-Coated Tablet, Injectable Solution, Oral Suspension, Paste, Topical Spot-On, Bolus, Intramammary Syringe, Pour-On, Premix |
+| Therapeutic Class | therapeutic_class | text | — | Pharmacologic or therapeutic category | Janus Kinase Inhibitor, Antimicrobial, Anthelmintic, NSAID, Antiparasitic, Corticosteroid |
+| Package Type | package_type | text | — | Container closure system | Bottle, Vial, Tube, Blister Pack, Sachet, Intramammary Syringe, Pour-On Container |
+| Active Ingredient | active_ingredient | text (list) | — | Chemical substance(s) responsible for the therapeutic effect | Oclacitinib Maleate, Florfenicol, Praziquantel and Pyrantel Pamoate and Febantel |
+| Inactive Ingredients | inactive_ingredients | text (list) | — | Excipients included in the formulation | Microcrystalline Cellulose, Polyethylene Glycol, Propylene Glycol, Artificial Beef Flavor |
 
 ## Extended Attributes
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| Country of Origin | country_of_origin | text | Country where the finished product is manufactured | USA, UK, Belgium, France, India, Australia |
-| Brand Name | brand_name | text | Proprietary trade name of the veterinary drug | Apoquel, Nuflor, Drontal, Rimadyl, Convenia, Cytopoint |
-| Generic Name | generic_name | text | International nonproprietary name of the active substance | oclacitinib maleate, florfenicol, praziquantel/pyrantel/febantel, carprofen |
-| Manufacturer | manufacturer | text | Name of the marketing authorization holder or manufacturer | Zoetis, Merck Animal Health, Elanco, Dechra, Boehringer Ingelheim, Vetoquinol |
-| Target Species | target_species | text (list) | Animal species for which the product is approved | Dogs, Cats, Cattle, Horses, Swine, Sheep, Poultry, Goats |
-| Strength | strength | text | Amount of active ingredient per dosage unit or per defined volume | 16 mg, 300 mg/mL, 50 mg/mL, 5%, 10 mg/kg |
-| Route of Administration | route_of_administration | text | Method by which the drug is delivered to the animal | Oral, Subcutaneous Injection, Intramuscular Injection, Intravenous, Topical, Pour-On, Intramammary, In-Feed |
-| Indication | indication | text (list) | Diseases, conditions, or parasites the product is approved to treat or prevent | Atopic Dermatitis, Bovine Respiratory Disease, Gastrointestinal Nematodes, Mastitis, Pain and Inflammation |
-| NADA/ANADA Number | nadaanada_number | text | FDA New Animal Drug Application or Abbreviated New Animal Drug Application number | NADA 141-345, ANADA 200-597, NADA 141-230 |
-| Regulatory Status | regulatory_status | enum | Prescription or dispensing classification of the veterinary product | Veterinary Prescription (Rx), OTC, Veterinary Feed Directive (VFD) |
-| Withdrawal Period | withdrawal_period | text | Mandatory time between last dose and slaughter or milk collection for food-producing animals | Meat 28 days, Milk 36 hours, Eggs 0 days, Not Applicable (Companion Animal) |
-| Controlled Substance Schedule | controlled_substance_schedule | text | DEA schedule classification if the product contains controlled substances | Schedule II, Schedule III, Schedule IV, Not Scheduled |
-| NDC | ndc | text | National Drug Code for US market identification | 54771-6494-1, 00061-0850-01, 58198-4301-3 |
-| Storage Conditions | storage_conditions | text | Required storage temperature and handling instructions | Store below 25C, Refrigerate 2-8C, Store in Original Container, Protect From Light |
-| Shelf Life | shelf_life | number (months) | Duration the product retains acceptable quality from date of manufacture | 24, 36, 48 |
+| Attribute | Key | Data Type | Unit | Description | Example Values |
+|--------|--------|--------|--------|--------|--------|
+| Country of Origin | country_of_origin | text | — | Country where the finished product is manufactured | USA, UK, Belgium, France, India, Australia |
+| Brand Name | brand_name | text | — | Proprietary trade name of the veterinary drug | Apoquel, Nuflor, Drontal, Rimadyl, Convenia, Cytopoint |
+| Generic Name | generic_name | text | — | International nonproprietary name of the active substance | oclacitinib maleate, florfenicol, praziquantel/pyrantel/febantel, carprofen |
+| Manufacturer | manufacturer | text | — | Name of the marketing authorization holder or manufacturer | Zoetis, Merck Animal Health, Elanco, Dechra, Boehringer Ingelheim, Vetoquinol |
+| Target Species | target_species | text (list) | — | Animal species for which the product is approved | Dogs, Cats, Cattle, Horses, Swine, Sheep, Poultry, Goats |
+| Strength | strength | text | — | Amount of active ingredient per dosage unit or per defined volume | 16 mg, 300 mg/mL, 50 mg/mL, 5%, 10 mg/kg |
+| Route of Administration | route_of_administration | text | — | Method by which the drug is delivered to the animal | Oral, Subcutaneous Injection, Intramuscular Injection, Intravenous, Topical, Pour-On, Intramammary, In-Feed |
+| Indication | indication | text (list) | — | Diseases, conditions, or parasites the product is approved to treat or prevent | Atopic Dermatitis, Bovine Respiratory Disease, Gastrointestinal Nematodes, Mastitis, Pain and Inflammation |
+| NADA/ANADA Number | nadaanada_number | text | — | FDA New Animal Drug Application or Abbreviated New Animal Drug Application number | NADA 141-345, ANADA 200-597, NADA 141-230 |
+| Regulatory Status | regulatory_status | enum | — | Prescription or dispensing classification of the veterinary product | Veterinary Prescription (Rx), OTC, Veterinary Feed Directive (VFD) |
+| Withdrawal Period | withdrawal_period | text | — | Mandatory time between last dose and slaughter or milk collection for food-producing animals | Meat 28 days, Milk 36 hours, Eggs 0 days, Not Applicable (Companion Animal) |
+| Controlled Substance Schedule | controlled_substance_schedule | text | — | DEA schedule classification if the product contains controlled substances | Schedule II, Schedule III, Schedule IV, Not Scheduled |
+| NDC | ndc | text | — | National Drug Code for US market identification | 54771-6494-1, 00061-0850-01, 58198-4301-3 |
+| Storage Conditions | storage_conditions | text | — | Required storage temperature and handling instructions | Store below 25C, Refrigerate 2-8C, Store in Original Container, Protect From Light |
+| Shelf Life | shelf_life | number | months | Duration the product retains acceptable quality from date of manufacture | 24, 36, 48 |
 
 ## Changelog
 

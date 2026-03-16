@@ -7,38 +7,38 @@
 
 ## Core Attributes
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| SKU | sku | text | Retailer or manufacturer product identifier | PAN-590702, KS-4217704879, SW-5649776 |
-| Product Name | product_name | text | Full product name including style, material, and decorative details | Sparkling Pave Tennis Bracelet Silver, Elisa Gold Pendant Necklace in Ivory Mother-of-Pearl |
-| URL | url | text | Direct link to the product page | https://example.com/product/pave-tennis-bracelet |
-| Price | price | number | Numeric retail price excluding currency symbol | 29.99, 65.00, 195.00 |
-| Currency | currency | text | ISO 4217 currency code | USD, GBP, EUR, CAD, AUD |
-| Jewelry Type | jewelry_type | enum | Primary product category | Necklace, Bracelet, Earrings, Ring, Anklet, Brooch, Hair Accessory, Charm, Body Jewelry |
-| Stone Type | stone_type | text (list) | Decorative stones or crystals used | Cubic Zirconia, Swarovski Crystal, Glass, Resin, Acrylic, Rhinestone, Simulated Pearl |
-| Material Description | material_description | text | Full material composition as stated by the seller | 925 Sterling Silver with 14K Gold Plating and Cubic Zirconia, Brass with Rhodium Plating |
-| Closure Type | closure_type | text | Type of fastening mechanism | Lobster Clasp, Toggle, Magnetic, Sliding Knot, Post with Butterfly Back, Hook, Barrel |
-| Country of Origin | country_of_origin | text | Country where the piece was manufactured | China, Thailand, India, Denmark, Italy |
+| Attribute | Key | Data Type | Unit | Description | Example Values |
+|--------|--------|--------|--------|--------|--------|
+| SKU | sku | text | — | Retailer or manufacturer product identifier | PAN-590702, KS-4217704879, SW-5649776 |
+| Product Name | product_name | text | — | Full product name including style, material, and decorative details | Sparkling Pave Tennis Bracelet Silver, Elisa Gold Pendant Necklace in Ivory Mother-of-Pearl |
+| URL | url | text | — | Direct link to the product page | https://example.com/product/pave-tennis-bracelet |
+| Price | price | number | — | Numeric retail price excluding currency symbol | 29.99, 65.00, 195.00 |
+| Currency | currency | text | — | ISO 4217 currency code | USD, GBP, EUR, CAD, AUD |
+| Jewelry Type | jewelry_type | enum | — | Primary product category | Necklace, Bracelet, Earrings, Ring, Anklet, Brooch, Hair Accessory, Charm, Body Jewelry |
+| Stone Type | stone_type | text (list) | — | Decorative stones or crystals used | Cubic Zirconia, Swarovski Crystal, Glass, Resin, Acrylic, Rhinestone, Simulated Pearl |
+| Material Description | material_description | text | — | Full material composition as stated by the seller | 925 Sterling Silver with 14K Gold Plating and Cubic Zirconia, Brass with Rhodium Plating |
+| Closure Type | closure_type | text | — | Type of fastening mechanism | Lobster Clasp, Toggle, Magnetic, Sliding Knot, Post with Butterfly Back, Hook, Barrel |
+| Country of Origin | country_of_origin | text | — | Country where the piece was manufactured | China, Thailand, India, Denmark, Italy |
 
 ## Extended Attributes
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| Base Metal | base_metal | text | Core metal or alloy before plating | Brass, Stainless Steel, Copper, Zinc Alloy, Sterling Silver, Mixed Metal Blend |
-| Plating | plating | text | Surface metal finish applied over the base metal | 14K Gold Plated, 18K Gold Plated, Rhodium Plated, Rose Gold Plated, Silver Plated, Ruthenium Plated |
-| Stone Color | stone_color | text | Primary color of decorative stones or crystals | Clear, Emerald Green, Sapphire Blue, Rose, Champagne, Aurora Borealis |
-| Nickel Free | nickel_free | boolean | Whether the item is certified nickel-free or hypoallergenic | Yes, No |
-| Color | color | text | Predominant visible color of the finished piece | Gold, Silver, Rose Gold, Multi-Color, Black, White, Turquoise |
-| Collection | collection | text | Named design collection or seasonal line | Pandora Timeless, Elisa, Constella, Millenia, Holiday 2026 |
-| Style | style | text | Design style or aesthetic category | Minimalist, Statement, Bohemian, Vintage, Classic, Layering, Cocktail |
-| Earring Style | earring_style | text | Subtype of earring construction | Stud, Drop, Hoop, Huggie, Crawler, Chandelier, Clip-On, Threader |
-| Pendant Dimensions | pendant_dimensions | text (mm) | Height x width of pendant or charm | 12 x 10, 25 x 18, 15 x 15 |
-| Adjustable | adjustable | boolean | Whether the piece has an adjustable length or size | Yes, No |
-| Number of Stones | number_of_stones | number | Total count of decorative stones or crystals | 1, 12, 48, 96 |
-| Pack Quantity | pack_quantity | number | Number of pieces included if sold as a set | 1, 2, 3, 5 |
-| Target Gender | target_gender | enum | Intended wearer demographic | Women, Men, Unisex, Girls, Boys |
-| Theme | theme | text | Decorative motif or symbolic design element | Heart, Infinity, Cross, Butterfly, Star, Celestial, Floral, Evil Eye |
-| Tarnish Resistant | tarnish_resistant | boolean | Whether the finish is treated to resist tarnishing | Yes, No |
+| Attribute | Key | Data Type | Unit | Description | Example Values |
+|--------|--------|--------|--------|--------|--------|
+| Base Metal | base_metal | text | — | Core metal or alloy before plating | Brass, Stainless Steel, Copper, Zinc Alloy, Sterling Silver, Mixed Metal Blend |
+| Plating | plating | text | — | Surface metal finish applied over the base metal | 14K Gold Plated, 18K Gold Plated, Rhodium Plated, Rose Gold Plated, Silver Plated, Ruthenium Plated |
+| Stone Color | stone_color | text | — | Primary color of decorative stones or crystals | Clear, Emerald Green, Sapphire Blue, Rose, Champagne, Aurora Borealis |
+| Nickel Free | nickel_free | boolean | — | Whether the item is certified nickel-free or hypoallergenic | Yes, No |
+| Color | color | text | — | Predominant visible color of the finished piece | Gold, Silver, Rose Gold, Multi-Color, Black, White, Turquoise |
+| Collection | collection | text | — | Named design collection or seasonal line | Pandora Timeless, Elisa, Constella, Millenia, Holiday 2026 |
+| Style | style | text | — | Design style or aesthetic category | Minimalist, Statement, Bohemian, Vintage, Classic, Layering, Cocktail |
+| Earring Style | earring_style | text | — | Subtype of earring construction | Stud, Drop, Hoop, Huggie, Crawler, Chandelier, Clip-On, Threader |
+| Pendant Dimensions | pendant_dimensions | text | mm | Height x width of pendant or charm | 12 x 10, 25 x 18, 15 x 15 |
+| Adjustable | adjustable | boolean | — | Whether the piece has an adjustable length or size | Yes, No |
+| Number of Stones | number_of_stones | number | — | Total count of decorative stones or crystals | 1, 12, 48, 96 |
+| Pack Quantity | pack_quantity | number | — | Number of pieces included if sold as a set | 1, 2, 3, 5 |
+| Target Gender | target_gender | enum | — | Intended wearer demographic | Women, Men, Unisex, Girls, Boys |
+| Theme | theme | text | — | Decorative motif or symbolic design element | Heart, Infinity, Cross, Butterfly, Star, Celestial, Floral, Evil Eye |
+| Tarnish Resistant | tarnish_resistant | boolean | — | Whether the finish is treated to resist tarnishing | Yes, No |
 
 ## Changelog
 

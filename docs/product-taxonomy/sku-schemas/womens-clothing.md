@@ -7,38 +7,38 @@
 
 ## Core Attributes
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| SKU | sku | text | Retailer or manufacturer product identifier, may include article number or reference code | WD-BLK-M-001, 77020365, E479071-000, 1310170003 |
-| Product Name | product_name | text | Full product name including brand, garment type, and key differentiators | Floral Wrap Midi Dress, Rayon Blouse, Long Printed Dress, Printed Shirt Dress |
-| URL | url | text | Direct link to the product page | https://example.com/product/floral-wrap-midi-dress |
-| Price | price | number | Numeric retail price per unit, excluding currency symbol | 19.99, 49.99, 245.00 |
-| Currency | currency | text | ISO 4217 currency code | USD, EUR, GBP, JPY, CAD |
-| Garment Type | garment_type | text | Type of clothing item | Dress, Blouse, Top, Skirt, Pants, Jeans, Jacket, Cardigan, Jumpsuit, Romper |
-| Size Type | size_type | enum | Cut or fit category that modifies the base size | Regular, Petite, Plus, Tall, Maternity |
-| Material | material | text | Primary fabric composition with fiber percentages | 100% Silk, 76% Rayon 24% Polyester, 100% Polyester, 95% Cotton 5% Elastane |
-| Fabric Type | fabric_type | text | Named weave, knit, or textile construction | Chiffon, Satin, Crepe, Jersey, Lace, Denim, Tweed, Organza, Velvet, Fluid |
-| Closure Type | closure_type | text | Primary fastening mechanism of the garment | Zipper, Button, Hook and Eye, Snap, Pull-On, Wrap Tie, Drawstring, No Closure |
+| Attribute | Key | Data Type | Unit | Description | Example Values |
+|--------|--------|--------|--------|--------|--------|
+| SKU | sku | text | — | Retailer or manufacturer product identifier, may include article number or reference code | WD-BLK-M-001, 77020365, E479071-000, 1310170003 |
+| Product Name | product_name | text | — | Full product name including brand, garment type, and key differentiators | Floral Wrap Midi Dress, Rayon Blouse, Long Printed Dress, Printed Shirt Dress |
+| URL | url | text | — | Direct link to the product page | https://example.com/product/floral-wrap-midi-dress |
+| Price | price | number | — | Numeric retail price per unit, excluding currency symbol | 19.99, 49.99, 245.00 |
+| Currency | currency | text | — | ISO 4217 currency code | USD, EUR, GBP, JPY, CAD |
+| Garment Type | garment_type | text | — | Type of clothing item | Dress, Blouse, Top, Skirt, Pants, Jeans, Jacket, Cardigan, Jumpsuit, Romper |
+| Size Type | size_type | enum | — | Cut or fit category that modifies the base size | Regular, Petite, Plus, Tall, Maternity |
+| Material | material | text | — | Primary fabric composition with fiber percentages | 100% Silk, 76% Rayon 24% Polyester, 100% Polyester, 95% Cotton 5% Elastane |
+| Fabric Type | fabric_type | text | — | Named weave, knit, or textile construction | Chiffon, Satin, Crepe, Jersey, Lace, Denim, Tweed, Organza, Velvet, Fluid |
+| Closure Type | closure_type | text | — | Primary fastening mechanism of the garment | Zipper, Button, Hook and Eye, Snap, Pull-On, Wrap Tie, Drawstring, No Closure |
 
 ## Extended Attributes
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| Country of Origin | country_of_origin | text | Country where the garment was manufactured | China, India, Turkey, Bangladesh, Vietnam, Cambodia, Morocco, Italy |
-| Sale Price | sale_price | number | Discounted or promotional price when the item is on sale, excluding currency symbol | 14.99, 39.99, 69.99 |
-| Gender | gender | enum | Target gender for the garment | Women, Unisex |
-| Fit | fit | enum | How the garment is cut relative to the body | Slim, Regular, Relaxed, Oversized, Bodycon, Fitted, Loose, Straight |
-| Color | color | text | Primary color of the garment | Black, Ivory, Blush, Emerald, Cobalt, Burgundy, Maroon, Purple |
-| Pattern | pattern | text | Visual pattern or print on the fabric | Solid, Floral, Striped, Polka Dot, Animal Print, Geometric, Abstract, Printed |
-| Fabric Technology | fabric_technology | text | Proprietary or branded fabric technology or performance finish | HEATTECH, AIRism, DRY-EX, CoolMax, Thermalite, UV Cut |
-| Neckline | neckline | text | Shape and style of the neckline or collar | V-Neck, Round, Square, Sweetheart, Off-Shoulder, Halter, Boat, Cowl, Shirt Collar |
-| Sleeve Style | sleeve_style | text | Design or shape of the sleeve | Set-In, Raglan, Puff, Bishop, Dolman, Flutter, Lantern, Balloon |
-| Silhouette | silhouette | text | Overall shape or outline of the garment | A-Line, Sheath, Shift, Empire, Fit-and-Flare, Wrap, Straight, Mermaid |
-| Lining | lining | enum | Whether the garment includes a lining | Fully Lined, Partially Lined, Unlined |
-| Waist Style | waist_style | text | Position and style of the waistline | Natural, High-Rise, Mid-Rise, Low-Rise, Empire, Drop, Elastic |
-| Occasion | occasion | text (list) | Intended wearing contexts for the garment | Casual, Work, Cocktail, Formal, Active, Vacation, Lounge, Bridal |
-| Season | season | text (list) | Seasons or climate conditions the garment is designed for | Spring, Summer, Fall, Winter, All-Season, Resort |
-| Care Instructions | care_instructions | text | Cleaning and maintenance directions | Machine wash cold, Dry clean only, Hand wash, Do not tumble dry, Iron low |
+| Attribute | Key | Data Type | Unit | Description | Example Values |
+|--------|--------|--------|--------|--------|--------|
+| Country of Origin | country_of_origin | text | — | Country where the garment was manufactured | China, India, Turkey, Bangladesh, Vietnam, Cambodia, Morocco, Italy |
+| Sale Price | sale_price | number | — | Discounted or promotional price when the item is on sale, excluding currency symbol | 14.99, 39.99, 69.99 |
+| Gender | gender | enum | — | Target gender for the garment | Women, Unisex |
+| Fit | fit | enum | — | How the garment is cut relative to the body | Slim, Regular, Relaxed, Oversized, Bodycon, Fitted, Loose, Straight |
+| Color | color | text | — | Primary color of the garment | Black, Ivory, Blush, Emerald, Cobalt, Burgundy, Maroon, Purple |
+| Pattern | pattern | text | — | Visual pattern or print on the fabric | Solid, Floral, Striped, Polka Dot, Animal Print, Geometric, Abstract, Printed |
+| Fabric Technology | fabric_technology | text | — | Proprietary or branded fabric technology or performance finish | HEATTECH, AIRism, DRY-EX, CoolMax, Thermalite, UV Cut |
+| Neckline | neckline | text | — | Shape and style of the neckline or collar | V-Neck, Round, Square, Sweetheart, Off-Shoulder, Halter, Boat, Cowl, Shirt Collar |
+| Sleeve Style | sleeve_style | text | — | Design or shape of the sleeve | Set-In, Raglan, Puff, Bishop, Dolman, Flutter, Lantern, Balloon |
+| Silhouette | silhouette | text | — | Overall shape or outline of the garment | A-Line, Sheath, Shift, Empire, Fit-and-Flare, Wrap, Straight, Mermaid |
+| Lining | lining | enum | — | Whether the garment includes a lining | Fully Lined, Partially Lined, Unlined |
+| Waist Style | waist_style | text | — | Position and style of the waistline | Natural, High-Rise, Mid-Rise, Low-Rise, Empire, Drop, Elastic |
+| Occasion | occasion | text (list) | — | Intended wearing contexts for the garment | Casual, Work, Cocktail, Formal, Active, Vacation, Lounge, Bridal |
+| Season | season | text (list) | — | Seasons or climate conditions the garment is designed for | Spring, Summer, Fall, Winter, All-Season, Resort |
+| Care Instructions | care_instructions | text | — | Cleaning and maintenance directions | Machine wash cold, Dry clean only, Hand wash, Do not tumble dry, Iron low |
 
 ## Changelog
 

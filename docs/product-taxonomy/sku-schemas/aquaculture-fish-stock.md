@@ -7,38 +7,38 @@
 
 ## Core Attributes
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| SKU | sku | text | Retailer or supplier product identifier | BT-FG-100, NTF-50, KOI-KH-8 |
-| Product Name | product_name | text | Full product name including species, life stage, grade, and quantity | Food Grade Blue Tilapia Fingerlings 100-Pack, Imported Premium Kohaku Koi 8-10 inch |
-| URL | url | text | Direct link to the product page | https://example.com/product/blue-tilapia-fingerlings |
-| Price | price | number | Numeric price per unit or per lot, excluding currency symbol | 0.89, 24.75, 199.99 |
-| Currency | currency | text | ISO 4217 currency code | USD, EUR, GBP, CAD, AUD |
-| Grade | grade | text | Quality or purpose grading assigned by the supplier | Food Grade, Aquaponics Grade, Pond Grade, Show Quality, Premium, Standard |
-| Water Type | water_type | enum | Type of water habitat the species requires | Freshwater, Saltwater, Brackish |
-| Diet Type | diet_type | enum | Feeding classification of the species | Omnivore, Herbivore, Carnivore, Filter Feeder |
-| Country of Origin | country_of_origin | text | Country or region where the stock was bred or harvested | USA, Israel, Thailand, Ecuador |
-| Supplier Type | supplier_type | enum | Type of operation selling the stock | Hatchery, Farm, Distributor, Breeder |
+| Attribute | Key | Data Type | Unit | Description | Example Values |
+|--------|--------|--------|--------|--------|--------|
+| SKU | sku | text | — | Retailer or supplier product identifier | BT-FG-100, NTF-50, KOI-KH-8 |
+| Product Name | product_name | text | — | Full product name including species, life stage, grade, and quantity | Food Grade Blue Tilapia Fingerlings 100-Pack, Imported Premium Kohaku Koi 8-10 inch |
+| URL | url | text | — | Direct link to the product page | https://example.com/product/blue-tilapia-fingerlings |
+| Price | price | number | — | Numeric price per unit or per lot, excluding currency symbol | 0.89, 24.75, 199.99 |
+| Currency | currency | text | — | ISO 4217 currency code | USD, EUR, GBP, CAD, AUD |
+| Grade | grade | text | — | Quality or purpose grading assigned by the supplier | Food Grade, Aquaponics Grade, Pond Grade, Show Quality, Premium, Standard |
+| Water Type | water_type | enum | — | Type of water habitat the species requires | Freshwater, Saltwater, Brackish |
+| Diet Type | diet_type | enum | — | Feeding classification of the species | Omnivore, Herbivore, Carnivore, Filter Feeder |
+| Country of Origin | country_of_origin | text | — | Country or region where the stock was bred or harvested | USA, Israel, Thailand, Ecuador |
+| Supplier Type | supplier_type | enum | — | Type of operation selling the stock | Hatchery, Farm, Distributor, Breeder |
 
 ## Extended Attributes
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| Species Common Name | species_common_name | text | Common name of the fish or aquatic organism | Blue Tilapia, Rainbow Trout, Koi, Channel Catfish, White Shrimp, Largemouth Bass |
-| Species Scientific Name | species_scientific_name | text | Binomial Latin name of the species | Oreochromis aureus, Oncorhynchus mykiss, Cyprinus rubrofuscus |
-| Life Stage | life_stage | enum | Developmental stage of the organism at time of sale | Egg, Fry, Fingerling, Stocker, Juvenile, Broodstock, Adult |
-| Sex | sex | enum | Sex composition of the lot | Male, Female, Mixed, All-Male, Unsexed |
-| Quantity per Lot | quantity_per_lot | number | Number of organisms included per purchase unit | 1, 15, 25, 50, 100, 500, 1000 |
-| Pricing Unit | pricing_unit | enum | How the product is priced | Per Fish, Per Lot, Per Pound, Per Thousand |
-| Temperature Range Min | temperature_range_min | number (F) | Minimum water temperature the species tolerates | 47, 55, 60, 68 |
-| Temperature Range Max | temperature_range_max | number (F) | Maximum water temperature the species tolerates | 86, 90, 100, 106 |
-| Optimal Temperature Min | optimal_temperature_min | number (F) | Lower bound of the ideal temperature range for growth | 72, 75, 78 |
-| Optimal Temperature Max | optimal_temperature_max | number (F) | Upper bound of the ideal temperature range for growth | 82, 85, 90 |
-| Growth Rate | growth_rate | text | Expected time to reach harvest or target size under optimal conditions | 7 months to 1 lb, 12-18 months to market size |
-| Purpose | purpose | text (list) | Intended use for the stock | Food Production, Aquaponics, Pond Stocking, Ornamental, Sport Fishing, Algae Control, Breeding |
-| Variety | variety | text | Named cultivar, color morph, or strain within a species | Kohaku, Showa, Sanke, Hawaiian Gold, Red Nile, Butterfly, Shubunkin |
-| Color | color | text | Primary body coloration | Red, White, Orange, Black, Blue, Gold, Calico, Platinum |
-| Pattern | pattern | text | Distinctive color pattern when applicable | Metallic, Two-tone, Tri-color, Calico, Solid |
+| Attribute | Key | Data Type | Unit | Description | Example Values |
+|--------|--------|--------|--------|--------|--------|
+| Species Common Name | species_common_name | text | — | Common name of the fish or aquatic organism | Blue Tilapia, Rainbow Trout, Koi, Channel Catfish, White Shrimp, Largemouth Bass |
+| Species Scientific Name | species_scientific_name | text | — | Binomial Latin name of the species | Oreochromis aureus, Oncorhynchus mykiss, Cyprinus rubrofuscus |
+| Life Stage | life_stage | enum | — | Developmental stage of the organism at time of sale | Egg, Fry, Fingerling, Stocker, Juvenile, Broodstock, Adult |
+| Sex | sex | enum | — | Sex composition of the lot | Male, Female, Mixed, All-Male, Unsexed |
+| Quantity per Lot | quantity_per_lot | number | — | Number of organisms included per purchase unit | 1, 15, 25, 50, 100, 500, 1000 |
+| Pricing Unit | pricing_unit | enum | — | How the product is priced | Per Fish, Per Lot, Per Pound, Per Thousand |
+| Temperature Range Min | temperature_range_min | number | F | Minimum water temperature the species tolerates | 47, 55, 60, 68 |
+| Temperature Range Max | temperature_range_max | number | F | Maximum water temperature the species tolerates | 86, 90, 100, 106 |
+| Optimal Temperature Min | optimal_temperature_min | number | F | Lower bound of the ideal temperature range for growth | 72, 75, 78 |
+| Optimal Temperature Max | optimal_temperature_max | number | F | Upper bound of the ideal temperature range for growth | 82, 85, 90 |
+| Growth Rate | growth_rate | text | — | Expected time to reach harvest or target size under optimal conditions | 7 months to 1 lb, 12-18 months to market size |
+| Purpose | purpose | text (list) | — | Intended use for the stock | Food Production, Aquaponics, Pond Stocking, Ornamental, Sport Fishing, Algae Control, Breeding |
+| Variety | variety | text | — | Named cultivar, color morph, or strain within a species | Kohaku, Showa, Sanke, Hawaiian Gold, Red Nile, Butterfly, Shubunkin |
+| Color | color | text | — | Primary body coloration | Red, White, Orange, Black, Blue, Gold, Calico, Platinum |
+| Pattern | pattern | text | — | Distinctive color pattern when applicable | Metallic, Two-tone, Tri-color, Calico, Solid |
 
 ## Changelog
 
