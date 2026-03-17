@@ -14,13 +14,17 @@
 - `tags` is a comma-separated string or array depending on endpoint — always normalize to array
 
 ## CSS Selectors
-- **Product links on collection pages:** `.product-card a`, `.product-item a` — varies by theme
-- **Pagination:** `.pagination a[rel="next"]` or `a.next`
-- **Breadcrumb:** Varies by theme — check `.breadcrumb`, `.breadcrumbs`, `nav[aria-label="Breadcrumb"]`
+
+| Element | Selector | Notes |
+|---------|----------|-------|
+| Product links on collection pages | `.product-card a` | Varies by theme: also try `.product-item a`, `.grid-product a` |
+| Pagination next | `.pagination a[rel="next"]` | Also try `a.next` |
+| Breadcrumb | `.breadcrumb` | Varies: also `.breadcrumbs`, `nav[aria-label="Breadcrumb"]` |
 
 ## Pagination
-- JSON API: `?limit=250&page={N}` — keep incrementing page until empty `products` array
-- HTML collection pages: `/collections/{name}?page={N}`, typically 16-24 products per page
+- URL pattern: `/collections/{name}?page={N}` (HTML) or `/products.json?limit=250&page={N}` (JSON API)
+- Products per page: 16-24 (HTML collections), 250 (JSON API)
+- Next page detection: `.pagination a[rel="next"]` (HTML) or empty `products` array (JSON API)
 - Product sitemap: `sitemap_products_1.xml` — lists all product URLs
 
 ## Common Pitfalls
