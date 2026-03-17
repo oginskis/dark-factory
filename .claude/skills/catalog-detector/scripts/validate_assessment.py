@@ -121,7 +121,7 @@ def check_discovery_actionable(content: str) -> dict:
     section = extract_section(content, "Product Discovery")
     if not section:
         return {"pass": False, "details": "### Product Discovery section missing"}
-    fields = ["Discovery method", "Pagination mechanism", "Products per page"]
+    fields = ["Discovery method", "Pagination mechanism", "Products per page", "Pagination URL pattern"]
     found = [f for f in fields if f"**{f}:**" in section]
     if len(found) == len(fields):
         method = extract_field(section, "Discovery method")
@@ -135,22 +135,32 @@ def check_category_tree_complete(content: str) -> dict:
     if not section:
         return {"pass": False, "details": "#### Verified Category Tree section missing"}
     # Parse table rows
-    rows = [l for l in section.split("\n") if l.strip().startswith("|") and "---" not in l]
+    rows = [line for line in section.split("\n") if line.strip().startswith("|") and "---" not in line]
     if len(rows) < 2:
         return {"pass": False, "details": "Category tree table has no data rows"}
+    # Parse column index from header
+    col_index = 2  # default fallback
+    if rows:
+        header_cells = [c.strip().lower() for c in rows[0].split("|")[1:-1]]
+        for i, h in enumerate(header_cells):
+            if "count" in h or "product count" in h:
+                col_index = i
+                break
     data_rows = rows[1:]  # skip header
     leaf_missing = 0
     total_leaves = 0
     for row in data_rows:
         cells = [c.strip() for c in row.split("|")[1:-1]]
-        if len(cells) < 4:
+        if len(cells) < col_index + 1:
             continue
-        count_cell = cells[2]  # Product Count column
+        count_cell = cells[col_index]
         if "(landing)" in count_cell.lower():
             continue
         total_leaves += 1
         if not re.search(r"\d+", count_cell):
             leaf_missing += 1
+    if total_leaves == 0:
+        return {"pass": False, "details": "Category tree table has no leaf categories (all rows skipped or landing pages)"}
     if leaf_missing == 0:
         return {"pass": True, "details": f"All {total_leaves} leaf categories have product counts"}
     return {"pass": False, "details": f"{leaf_missing} of {total_leaves} leaf categories missing product count"}
@@ -233,7 +243,7 @@ def check_valid_stop_reason(content: str) -> dict:
 
 def check_findings_explain(content: str) -> dict:
     section = extract_section(content, "Findings")
-    if section and "-" in section:
+    if bool(section and section.count("\n-") > 0):
         bullet_count = section.count("\n-")
         return {"pass": True, "details": f"Findings section has {bullet_count} bullet(s)"}
     return {"pass": False, "details": "## Findings section missing or has no bullets"}
