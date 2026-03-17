@@ -341,6 +341,114 @@ def get_body_text_length(html: str) -> int:
     return len(body.text(strip=True)) if body else 0
 
 
+def parse_robots_txt(text: str) -> dict:
+    sitemaps = []
+    disallowed = []
+    crawl_delay = None
+    for line in text.split("\n"):
+        line = line.strip()
+        if line.lower().startswith("sitemap:"):
+            sitemaps.append(line.split(":", 1)[1].strip())
+        elif line.lower().startswith("disallow:"):
+            path = line.split(":", 1)[1].strip()
+            if path:
+                disallowed.append(path)
+        elif line.lower().startswith("crawl-delay:"):
+            try:
+                crawl_delay = int(line.split(":", 1)[1].strip())
+            except ValueError:
+                pass
+    return {"sitemaps": sitemaps, "disallowed_paths": disallowed, "crawl_delay": crawl_delay}
+
+
+PRODUCT_URL_PATTERNS = re.compile(r"/product/|/p/|\.html|/shop/|/collections/|/toode/")
+MAX_SITEMAP_DEPTH = 3
+MAX_PRODUCT_URLS = 10_000
+
+
+def parse_sitemap(client: httpx.Client, url: str, *, timeout: float, delay: float,
+                  max_size: int, tracker: TransportTracker,
+                  depth: int = 0) -> list[str]:
+    """Parse a sitemap (or sitemap index) and return product-like URLs."""
+    if depth > MAX_SITEMAP_DEPTH:
+        log("warning", "Sitemap recursion depth exceeded", url=url, depth=depth)
+        return []
+
+    text, status, _, _, _ = fetch(client, url, timeout=timeout, delay=delay,
+                                   max_size=max_size, tracker=tracker)
+    if not text or status != 200:
+        return []
+
+    urls = []
+    try:
+        # Strip namespace for easier parsing
+        clean = re.sub(r'\sxmlns="[^"]+"', '', text, count=1)
+        root = ET.fromstring(clean)
+    except ET.ParseError:
+        log("warning", "Failed to parse sitemap XML", url=url)
+        return []
+
+    # Check if sitemap index
+    if root.tag == "sitemapindex" or root.findall("sitemap"):
+        for sitemap_el in root.findall(".//sitemap/loc"):
+            if sitemap_el.text and len(urls) < MAX_PRODUCT_URLS:
+                child_urls = parse_sitemap(client, sitemap_el.text.strip(),
+                                           timeout=timeout, delay=delay,
+                                           max_size=max_size, tracker=tracker,
+                                           depth=depth + 1)
+                urls.extend(child_urls)
+    else:
+        for loc in root.findall(".//url/loc"):
+            if loc.text:
+                u = loc.text.strip()
+                if PRODUCT_URL_PATTERNS.search(u):
+                    urls.append(u)
+                    if len(urls) >= MAX_PRODUCT_URLS:
+                        break
+
+    return urls
+
+
+def sample_diverse(urls: list[str], n: int) -> list[str]:
+    """Sample n URLs from diverse positions (beginning, middle, end)."""
+    if len(urls) <= n:
+        return list(urls)
+    step = len(urls) // n
+    return [urls[i * step] for i in range(n)]
+
+
+def extract_homepage_links(html: str, base_url: str) -> dict:
+    tree = HTMLParser(html)
+    catalog_keywords = {"product", "shop", "catalog", "collection", "price", "buy", "store"}
+    catalog_links = []
+    nav_categories = []
+
+    for link in tree.css("a[href]"):
+        href = link.attributes.get("href", "")
+        text = link.text(strip=True)
+        if not href or href.startswith("#") or href.startswith("javascript:"):
+            continue
+        href_lower = href.lower()
+        # Catalog link detection
+        if any(kw in href_lower for kw in catalog_keywords):
+            if href.startswith("/"):
+                catalog_links.append(href)
+            elif href.startswith(base_url):
+                catalog_links.append(href.replace(base_url, ""))
+
+    # Nav categories from main navigation
+    for nav in tree.css("nav, .nav, .menu, .main-menu"):
+        for link in nav.css("a"):
+            text = link.text(strip=True)
+            if text and len(text) > 2 and len(text) < 50:
+                nav_categories.append(text)
+
+    return {
+        "catalog_links": list(set(catalog_links))[:10],
+        "nav_categories": list(dict.fromkeys(nav_categories))[:20],
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Probe website for catalog detection")
     parser.add_argument("--url", required=True, help="Company website URL")
