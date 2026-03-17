@@ -3,7 +3,7 @@ name: catalog-detector
 description: >
   Detect whether a company has a public product catalog and produce a concrete extraction blueprint for the scraper-generator.
   Produces a catalog assessment with verified selectors, API endpoints, category tree, and platform-specific extraction recipe.
-  Use this skill when the user wants to check catalog availability or scrapability for a company that has already been classified —
+  Use this skill when the user wants to check catalog availability or scrapability for a company that already has a company report from /product-classifier —
   "check if X has a catalog", "detect pricelist for X", "what scraping strategy for X", "can we scrape X",
   "does X have a public product listing". Requires a company report from /product-classifier to exist first.
   If the user wants the full pipeline, use /product-discovery instead.
@@ -40,5 +40,4 @@ Read and follow `references/workflow.md`.
 
 ## Notes
 
-File-driven skill — no database or external services required.
-This skill owns the platform knowledgebase — it reads on every run and writes on every successful run.
+Owns the platform knowledgebase — reads on every run, writes on every successful run.
