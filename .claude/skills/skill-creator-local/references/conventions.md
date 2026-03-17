@@ -15,14 +15,14 @@ description: >
   {What it does — first sentence.}
   {What it produces — second sentence.}
   {When to use — trigger phrases and contexts.}
-  {Prerequisites — what must exist first.}
+  {Prerequisites — name the specific upstream skill, e.g., "Requires a company report from /product-classifier".}
   {Pipeline redirect — when to use /product-discovery instead, or note if independent.}
 user-invocable: true
 ---
 
 # {Skill Title}
 
-{One-line summary of what this skill does.}
+{One-line summary — what value this skill provides to the downstream consumer.}
 
 ## Input
 
@@ -42,7 +42,7 @@ user-invocable: true
 
 ## {Optional: Domain context section}
 
-{When a skill needs to explain its role relative to shared concepts (e.g., how the eval relates to the product record format, how the catalog-detector determines scrapability), add a domain context section between File locations and Workflow. Examples: `## Role in the four-level product record` (catalog-detector), `## Eval and the four-level product record` (eval-generator). Omit when not needed.}
+{When a skill needs to explain its role relative to shared concepts, add a domain context section between File locations and Workflow. Omit when not needed.}
 
 ## Workflow
 
@@ -61,7 +61,7 @@ Read and follow `references/workflow.md`.
 
 ## Notes
 
-File-driven skill — no database or external services required.
+{Only include if there's something genuinely useful to say — skill ownership, unusual behaviors, operational constraints. Omit or keep minimal if there's nothing worth noting.}
 ```
 
 ### SKILL.md rules
@@ -69,9 +69,10 @@ File-driven skill — no database or external services required.
 | Rule | Why |
 |------|-----|
 | **Description includes trigger phrases** | Prevents undertriggering — Claude needs explicit cues |
-| **Description mentions prerequisites** | Prevents invocation before upstream stages complete |
+| **Prerequisites name the specific upstream skill** | "Requires a company report from /product-classifier" not "requires upstream data" |
 | **Description mentions pipeline redirect** | Prevents confusion between individual stages and full pipeline |
 | **File locations table is exhaustive** | Every file the workflow reads or writes must have a row |
+| **One-line summary describes value to downstream consumer** | Forces purpose-driven thinking |
 | **Workflow section lists all escalation points with user options** | User must know what actions they can take on escalation |
 | **Workflow explicitly describes stop behavior** | Harness needs to know the skill may terminate without output |
 | **Workflow examples match logical resource names exactly** | Prevents mapping errors between SKILL.md and references/ |
@@ -107,13 +108,13 @@ The `references/workflow.md` file contains all reasoning, decision logic, and re
 # {Skill Name} Workflow
 
 **Input:** {what the workflow receives}
-**Output:** {what it produces, or "escalation"}
+**Output:** {what it produces — describe value to downstream consumer}
 
 ---
 
 ## Context
 
-{What this workflow does, its role in the pipeline.}
+{What this workflow does, its role in the pipeline, what the downstream consumer needs.}
 
 ## Step 1: {First Action}
 {Instructions}
@@ -169,6 +170,23 @@ The `references/workflow.md` file contains all reasoning, decision logic, and re
 | **Strict format rules table after each report template** | Correct/Wrong columns prevent formatting errors |
 | **Self-verification step with numbered quality gates** | Workflow must check its own output before completing |
 | **Decisions section is always last** | Consistent location for harness to find definitions |
+| **No duplicated steps across branches** | If writing "Same as Step X", make it a shared step instead |
+| **Output designed for downstream consumer** | Not a generic survey — every section should help the next stage |
+
+### Branching workflows
+
+When a workflow has variants (e.g., fast path vs. full investigation), structure it so that only the actual divergence is branched. Share everything before and after:
+
+```
+Step 1: Shared setup/detection
+Step 2: Fast path (branch A)        ← only these differ
+Step 3: Full investigation (branch B)
+Step 4: Shared output building      ← uses results from whichever branch ran
+Step 5: Shared report writing
+Step 6: Shared verification
+```
+
+**Test:** If a step in one branch says "Same as Step X in the other branch", it should be a shared step after the branches merge. This typically cuts 30-40% of workflow length.
 
 ### Decomposition pattern
 

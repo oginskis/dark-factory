@@ -17,8 +17,6 @@ user-invocable: true
 
 Create and improve pipeline skills following the conventions established in this repository.
 
-This skill codifies the patterns distilled from `product-discovery`, `product-classifier`, and `catalog-detector` — the most mature skills in the pipeline. All new or revised skills must follow these conventions for consistency.
-
 ## Input
 
 `$ARGUMENTS` describes what to create or improve (e.g., "create a new skill for X", "review catalog-detector", "improve scraper-generator conventions").
@@ -60,7 +58,11 @@ Standalone skills still follow the general best practices below but skip Convent
 
 ## Skill Writing Best Practices
 
-These are general skill-writing principles that apply to all skills in this repo.
+### Purpose-Driven Design
+
+Every skill should answer: **what does the downstream consumer need?** Design the output for the next stage in the pipeline, not as a generic report. If a skill's output doesn't directly enable the next step, it's doing work for its own sake.
+
+Example: catalog-detector doesn't produce a site survey — it produces an extraction blueprint with verified selectors, API endpoints, and category tree that the scraper-generator can translate directly into code.
 
 ### Progressive Disclosure
 
@@ -69,16 +71,39 @@ Skills load in three tiers. Design with this in mind:
 2. **SKILL.md body** — loaded when skill triggers. Keep under 500 lines. Move detail into `references/` with clear pointers.
 3. **Bundled resources** — loaded on demand (unlimited size). Use `scripts/` for code, `references/` for docs, `assets/` for templates.
 
-### Description — Prevent Undertriggering
+### Description — Be Concrete, Not Vague
 
-The `description` field is how Claude decides whether to invoke a skill. Include trigger phrases, contexts, and near-miss redirects. Claude tends to undertrigger, so be explicit about when to use the skill.
+The `description` field is how Claude decides whether to invoke a skill. Include trigger phrases, contexts, and near-miss redirects. State prerequisites by naming the specific upstream skill, not vague references.
+
+| Wrong | Right |
+|-------|-------|
+| "for a company that has already been classified" | "for a company that already has a company report from /product-classifier" |
+| "requires upstream data" | "requires a catalog assessment from /catalog-detector" |
 
 ### Writing Style
 
 - **Explain the why** behind instructions rather than piling on rigid MUSTs. LLMs respond better to reasoning than to rules.
 - **Use imperative form** — "Read the company report" not "You should read the company report."
 - **Prefer examples over abstract rules** — a Correct/Wrong table communicates faster than a paragraph of constraints.
-- **Keep it lean** — remove instructions that aren't pulling their weight.
+- **Keep it lean** — remove instructions that aren't pulling their weight. If a line says "Same as Step X", the step should be shared, not duplicated.
+
+### Notes Section
+
+The `## Notes` section should contain information that actually helps. Skill ownership, unusual behaviors, operational constraints. Drop boilerplate that applies to every skill equally — it adds noise without signal.
+
+### Workflow Structure — Branch at the Narrow Point
+
+When a workflow has variants (e.g., different paths for known vs. unknown inputs), identify what's actually different and share everything else:
+
+```
+Shared: Step 1 (detection/setup)
+Branch: Step 2 (fast path) OR Step 3 (full investigation)  ← only this differs
+Shared: Step 4 (build output)
+Shared: Step 5 (write report)
+Shared: Step 6 (verify)
+```
+
+Never duplicate shared steps across branches. If you're writing "Same as Step X" — that step should be shared, not in the branch. This typically cuts 30-40% of workflow length.
 
 ### Output Format Definition
 
@@ -117,6 +142,9 @@ When a skill supports multiple variants, organize by domain with a reference fil
 | 10 | SKILL.md escalation template says "workflow" not "agent" |
 | 11 | Orchestrator's stop list matches workflow decisions |
 | 12 | Logical resource names are unambiguous (full names, not short forms) |
+| 13 | No duplicated steps across workflow branches — shared logic is shared |
+| 14 | Output designed for downstream consumer, not as a generic survey |
+| 15 | Prerequisites name the specific upstream skill |
 
 ## Workflow: Reviewing an Existing Skill
 
@@ -128,8 +156,14 @@ When a skill supports multiple variants, organize by domain with a reference fil
 2. Read both the SKILL.md and `references/workflow.md` for issues the script can't catch (clarity, flow, ambiguity)
 3. Check cross-reference integrity (Convention 3 in `references/conventions.md`)
 4. Check orchestrator alignment (Convention 4 in `references/conventions.md`)
-5. Report findings organized by severity: Critical > Moderate > Minor
-6. Fix issues with the user's approval
+5. **Check for common anti-patterns:**
+   - "Same as Step X" duplication — refactor into shared steps
+   - Survey-style output that doesn't serve the downstream consumer
+   - Vague prerequisites ("already classified" instead of naming the skill)
+   - Boilerplate notes that add no information
+   - Branches that duplicate shared logic before/after the divergence point
+6. Report findings organized by severity: Critical > Moderate > Minor
+7. Fix issues with the user's approval
 
 Read `references/conventions.md` for detailed convention definitions.
 
