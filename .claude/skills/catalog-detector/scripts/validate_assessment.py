@@ -70,7 +70,7 @@ def extract_section(content: str, heading: str) -> str | None:
 # Success gate checks (12 gates)
 # ---------------------------------------------------------------------------
 
-def check_correct_template(content: str, template: str) -> dict:
+def check_correct_template(template: str) -> dict:
     if template == "success":
         return {"pass": True, "details": "Success template detected: has Extraction Blueprint section"}
     if template == "stop":
@@ -266,7 +266,7 @@ def run_gates(content: str, kb_dir: Path) -> dict:
         }
     elif template == "success":
         gate_fns = {
-            "correct_template": lambda: check_correct_template(content, template),
+            "correct_template": lambda: check_correct_template(template),
             "heading_and_slug": lambda: check_heading_and_slug(content),
             "strategy_valid": lambda: check_strategy_valid(content),
             "platform_valid": lambda: check_platform_valid(content),
@@ -280,7 +280,7 @@ def run_gates(content: str, kb_dir: Path) -> dict:
             "anti_bot_value": lambda: check_anti_bot_value(content),
         }
     else:
-        gates["correct_template"] = check_correct_template(content, template)
+        gates["correct_template"] = check_correct_template(template)
         issues.append("Gate 1 (correct_template): neither success nor stop template")
         return {"file": "", "detected_template": "unknown", "gates": gates,
                 "passed": 0, "failed": 1, "issues": issues}
