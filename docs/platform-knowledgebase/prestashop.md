@@ -2,17 +2,17 @@
 
 ## JSON-LD Patterns
 
-No JSON-LD Product schema observed on product pages (PATA Timber). Product data is embedded in HTML only. Google Tag Manager dataLayer contains product info (`item_id`, `item_name`, `price`, `item_category2`, `item_category3`) but is not accessible via simple HTTP scraping.
+JSON-LD availability varies by site. UK Timber (PrestaShop 9.0.2) has full Product schema with `name`, `sku`, `mpn`, `brand`, `offers` (price, currency, availability), and BreadcrumbList. PATA Timber (older version) has no JSON-LD Product schema — product data is HTML-only. Always check for JSON-LD first; fall back to CSS selectors if absent.
 
 ## CSS Selectors
 
 | Element | Selector | Notes |
 |---------|----------|-------|
-| Product links on listing pages | `a[href*="/p/"]` matching `/p/\d+-` pattern | Product URLs use `/p/{id}-{slug}` format |
+| Product links on listing pages | `a[href$=".html"]` inside `article` elements | URL patterns vary: PATA uses `/p/{id}-{slug}`, UK Timber uses `/{category-slug}/{id}-{slug}.html`. Match by `.html` suffix within article containers. |
 | Product price | `.price` (first occurrence) | Multiple `.price` elements may exist — use first for primary price |
 | Product name | `h1` | Standard heading |
-| Breadcrumb | `.pata-breadcrumbs a` | Site-specific class; standard PrestaShop may use `nav.breadcrumb` or `ol.breadcrumb` |
-| Product attributes | `table tr` with exactly 2 `td` cells | Label in first cell, value in second. NOT `dl/dt/dd` — PATA uses 2-column table rows in tab panels |
+| Breadcrumb | `nav.breadcrumb` or JSON-LD BreadcrumbList | PATA uses custom `.pata-breadcrumbs`; UK Timber uses `nav.breadcrumb.hidden-sm-down`. Prefer JSON-LD BreadcrumbList when available. |
+| Product attributes | `.product-variants .form-group` or `table tr` with 2 `td` cells | Varies by site: UK Timber uses variant selectors (select/radio in `.product-variants`); PATA uses 2-column table rows in tab panels |
 | Subcategory links | `a[href]` matching `/{parent-id}-{parent-slug}/{child-id}-{child-slug}` pattern | Numeric ID prefix on all category URLs |
 
 ## Pagination
@@ -30,10 +30,13 @@ No JSON-LD Product schema observed on product pages (PATA Timber). Product data 
 | Top-level category returns no products | PrestaShop top-level categories are often landing/index pages. Must traverse to leaf subcategories to find products |
 | 404 on some product URLs | Discontinued products return error pages ("Kļūda"). Skip gracefully |
 | Latvian attribute labels | Product specs use Latvian: Norāde=SKU, Biezums=thickness, Platums=width, Garums=length, Suga=species, Mitrums=moisture, Kvalitāte=grade |
-| No sitemap | No sitemap.xml available; category tree traversal is the only discovery method |
+| No sitemap | No sitemap.xml available on either site; use category tree traversal or productlist module |
+| Variant selectors as attributes | UK Timber uses PrestaShop variant selectors (`.product-variants .form-group` with select/radio) instead of spec tables. Label in `.control-label`, options in `select > option` or `input[type="radio"]` |
+| Productlist module | Some PrestaShop sites expose `/module/productlist/productlist{n}` — a flat paginated product list useful for discovery when sitemaps are absent |
 
 ## Sites Using This Platform
 
 | Company | Slug | Date | Notes |
 |---------|------|------|-------|
 | PATA Timber | pata | 2026-03-16 | Latvian timber retailer. No JSON-LD, no sitemap. Custom breadcrumb class `.pata-breadcrumbs`. All labels in Latvian. Product attributes in 2-column table rows (not dl/dt/dd). Category numeric IDs may differ from navigation links — verify via BFS discovery. Tabs: Informācija, Detalizēta informācija, Tehniskais apraksts, Kvalitātes apraksts. Specs in Detalizēta informācija tab. |
+| UK Timber | uk-timber | 2026-03-17 | UK timber merchant. PrestaShop 9.0.2. Full JSON-LD Product + BreadcrumbList. Product URLs: `/{category-slug}/{id}-{slug}.html`. Attributes via variant selectors (`.product-variants .form-group`), not spec tables. Productlist module at `/module/productlist/productlist{1-5}` (~250 products). Prices ex-VAT. No sitemap. Standard `nav.breadcrumb` class. Tabs: More Info, Product Details, Reviews. |
