@@ -10,16 +10,14 @@
 - `sku` can be numeric (integer) in the JSON-LD — always convert to string
 
 ## CSS Selectors
-- **Product links on category pages:** `ul.products li.product a` — filter for `href` containing `/product/`
-- **Pagination next page:** `a.next.page-numbers`
-- **Breadcrumb:** Varies by theme:
-  - Kadence theme: `.kadence-breadcrumbs`
-  - Default WooCommerce: `nav.woocommerce-breadcrumb`
-  - Yoast SEO: `.yoast-breadcrumb`
-  - Custom themes with `nav[aria-label='breadcrumb']`
-  - Always check all selectors, falling back in order
-- **Product short description:** `.woocommerce-product-details__short-description`
-- **Product full description:** `.woocommerce-Tabs-panel--description`
+
+| Element | Selector | Notes |
+|---------|----------|-------|
+| Product links on category pages | `ul.products li.product a` | Filter for `href` containing `/product/`. Multilingual: `/toode/` in Estonian |
+| Pagination next page | `a.next.page-numbers` | Absent when on last page (no disabled state) |
+| Breadcrumb | `nav.woocommerce-breadcrumb` | Varies: Kadence `.kadence-breadcrumbs`, Yoast `.yoast-breadcrumb`, generic `nav[aria-label='breadcrumb']`. Try all, fallback in order |
+| Product short description | `.woocommerce-product-details__short-description` | — |
+| Product full description | `.woocommerce-Tabs-panel--description` | — |
 
 ## Pagination
 - URL pattern: `/product-category/{category}/page/{N}/`
