@@ -69,8 +69,7 @@ This stage examines the company's website for a public product catalog, analyzes
 - No public catalog is found (`Catalog found: no`)
 - The catalog is behind authentication
 - Severe anti-bot protection makes scraping non-viable
-- The site requires a headless browser (JavaScript rendering with no structured data fallback)
-- The site is a heavy SPA where products require complex user interaction to surface
+- The site requires JavaScript rendering with no structured data fallback (`js_only`)
 - Product attributes are not extractable from product pages in a structured, scrapable form
 
 ## Stage 3: Scraper Generator

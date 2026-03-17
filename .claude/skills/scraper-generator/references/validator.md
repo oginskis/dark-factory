@@ -10,7 +10,7 @@
 | Field | Type | Description |
 |---|---|---|
 | `scraper` | artifact | The generated scraper to validate |
-| `catalog_structure` | object | Categories, navigation paths, and top-level category list from the catalog assessment |
+| `catalog_structure` | object | Verified Category Tree and Product Discovery section from the catalog assessment's Extraction Blueprint |
 | `expected_product_count` | int | Estimated total products in the catalog (from catalog assessment) |
 | `label_coverage` | float | Label coverage computed during label discovery (non-English sites only; omit for English sites) |
 | `extension_attempts_used` | int | Number of label-discovery extension attempts already consumed (non-English sites only) |

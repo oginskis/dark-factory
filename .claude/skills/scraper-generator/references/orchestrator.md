@@ -97,7 +97,7 @@ Step 5: Self-Verification ──────────────────
 
 Read the company report and extract: site URL, subcategory taxonomy IDs, business model.
 
-Read the catalog assessment and extract: scraping strategy (`static_html`, `structured_data`, `pdf_pricelist`), catalog structure (categories, navigation paths, pagination patterns), estimated product count, catalog entry points, anti-bot notes, and platform (e.g., `woocommerce`, `shopify`, `unknown`).
+Read the catalog assessment and extract: scraping strategy (`static_html`, `structured_data`, `pdf_pricelist`), platform, estimated product count, anti-bot severity, and currency from the header metadata. Read the `## Extraction Blueprint` section for the data source (API endpoints, selectors), product discovery (pagination, verified category tree), product data extraction (price, name, SKU, spec table, breadcrumb selectors with verified examples), and platform-specific notes.
 
 If no catalog assessment exists, escalate — see the `missing_catalog_assessment` decision.
 
@@ -154,7 +154,7 @@ Build the `LABEL_MAP` and `CATEGORY_ALIASES` dicts that the scraper will use to 
 
 **Sources (in priority order):**
 1. **Language seed file** — check the platform knowledgebase for a language seed (e.g., `labels-lv.json` for Latvian). Load common translations as the starting point.
-2. **Extraction blueprint sample labels** — the catalog assessment's extraction blueprint contains sample attribute labels from 3-5 product pages. Map each label to a schema key using the attribute routing tables from Step 2a.
+2. **Extraction blueprint sample labels** — the catalog assessment's `## Extraction Blueprint > ### Product Data Extraction > #### Sample Attribute Labels` table contains sample attribute labels from 3-5 product pages. Map each label to a schema key using the attribute routing tables from Step 2a.
 3. **Unmapped labels** — labels that don't match any schema key go to `extra_attributes` with `snake_case` keys.
 
 **Build CATEGORY_ALIASES** for labels that map to different schema keys per subcategory (e.g., "thickness" → `nominal_thickness` for lumber, `thickness` for flooring). The language seed may already contain aliases — use those, add new ones from blueprint labels.
