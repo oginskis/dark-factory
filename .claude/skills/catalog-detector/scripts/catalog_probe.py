@@ -534,9 +534,17 @@ def verify_recipe(client: httpx.Client, product_urls: list[str],
         for script in tree.css('script[type="application/ld+json"]'):
             try:
                 data = json.loads(script.text(strip=True))
-                if data.get("@type") == "Product":
-                    json_ld_product = data
-                    break
+                if isinstance(data, dict):
+                    if data.get("@type") == "Product":
+                        json_ld_product = data
+                        break
+                    # Handle @graph-wrapped JSON-LD (WooCommerce pattern)
+                    for item in data.get("@graph", []):
+                        if isinstance(item, dict) and item.get("@type") == "Product":
+                            json_ld_product = item
+                            break
+                    if json_ld_product:
+                        break
             except (json.JSONDecodeError, AttributeError):
                 pass
 
@@ -631,8 +639,28 @@ def check_pagination(client: httpx.Client, product_urls: list[str],
         return {"tested": False, "reason": f"category page returned {status1}"}
 
     tree1 = HTMLParser(text1)
-    p1_links = {a.attributes.get("href", "") for a in tree1.css("a[href]")
-                if a.attributes.get("href", "").endswith(".html")}
+    parsed_base = urlparse(category_url)
+
+    def collect_links(tree: HTMLParser) -> set[str]:
+        links = set()
+        for a in tree.css("a[href]"):
+            href = a.attributes.get("href", "")
+            if not href or href.startswith("#") or href.startswith("javascript:"):
+                continue
+            # Normalize relative to absolute
+            if href.startswith("/"):
+                full = f"{parsed_base.scheme}://{parsed_base.netloc}{href}"
+            elif href.startswith("http"):
+                full = href
+            else:
+                continue
+            # Include any path with 2+ segments and no query string that looks product-like
+            ph = urlparse(full)
+            if ph.netloc == parsed_base.netloc and len([s for s in ph.path.split("/") if s]) >= 2:
+                links.add(ph.path)
+        return links
+
+    p1_links = collect_links(tree1)
 
     # Build page 2 URL
     if "?page=" in pagination_pattern or "?p=" in pagination_pattern:
@@ -651,8 +679,7 @@ def check_pagination(client: httpx.Client, product_urls: list[str],
                 "page2_product_count": 0, "products_differ": False}
 
     tree2 = HTMLParser(text2)
-    p2_links = {a.attributes.get("href", "") for a in tree2.css("a[href]")
-                if a.attributes.get("href", "").endswith(".html")}
+    p2_links = collect_links(tree2)
 
     return {
         "tested": True,
@@ -711,6 +738,9 @@ def guess_url_pattern(urls: list[str]) -> str | None:
     if all("/products/" in p for p in paths):
         return "/products/{handle}"
     return None
+
+
+RECIPE_RANK = {"full": 3, "partial": 2, "poor": 1, "untested": 0}
 
 
 def parse_args() -> argparse.Namespace:
@@ -793,8 +823,13 @@ def main() -> None:
             for script in tree.css('script[type="application/ld+json"]'):
                 try:
                     data = json.loads(script.text(strip=True))
-                    if "@type" in data:
-                        json_ld_types.append(data["@type"])
+                    if isinstance(data, dict):
+                        if "@type" in data:
+                            json_ld_types.append(data["@type"])
+                        # Handle @graph wrapper
+                        for item in data.get("@graph", []):
+                            if isinstance(item, dict) and "@type" in item:
+                                json_ld_types.append(item["@type"])
                 except (json.JSONDecodeError, AttributeError):
                     pass
             result["json_ld_on_homepage"] = json_ld_types
@@ -880,16 +915,17 @@ def main() -> None:
                     "pagination_check": pagination,
                 }
                 # Keep the best-matching platform result
-                if best_recipe is None or recipe_match == "full":
+                if best_recipe is None or RECIPE_RANK.get(recipe_match, 0) > RECIPE_RANK.get(best_recipe["recipe_match"], 0):
                     best_recipe = candidate
 
-                # Check product page for anti-bot (from first platform tested)
-                if checks and checks[0]["status"] == 200:
-                    result["anti_bot"]["product_page_status"] = 200
-                    result["anti_bot"]["product_page_accessible"] = True
-                elif checks:
-                    result["anti_bot"]["product_page_status"] = checks[0]["status"]
-                    result["anti_bot"]["product_page_accessible"] = False
+                # Check product page for anti-bot (from first platform tested only)
+                if result["anti_bot"]["product_page_status"] is None:
+                    if checks and checks[0]["status"] == 200:
+                        result["anti_bot"]["product_page_status"] = 200
+                        result["anti_bot"]["product_page_accessible"] = True
+                    elif checks:
+                        result["anti_bot"]["product_page_status"] = checks[0]["status"]
+                        result["anti_bot"]["product_page_accessible"] = False
 
             if best_recipe:
                 result["recipe_verification"] = best_recipe
