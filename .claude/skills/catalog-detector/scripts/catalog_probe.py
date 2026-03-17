@@ -449,6 +449,270 @@ def extract_homepage_links(html: str, base_url: str) -> dict:
     }
 
 
+def extract_md_section(content: str, heading: str) -> str | None:
+    """Extract content under a ## heading."""
+    pattern = rf"^## {re.escape(heading)}\s*\n(.*?)(?=\n## |\Z)"
+    match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
+    return match.group(1) if match else None
+
+
+def parse_knowledgebase(kb_path: Path) -> dict:
+    """Parse CSS selectors, JSON-LD patterns, pagination, and API endpoints from a knowledgebase file."""
+    content = kb_path.read_text(encoding="utf-8")
+    result = {
+        "css_selectors": [],
+        "json_ld_types": [],
+        "pagination_url_pattern": None,
+        "products_per_page": None,
+        "api_endpoints": [],
+    }
+
+    # Parse CSS Selectors table
+    css_section = extract_md_section(content, "CSS Selectors")
+    if css_section:
+        for line in css_section.split("\n"):
+            if not line.strip().startswith("|") or "---" in line:
+                continue
+            cells = [c.strip() for c in line.split("|")[1:-1]]
+            if len(cells) >= 2 and cells[0].lower() != "element":
+                # Extract selector from backticks
+                selector_match = re.search(r"`([^`]+)`", cells[1])
+                if selector_match:
+                    result["css_selectors"].append({
+                        "element": cells[0],
+                        "selector": selector_match.group(1),
+                        "notes": cells[2] if len(cells) > 2 else "",
+                    })
+
+    # Parse JSON-LD Patterns
+    jsonld_section = extract_md_section(content, "JSON-LD Patterns")
+    if jsonld_section:
+        for schema_type in ["Product", "BreadcrumbList", "AggregateOffer", "Offer"]:
+            if schema_type.lower() in jsonld_section.lower():
+                result["json_ld_types"].append(schema_type)
+
+    # Parse Pagination
+    pagination_section = extract_md_section(content, "Pagination")
+    if pagination_section:
+        url_match = re.search(r"URL pattern:\s*`?([^`\n]+)`?", pagination_section)
+        if url_match:
+            result["pagination_url_pattern"] = url_match.group(1).strip()
+        pp_match = re.search(r"Products per page:\s*(\d+)", pagination_section)
+        if pp_match:
+            result["products_per_page"] = int(pp_match.group(1))
+
+    # Parse API endpoints (Shopify JSON API or similar named sections)
+    for section_name in ["Shopify JSON API", "API Endpoints", "JSON API"]:
+        api_section = extract_md_section(content, section_name)
+        if api_section:
+            for match in re.finditer(r"`(/[^`]+\.json[^`]*)`", api_section):
+                result["api_endpoints"].append(match.group(1))
+            break
+
+    return result
+
+
+def verify_recipe(client: httpx.Client, product_urls: list[str],
+                  kb: dict, *, timeout: float, delay: float,
+                  max_size: int, tracker: TransportTracker) -> list[dict]:
+    checks = []
+    for url in product_urls:
+        text, status, truncated, _, _ = fetch(client, url, timeout=timeout, delay=delay,
+                                               max_size=max_size, tracker=tracker)
+        if not text or (status and status != 200):
+            checks.append({"url": url, "status": status, "page_truncated": truncated,
+                           "body_text_length": 0, "json_ld_product_found": False,
+                           "json_ld_extracted": None, "css_checks": [], "api_checks": [],
+                           "attribute_selectors_tested": []})
+            continue
+
+        body_text_len = get_body_text_length(text)
+        tree = HTMLParser(text)
+
+        # JSON-LD extraction
+        json_ld_product = None
+        for script in tree.css('script[type="application/ld+json"]'):
+            try:
+                data = json.loads(script.text(strip=True))
+                if data.get("@type") == "Product":
+                    json_ld_product = data
+                    break
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+        json_ld_extracted = None
+        if json_ld_product:
+            offers = json_ld_product.get("offers", {})
+            if isinstance(offers, list):
+                offers = offers[0] if offers else {}
+            brand = json_ld_product.get("brand", {})
+            brand_name = brand.get("name") if isinstance(brand, dict) else str(brand)
+            json_ld_extracted = {
+                "name": str(json_ld_product.get("name", ""))[:200],
+                "sku": str(json_ld_product.get("sku", ""))[:200],
+                "price": str(offers.get("price", offers.get("lowPrice", "")))[:50],
+                "currency": str(offers.get("priceCurrency", ""))[:10],
+                "brand": str(brand_name or "")[:200],
+            }
+
+        # CSS selector checks (cap at 10)
+        css_checks = []
+        for sel_info in kb["css_selectors"][:10]:
+            selector = sel_info["selector"]
+            el = tree.css_first(selector)
+            extracted = el.text(strip=True)[:200] if el else ""
+            css_checks.append({
+                "selector": selector,
+                "extracted": extracted,
+                "non_empty": bool(extracted),
+            })
+
+        # API checks
+        api_checks = []
+        for endpoint in kb["api_endpoints"]:
+            api_url = urljoin(url, endpoint)
+            api_text, api_status, _, _, _ = fetch(client, api_url, timeout=timeout,
+                                                   delay=delay, max_size=max_size, tracker=tracker)
+            has_data = False
+            if api_text and api_status == 200:
+                try:
+                    api_data = json.loads(api_text)
+                    has_data = bool(api_data)
+                except json.JSONDecodeError:
+                    pass
+            api_checks.append({"endpoint": endpoint, "status": api_status, "has_data": has_data})
+
+        # Attribute selectors (check for spec tables or variant containers)
+        attr_selectors = []
+        for sel in [".product-variants .form-group", "table.data.table tr",
+                    "#product-attribute-specs-table tr", "dl.product-attributes dt"]:
+            els = tree.css(sel)
+            if els:
+                attr_selectors.append({"selector": sel, "count": len(els)})
+
+        checks.append({
+            "url": url,
+            "status": status,
+            "page_truncated": truncated,
+            "body_text_length": body_text_len,
+            "json_ld_product_found": json_ld_product is not None,
+            "json_ld_extracted": json_ld_extracted,
+            "css_checks": css_checks,
+            "api_checks": api_checks,
+            "attribute_selectors_tested": attr_selectors,
+        })
+
+    return checks
+
+
+def check_pagination(client: httpx.Client, product_urls: list[str],
+                     kb: dict, *, timeout: float, delay: float,
+                     max_size: int, tracker: TransportTracker) -> dict:
+    """Try to find a category page and verify pagination works."""
+    # Try to derive a category URL from a product URL
+    pagination_pattern = kb.get("pagination_url_pattern")
+    if not pagination_pattern or not product_urls:
+        return {"tested": False, "reason": "no pagination pattern or product URLs available"}
+
+    # Attempt: strip product slug from a product URL to get category
+    sample_url = product_urls[0]
+    parsed = urlparse(sample_url)
+    path_parts = [p for p in parsed.path.split("/") if p]
+    if len(path_parts) >= 2:
+        category_path = "/" + "/".join(path_parts[:-1])
+        category_url = f"{parsed.scheme}://{parsed.netloc}{category_path}"
+    else:
+        return {"tested": False, "reason": "cannot derive category URL from product URL"}
+
+    # Fetch page 1
+    text1, status1, _, _, _ = fetch(client, category_url, timeout=timeout, delay=delay,
+                                     max_size=max_size, tracker=tracker)
+    if not text1 or status1 != 200:
+        return {"tested": False, "reason": f"category page returned {status1}"}
+
+    tree1 = HTMLParser(text1)
+    p1_links = {a.attributes.get("href", "") for a in tree1.css("a[href]")
+                if a.attributes.get("href", "").endswith(".html")}
+
+    # Build page 2 URL
+    if "?page=" in pagination_pattern or "?p=" in pagination_pattern:
+        page2_url = category_url + "?page=2"
+    elif "/page/" in pagination_pattern:
+        page2_url = category_url.rstrip("/") + "/page/2/"
+    else:
+        page2_url = category_url + "?page=2"
+
+    text2, status2, _, _, _ = fetch(client, page2_url, timeout=timeout, delay=delay,
+                                     max_size=max_size, tracker=tracker)
+    if not text2 or status2 != 200:
+        return {"tested": True, "category_url": category_url,
+                "page1_product_count": len(p1_links),
+                "page2_url": page2_url, "page2_status": status2,
+                "page2_product_count": 0, "products_differ": False}
+
+    tree2 = HTMLParser(text2)
+    p2_links = {a.attributes.get("href", "") for a in tree2.css("a[href]")
+                if a.attributes.get("href", "").endswith(".html")}
+
+    return {
+        "tested": True,
+        "category_url": category_url,
+        "page1_product_count": len(p1_links),
+        "page2_url": page2_url,
+        "page2_status": status2,
+        "page2_product_count": len(p2_links),
+        "products_differ": bool(p2_links - p1_links),
+    }
+
+
+def compute_recipe_match(checks: list[dict], pagination: dict) -> str:
+    if not checks:
+        return "untested"
+    total_checks = 0
+    passed_checks = 0
+    for check in checks:
+        if check["status"] != 200:
+            continue
+        # JSON-LD check
+        total_checks += 1
+        if check["json_ld_product_found"]:
+            passed_checks += 1
+        # CSS checks
+        for css in check["css_checks"]:
+            total_checks += 1
+            if css["non_empty"]:
+                passed_checks += 1
+
+    if total_checks == 0:
+        return "untested"
+
+    ratio = passed_checks / total_checks
+    pagination_tested = pagination.get("tested", False)
+
+    if ratio == 1.0 and pagination_tested and pagination.get("products_differ", False):
+        return "full"
+    if ratio > 0.5:
+        return "partial"
+    return "poor"
+
+
+def guess_url_pattern(urls: list[str]) -> str | None:
+    """Guess a URL template from a sample of URLs."""
+    if not urls:
+        return None
+    paths = [urlparse(u).path for u in urls[:20]]
+    # Find common suffixes
+    if all(p.endswith(".html") for p in paths):
+        return "/{path}.html"
+    if all("/product/" in p for p in paths):
+        return "/product/{slug}"
+    if all("/p/" in p for p in paths):
+        return "/p/{id}-{slug}"
+    if all("/products/" in p for p in paths):
+        return "/products/{handle}"
+    return None
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Probe website for catalog detection")
     parser.add_argument("--url", required=True, help="Company website URL")
@@ -463,9 +727,194 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    log("info", "catalog_probe.py skeleton — full implementation coming in Task 7", url=args.url)
-    print(json.dumps({"url": args.url, "status": "skeleton"}))
-    sys.exit(0)
+    tracker = TransportTracker()
+    errors: list[dict] = []
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+
+    result: dict = {
+        "url": args.url,
+        "final_url": args.url,
+        "redirected": False,
+        "cross_domain_redirect": False,
+        "homepage_status": None,
+        "errors": errors,
+        "rate_limited": False,
+    }
+
+    try:
+        with httpx.Client(headers=headers, follow_redirects=True, max_redirects=10) as client:
+            # 1. Fetch homepage
+            hp_text, hp_status, _, hp_headers, hp_final_url = fetch(
+                client, args.url, timeout=args.timeout,
+                delay=0, max_size=args.max_response_size, tracker=tracker)
+            result["homepage_status"] = hp_status
+
+            if not hp_text:
+                errors.append({"section": "homepage", "error": "Homepage unreachable"})
+                result["transport_health"] = tracker.summary(args.delay)
+                print(json.dumps(result, indent=2))
+                sys.exit(1)
+
+            # Redirect detection
+            if hp_final_url and hp_final_url != args.url:
+                result["final_url"] = hp_final_url
+                result["redirected"] = True
+                input_domain = urlparse(args.url).netloc.replace("www.", "")
+                final_domain = urlparse(hp_final_url).netloc.replace("www.", "")
+                result["cross_domain_redirect"] = input_domain != final_domain
+            else:
+                result["final_url"] = hp_final_url or args.url
+
+            # 2. Platform detection
+            resp_headers = hp_headers
+            signals = detect_platform_signals(hp_text, resp_headers)
+            guess, confidence, sig_count, conflict, version = guess_platform(signals)
+            result["platform_signals"] = signals
+            result["platform_guess"] = guess
+            result["platform_confidence"] = confidence
+            result["platform_signal_count"] = sig_count
+            result["platform_conflict"] = conflict
+            result["platform_version"] = version
+
+            # 3. Anti-bot
+            body_text_len = get_body_text_length(hp_text)
+            result["anti_bot"] = analyze_anti_bot(hp_text, len(hp_text), body_text_len, HTMLParser(hp_text))
+            result["anti_bot"]["cloudflare_ray"] = resp_headers.get("cf-ray")
+            result["js_rendering_signals"] = analyze_js_rendering(hp_text, len(hp_text))
+            result["geo_hints"] = extract_geo_hints(hp_text, resp_headers, result["final_url"])
+
+            # 4. JSON-LD on homepage
+            tree = HTMLParser(hp_text)
+            json_ld_types = []
+            for script in tree.css('script[type="application/ld+json"]'):
+                try:
+                    data = json.loads(script.text(strip=True))
+                    if "@type" in data:
+                        json_ld_types.append(data["@type"])
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+            result["json_ld_on_homepage"] = json_ld_types
+
+            # 5. Robots.txt
+            robots_url = urljoin(result["final_url"], "/robots.txt")
+            robots_text, robots_status, _, _, _ = fetch(client, robots_url, timeout=args.timeout,
+                                                      delay=args.delay, max_size=100_000,
+                                                      tracker=tracker)
+            if robots_text and robots_status == 200:
+                robots = parse_robots_txt(robots_text)
+                result["robots_txt"] = {"found": True, "status": 200, **robots}
+            else:
+                result["robots_txt"] = {"found": False, "status": robots_status,
+                                        "sitemaps": [], "disallowed_paths": [], "crawl_delay": None}
+
+            # 6. Sitemap
+            sitemap_urls_to_check = result["robots_txt"]["sitemaps"] or [
+                urljoin(result["final_url"], "/sitemap.xml")
+            ]
+            all_product_urls: list[str] = []
+            for sm_url in sitemap_urls_to_check:
+                product_urls = parse_sitemap(client, sm_url, timeout=args.timeout,
+                                             delay=args.delay, max_size=args.max_response_size,
+                                             tracker=tracker)
+                all_product_urls.extend(product_urls)
+
+            truncated = len(all_product_urls) >= MAX_PRODUCT_URLS
+            samples = sample_diverse(all_product_urls, args.max_product_samples)
+
+            # Check sample accessibility
+            ok_count = 0
+            for s_url in samples:
+                _, s_status, _, _, _ = fetch(client, s_url, timeout=args.timeout,
+                                             delay=args.delay, max_size=args.max_response_size,
+                                             tracker=tracker)
+                if s_status == 200:
+                    ok_count += 1
+
+            result["sitemap"] = {
+                "found": bool(all_product_urls),
+                "urls_checked": sitemap_urls_to_check,
+                "product_url_count": min(len(all_product_urls), MAX_PRODUCT_URLS),
+                "product_url_count_truncated": truncated,
+                "product_url_pattern_guess": guess_url_pattern(all_product_urls[:100]),
+                "sample_product_urls": samples,
+                "sample_success_rate": f"{ok_count}/{len(samples)}" if samples else "0/0",
+            }
+
+            # 7. Homepage links
+            result["homepage_links"] = extract_homepage_links(hp_text, result["final_url"])
+
+            # 8. Recipe verification (supports multi-platform on conflict)
+            platforms_to_test = [guess]
+            if conflict:
+                # Also test other detected platforms
+                for sig_key, plat in SIGNAL_TO_PLATFORM.items():
+                    if signals.get(sig_key) and plat != guess and plat not in platforms_to_test:
+                        platforms_to_test.append(plat)
+
+            best_recipe = None
+            for test_platform in platforms_to_test:
+                kb_file = args.knowledgebase_dir / f"{test_platform}.md"
+                if not kb_file.exists():
+                    continue
+                kb = parse_knowledgebase(kb_file)
+                recipe_samples = samples[:args.max_product_samples] if samples else []
+                checks = verify_recipe(client, recipe_samples, kb, timeout=args.timeout,
+                                       delay=args.delay, max_size=args.max_response_size,
+                                       tracker=tracker)
+                pagination = check_pagination(client, all_product_urls[:10], kb,
+                                              timeout=args.timeout, delay=args.delay,
+                                              max_size=args.max_response_size, tracker=tracker)
+                recipe_match = compute_recipe_match(checks, pagination)
+                candidate = {
+                    "knowledgebase_file": kb_file.name,
+                    "knowledgebase_found": True,
+                    "knowledgebase_selectors_parsed": len(kb["css_selectors"]),
+                    "knowledgebase_api_endpoints_parsed": len(kb["api_endpoints"]),
+                    "recipe_match": recipe_match,
+                    "product_pages_tested": len(checks),
+                    "checks": checks,
+                    "pagination_check": pagination,
+                }
+                # Keep the best-matching platform result
+                if best_recipe is None or recipe_match == "full":
+                    best_recipe = candidate
+
+                # Check product page for anti-bot (from first platform tested)
+                if checks and checks[0]["status"] == 200:
+                    result["anti_bot"]["product_page_status"] = 200
+                    result["anti_bot"]["product_page_accessible"] = True
+                elif checks:
+                    result["anti_bot"]["product_page_status"] = checks[0]["status"]
+                    result["anti_bot"]["product_page_accessible"] = False
+
+            if best_recipe:
+                result["recipe_verification"] = best_recipe
+            else:
+                result["recipe_verification"] = {
+                    "knowledgebase_file": None,
+                    "knowledgebase_found": False,
+                    "knowledgebase_selectors_parsed": 0,
+                    "knowledgebase_api_endpoints_parsed": 0,
+                    "recipe_match": "untested",
+                    "product_pages_tested": 0,
+                    "checks": [],
+                    "pagination_check": {"tested": False, "reason": "no knowledgebase found"},
+                }
+
+            # 9. Transport health
+            result["rate_limited"] = tracker.rate_limited
+            result["transport_health"] = tracker.summary(args.delay)
+
+    except Exception as exc:
+        log("error", "Script crashed", error=str(exc))
+        sys.exit(2)
+
+    print(json.dumps(result, indent=2))
+    sys.exit(0 if not errors else 1)
 
 
 if __name__ == "__main__":
