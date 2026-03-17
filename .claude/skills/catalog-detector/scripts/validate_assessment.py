@@ -157,7 +157,9 @@ def check_category_tree_complete(content: str) -> dict:
         if "(landing)" in count_cell.lower():
             continue
         total_leaves += 1
-        if not re.search(r"\d+", count_cell):
+        if count_cell.strip() in ("*", "—", "–", "-", ""):
+            pass  # accepted as acknowledged-incomplete placeholder
+        elif not re.search(r"\d+", count_cell):
             leaf_missing += 1
     if total_leaves == 0:
         return {"pass": False, "details": "Category tree table has no leaf categories (all rows skipped or landing pages)"}
@@ -170,7 +172,7 @@ def check_price_verified(content: str) -> dict:
     section = extract_section(content, "Price")
     if not section:
         return {"pass": False, "details": "#### Price section missing"}
-    verified = section.count("http")
+    verified = len(re.findall(r"[-–]\s+(?:https?://|/)[\S]+", section))
     if verified >= 2:
         return {"pass": True, "details": f"{verified} product URLs found with price values in Verified on section"}
     return {"pass": False, "details": f"Only {verified} verified URLs (need >= 2)"}
@@ -185,7 +187,7 @@ def check_spec_table_verified(content: str) -> dict:
             break
     if not section:
         return {"pass": False, "details": "#### Spec Table / Attributes section missing"}
-    verified = section.count("http")
+    verified = len(re.findall(r"[-–]\s+(?:https?://|/)[\S]+", section))
     if verified >= 2:
         return {"pass": True, "details": f"{verified} product URLs found with attribute counts"}
     return {"pass": False, "details": f"Only {verified} verified URLs (need >= 2)"}

@@ -506,7 +506,9 @@ def parse_knowledgebase(kb_path: Path) -> dict:
         api_section = extract_md_section(content, section_name)
         if api_section:
             for match in re.finditer(r"`(/[^`]+\.json[^`]*)`", api_section):
-                result["api_endpoints"].append(match.group(1))
+                endpoint = re.sub(r'\{[^}]+\}', '', match.group(1))
+                endpoint = endpoint.rstrip('?&')
+                result["api_endpoints"].append(endpoint)
             break
 
     return result
