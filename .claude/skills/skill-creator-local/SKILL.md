@@ -21,13 +21,6 @@ Create and improve pipeline skills following the conventions established in this
 
 `$ARGUMENTS` describes what to create or improve (e.g., "create a new skill for X", "review catalog-detector", "improve scraper-generator conventions").
 
-## When to use this skill
-
-- Creating a new pipeline stage skill
-- Improving or reviewing an existing skill for convention compliance
-- Adding new decisions, stop conditions, or report sections to an existing skill
-- Verifying cross-file references between skills and the orchestrator
-
 ## Architecture: Skill Pattern
 
 Pipeline skills use a SKILL.md with a `references/` directory:

@@ -1,11 +1,10 @@
-# Code Generator Sub-Agent
+# Code Generator Reference
 
-**Input:** Catalog assessment, SKU schemas, attribute routing tables, LABEL_MAP + CATEGORY_ALIASES (non-English), category mapping, persist hook implementations
-**Output:** A single standalone Python scraper file (scraper.py)
+This reference defines the canonical product record format, library selection, required behavior, and code quality rules for generated scrapers. The orchestrator reads this inline during Step 2c — it is not dispatched as a sub-agent.
 
----
+## Inputs
 
-## Input Contract
+The orchestrator provides the following when generating scraper code:
 
 | Input | What it contains |
 |-------|-----------------|
@@ -242,7 +241,7 @@ List the exact libraries chosen in the Library Selection step.
 
 ---
 
-## Output Contract
+## Expected Output
 
 A single standalone Python file containing:
 - PEP 723 inline script metadata with declared dependencies

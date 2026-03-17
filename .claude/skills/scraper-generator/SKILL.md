@@ -37,6 +37,7 @@ Generate a production-ready Python scraper for a company's product catalog, vali
 | Generator input (pre-processed) | `docs/scraper-generator/{slug}/generator_input.json` |
 | Language seed (non-English) | `docs/platform-knowledgebase/labels-{lang}.json` |
 | Validation diagnostics (output) | `docs/scraper-generator/{slug}/output/validation.json` |
+| Debug log (output) | `docs/scraper-generator/{slug}/output/debug.log` |
 
 ### Slug derivation
 
@@ -48,9 +49,9 @@ Generate a production-ready Python scraper for a company's product catalog, vali
 
 Read and follow `references/orchestrator.md`.
 
-- Provide the file paths from the table above when the workflow references logical resources (e.g., "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the platform knowledgebase", "the persist hooks reference file").
+- Provide the file paths from the table above when the workflow references logical resources (e.g., "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the platform knowledgebase", "the persist hooks reference file", "the pre-processed generator input file", "the language seed file").
 - Dispatch the validator sub-agent using the Agent tool as directed by the orchestrator. Sub-agent file: `.claude/skills/scraper-generator/references/validator.md` — probe testing and smoke tests. The orchestrator specifies what data to pass and when to dispatch.
-- The orchestrator handles label mapping and code generation inline (no sub-agent dispatch for these). Reference file `references/code-generator.md` defines the canonical product record format — the orchestrator reads it during code generation but does not dispatch it as a sub-agent.
+- The orchestrator handles label mapping and code generation inline (no sub-agent dispatch for these). Reference file `references/code-generator.md` defines the canonical product record format, library selection, required behavior, and code quality rules — the orchestrator reads it inline during Step 2c.
 - Before starting the orchestrator, run the pre-processing script to build routing tables: `uv run python .claude/skills/scraper-generator/scripts/prepare_generator_input.py --schemas {taxonomy_ids} --output docs/scraper-generator/{slug}/generator_input.json` where `{taxonomy_ids}` are the space-separated subcategory taxonomy IDs from the company report.
 - For non-English sites, check for a language seed file at `docs/platform-knowledgebase/labels-{lang}.json` where `{lang}` is the ISO 639-1 language code from the catalog assessment. If it exists, provide it to the orchestrator. After successful scraper generation, save the updated label map back to the seed file.
 - The `no_sku_schema` decision has an autonomous resolution path: when the subcategory exists in the taxonomy but the SKU schema file hasn't been created yet, automatically invoke `/product-taxonomy` for that subcategory to generate the schema, then continue without user interaction. Before concluding a schema is missing, **list the `docs/product-taxonomy/sku-schemas/` directory** and search for the subcategory name — never guess the filename from a partial slug.

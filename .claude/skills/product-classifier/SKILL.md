@@ -2,7 +2,8 @@
 name: product-classifier
 description: >
   Research and classify a company's physical products into the project taxonomy.
-  Produces a company profile report with classification, product lines, and preliminary catalog analysis.
+  Produces a company profile report with URL, taxonomy classification, product lines, and preliminary catalog structure —
+  enabling catalog-detector to know what site to visit, which categories to look for, and what business model to expect.
   Use this skill whenever the user provides a company name or URL for investigation — "research this company",
   "what does X make", "classify this company", "look up [company name]", "what products does X sell",
   or any company name/URL given with intent to understand what physical goods a company offers.
@@ -13,7 +14,7 @@ user-invocable: true
 
 # Product Classifier
 
-Research and classify a company's physical products into the project taxonomy, producing a company profile report.
+Produce a company profile report that catalog-detector uses to determine what to scrape and how to classify it.
 
 ## Input
 
@@ -58,4 +59,4 @@ User options per escalation:
 
 ## Notes
 
-File-driven skill — no database or external services required.
+First stage in the pipeline — no prerequisites. All other stages depend on this report.

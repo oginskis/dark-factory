@@ -46,6 +46,8 @@ uv pip install package            # install a package
 
 ## Git
 
+**Do not commit unless explicitly asked.** Present the diff and wait for approval.
+
 Per-company pipeline output under `docs/` is gitignored — only shared knowledge is tracked:
 
 | Tracked | Gitignored |

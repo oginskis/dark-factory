@@ -362,9 +362,9 @@ If all 13 pass, the scraper is complete.
 
 ### Decision: label_coverage_insufficient
 
-**Context:** The site uses a non-English language and the LABEL_MAP cannot achieve ≥30% coverage of attribute labels that map to schema keys. This means the site's attribute vocabulary is too different from the SKU schemas, or the schemas lack keys for attributes this site commonly provides.
-**Autonomous resolution:** Never. This indicates a structural mismatch between the site's data model and the taxonomy schemas that cannot be solved by adding more label mappings.
-**Escalate when:** Label coverage remains below 30% at Step 2b.
+**Context:** The site uses a non-English language and label coverage is too low for a viable scraper. Two paths trigger this decision: (1) the initial LABEL_MAP at Step 2b cannot reach 30% coverage, indicating a fundamental mismatch between the site's attribute vocabulary and the SKU schemas; (2) after 3 extension attempts (Step 2b → Step 2c → validator re-dispatch cycles), label coverage still stays below 70%, indicating the gap cannot be closed incrementally.
+**Autonomous resolution:** Never. Both trigger paths indicate a structural mismatch that cannot be solved by adding more label mappings.
+**Escalate when:** Label coverage is below 30% at Step 2b (immediate), or label coverage remains below 70% after 3 extension attempts (retry budget exhausted).
 **Escalation payload:** Company slug, current label coverage percentage, the label inventory (all discovered labels), which labels have no schema mapping, and which subcategories are most affected.
 
 ### Decision: probe_extraction_failed

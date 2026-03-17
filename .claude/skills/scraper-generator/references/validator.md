@@ -141,16 +141,6 @@ After the smoke test, analyze the test output for potential schema improvements.
 3. Verify the candidate is not already in the schema under a different name.
 4. For significant candidates, record the candidate attribute names and example values in the output as a taxonomy feedback signal. Do not re-map the current scraper's output — the scraper is final.
 
-### File locking for concurrency
-
-Before triggering any schema modification:
-
-- Check for a lock file next to the relevant SKU schema file.
-- If the lock file exists and is less than 10 minutes old: skip the feedback step and log a warning.
-- If the lock file exists but is older than 10 minutes: treat it as stale, delete it, and proceed.
-- Create the lock file before triggering schema enrichment.
-- Delete the lock file after the taxonomy update completes or fails.
-
 Record which attributes were proposed in `taxonomy_feedback`.
 
 ---

@@ -1,7 +1,7 @@
 # Product Classifier Workflow
 
 **Input:** Company name or URL
-**Output:** Company profile report, or escalation
+**Output:** Company profile report (URL, taxonomy classification, catalog structure) for catalog-detector
 
 ---
 
