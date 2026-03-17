@@ -117,7 +117,7 @@ When a skill supports multiple variants, organize by domain with a reference fil
    - Every decision in workflow -> reflected in SKILL.md workflow section
    - Every stop condition -> reflected in orchestrator
 4. **Update the orchestrator** per Convention 4
-5. **Run verification:** `uv run python .claude/skills/skill-creator-local/scripts/verify_skill.py <skill-name>`
+5. **Run verification:** `uv run .claude/skills/skill-creator-local/scripts/verify_skill.py <skill-name>`
 6. **Test and optimize:** Use `/skill-creator:skill-creator` to run eval prompts
 7. **Self-review checklist:**
 
@@ -138,13 +138,16 @@ When a skill supports multiple variants, organize by domain with a reference fil
 | 13 | No duplicated steps across workflow branches — shared logic is shared |
 | 14 | Output designed for downstream consumer, not as a generic survey |
 | 15 | Prerequisites name the specific upstream skill |
+| 16 | Mechanical steps are scripted, not in workflow prose (Convention 5) |
+| 17 | Scripts follow PEP 723 + exit code contract + JSON stdout (Convention 5) |
+| 18 | Script documentation has all 3 layers: docstring, inline comments, gate docstrings (Convention 5) |
 
 ## Workflow: Reviewing an Existing Skill
 
 1. **Run the verification script first** — it catches structural issues programmatically:
    ```bash
-   uv run python .claude/skills/skill-creator-local/scripts/verify_skill.py <skill-name>
-   uv run python .claude/skills/skill-creator-local/scripts/verify_skill.py --all
+   uv run .claude/skills/skill-creator-local/scripts/verify_skill.py <skill-name>
+   uv run .claude/skills/skill-creator-local/scripts/verify_skill.py --all
    ```
 2. Read both the SKILL.md and `references/workflow.md` for issues the script can't catch (clarity, flow, ambiguity)
 3. Check cross-reference integrity (Convention 3 in `references/conventions.md`)
@@ -187,7 +190,7 @@ This skill and the generic `skill-creator:skill-creator` plugin are complementar
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `scripts/verify_skill.py` | Programmatic convention compliance checker | `uv run python .claude/skills/skill-creator-local/scripts/verify_skill.py <skill-name>` or `--all` |
+| `scripts/verify_skill.py` | Programmatic convention compliance checker | `uv run .claude/skills/skill-creator-local/scripts/verify_skill.py <skill-name>` or `--all` |
 
 The verification script checks:
 - Skill structure (frontmatter, required sections, one-line summary, workflow delegation line, escalation template wording)

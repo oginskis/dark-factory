@@ -267,3 +267,132 @@ The product-discovery orchestrator (`.claude/skills/product-discovery/SKILL.md`)
 3. Update `## Pipeline Summary` if the stage produces additional output files
 
 Every stage's stop conditions must appear in the orchestrator's stop list — this is the single source of truth for pipeline halting behavior.
+
+---
+
+## Convention 5: Script Infrastructure
+
+Script everything mechanical. If a step is repeatable, doesn't need LLM judgment, and produces structured data — it belongs in a Python script, not in the workflow prose. Scripts reduce token cost (run once per company, not per-conversation), improve consistency (same logic every time), and make output inspectable (JSON files on disk).
+
+### When to script
+
+| Script it | Don't script it |
+|-----------|-----------------|
+| Data gathering (fetch pages, parse sitemaps, detect platforms) | Deciding what strategy to use |
+| Validation gates (check report structure, verify required fields) | Writing the report itself |
+| Evidence collection (test selectors, check anti-bot, verify recipes) | Interpreting ambiguous results |
+| Any check that can be expressed as code | Anything requiring web browsing with judgment |
+
+**Rule of thumb:** If you find yourself writing "check that X exists and Y matches pattern Z" in a workflow step, that's a script.
+
+### Script directory structure
+
+```
+.claude/skills/{name}/
+├── SKILL.md
+├── references/
+│   └── workflow.md
+└── scripts/
+    ├── _lib.py              ← shared infrastructure (HTTP, logging); NOT standalone
+    ├── {action_1}.py        ← focused tactical script; standalone via uv run
+    ├── {action_2}.py        ← focused tactical script
+    ├── {orchestrator}.py    ← thin coordinator; runs tactical scripts as subprocesses
+    └── {validator}.py       ← validates the skill's output report
+```
+
+### Script design rules
+
+| Rule | Why |
+|------|-----|
+| **PEP 723 inline metadata** | Each script is standalone-runnable with `uv run script.py` — no setup, no virtualenv |
+| **JSON to stdout, logs to stderr** | Output is structured data the LLM can parse; logs are for humans debugging |
+| **Exit code contract: 0 = full, 1 = partial, 2 = crash** | LLM routes on exit code — 0/1 = use the output, 2 = fall back to manual |
+| **Evidence not decisions** | Scripts report what they found. The LLM decides what to do with it. No pass/fail verdicts that hide reasoning |
+| **Null = not found, errors[] = couldn't check** | Distinguishes "field is absent" from "script failed to check" — prevents false negatives |
+| **Immutable during pipeline runs** | Never edit scripts mid-run. Record bugs in the report's Platform-Specific Notes; fix in a dedicated maintenance pass |
+| **One responsibility per script, ~150-300 lines** | Small enough to reason about in isolation. If a script mixes concerns, split it |
+| **No info-level fetch logging** | Don't log every HTTP request. Only log warnings (timeouts, rate limits) and errors (crashes, parse failures) |
+
+### Shared library pattern
+
+Extract shared infrastructure (HTTP client, logging, challenge detection) into a `_lib.py` file. Tactical scripts import from it:
+
+```python
+from _lib import fetch, log, make_client, TransportTracker
+```
+
+`_lib.py` is NOT a standalone script — no PEP 723 block, no `if __name__`. Python's `sys.path[0]` = script directory makes sibling imports work with `uv run`.
+
+### Script documentation — three layers
+
+Scripts must be self-documenting for the LLM. Three layers, each serving a different purpose:
+
+**Layer 1: Module docstring** — when to call, what args, exit codes, interpretation guide:
+```python
+"""
+Fetch a website's homepage and assess transport health.
+
+WHEN TO CALL: First script in the probe pipeline. No preconditions.
+ARGUMENTS: --url (required), --timeout (default: 15.0)
+EXIT CODES: 0 = full result, 1 = partial, 2 = crash
+
+INTERPRETATION:
+    transport_health == "blocked" → stop immediately
+    transport_health == "degraded" → proceed but note in report
+"""
+```
+
+**Layer 2: Inline comments on output fields** — what each value means to the caller:
+```python
+result = {
+    "recipe_match": recipe_match,
+    # "full"     → recipe verified; use fast path
+    # "partial"  → some checks passed; verify manually
+    # "poor"     → most failed; check if URLs were category pages
+    # "untested" → no product URLs supplied
+}
+```
+
+**Layer 3: Validation gate docstrings** — what it checks, what failure means, how to fix:
+```python
+def check_price_verified(content: str) -> dict:
+    """
+    WHAT IT CHECKS: Price section has >=2 URLs with observed values.
+    FAILURE MEANS: Price selector written without testing on real pages.
+    HOW TO FIX: Navigate to 2+ product pages, record URLs with prices.
+    """
+```
+
+### Orchestrator pattern
+
+When a skill has multiple tactical scripts, add a thin orchestrator that:
+1. Runs tactical scripts as subprocesses (via `subprocess.run(["uv", "run", ...])`)
+2. Saves each script's JSON output to `{output-dir}/{script_name}.json`
+3. Merges all stderr into `{output-dir}/{stage}.log`
+4. Assembles a combined JSON to stdout
+5. Handles early-exit conditions (e.g., skip remaining scripts if site is blocked)
+
+The orchestrator contains NO analysis logic — only coordination, file I/O, and JSON assembly.
+
+### Per-slug output directories
+
+Script output goes to `docs/{stage}/{slug}/` with individual JSON files per script:
+
+```
+docs/{stage}/{slug}/
+    {script_1}.json     ← individual script result
+    {script_2}.json     ← individual script result
+    {stage}.log         ← merged stderr from all scripts
+    assessment.md       ← the skill's main output report
+    validate.json       ← validation gate results
+    validate.log        ← validation stderr
+```
+
+This makes every intermediate result inspectable — when something goes wrong, you can check the individual JSON file instead of re-running the entire pipeline.
+
+### SKILL.md integration
+
+When a skill has scripts, the SKILL.md Workflow section includes:
+- The exact `uv run` command with argument placeholders
+- Routing logic based on script output fields (e.g., "if recipe_match is 'full' AND transport_health is 'healthy' → skip Steps 1-3")
+- The immutability rule: "DO NOT modify the script. If it produces unexpected results, fall back to manual reasoning."

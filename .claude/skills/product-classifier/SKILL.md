@@ -32,6 +32,12 @@ Produce a company profile report that catalog-detector uses to determine what to
 
 Read and follow `references/workflow.md`.
 
+- Before starting the workflow, derive the company slug:
+  `uv run .claude/skills/product-classifier/scripts/derive_slug.py --url {company_url}`
+  Parse stdout as JSON. Use the `slug` field for file paths.
+- After writing the company report, run the validation script:
+  `uv run .claude/skills/product-classifier/scripts/validate_report.py docs/product-classifier/{slug}.md --categories-file docs/product-taxonomy/categories.md`
+  Fix any failing gates. DO NOT modify the validation script.
 - Provide the file paths from the table above when the workflow references logical resources (e.g., "the product taxonomy categories file", "the company reports directory", "write the company report").
 - Use web search, web fetch, and Playwright browser tools to investigate company websites as the workflow directs.
 - This skill may stop autonomously without escalation — if the company fails the tangible goods gate or is rejected as a general retailer/marketplace. In these cases the workflow produces no report. Report the outcome to the user.
@@ -56,6 +62,7 @@ User options per escalation:
 - `ambiguous_company` — 1) Pick a candidate by name or number, 2) Provide additional context to narrow the search, 3) Stop
 - `tangible_ambiguous` — 1) Include the company and proceed with classification, 2) Exclude the company and stop the pipeline, 3) Stop
 - `category_not_found` — 1) Suggest a new subcategory to add to the taxonomy, 2) Stop
+- `inaccessible_site` — 1) Provide an alternative URL or data source, 2) Stop
 
 ## Notes
 

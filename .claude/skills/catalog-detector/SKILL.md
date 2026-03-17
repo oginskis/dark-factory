@@ -23,7 +23,7 @@ Produce a concrete extraction blueprint that the scraper-generator can translate
 | Resource | Path |
 |----------|------|
 | Company report | `docs/product-classifier/{slug}.md` |
-| Catalog assessment (output) | `docs/catalog-detector/{slug}.md` |
+| Catalog assessment (output) | `docs/catalog-detector/{slug}/assessment.md` |
 | Platform knowledgebase (read+write) | `docs/platform-knowledgebase/{platform-slug}.md` |
 
 The platform knowledgebase is both read and written by this skill. For known platforms, it is loaded as the primary extraction recipe. After every successful run, the knowledgebase is updated with site-specific findings. For newly identified platforms on the deep investigation path, a new knowledgebase file is created.
@@ -33,10 +33,10 @@ The platform knowledgebase is both read and written by this skill. For known pla
 Read and follow `references/workflow.md`.
 
 - Before starting the workflow, run the catalog probe script:
-  `uv run python .claude/skills/catalog-detector/scripts/catalog_probe.py --url {site_url} --knowledgebase-dir docs/platform-knowledgebase 2>docs/catalog-detector/{slug}_probe_stderr.log`
-  Parse stdout as JSON. Read the stderr log file for diagnostics if needed.
+  `uv run .claude/skills/catalog-detector/scripts/catalog_probe.py --url {site_url} --slug {slug} --knowledgebase-dir docs/platform-knowledgebase --output-dir docs/catalog-detector/{slug}`
+  Parse stdout as JSON. Individual probe results are saved as JSON files in the output directory. Read `docs/catalog-detector/{slug}/probe.log` for diagnostics if needed.
   - Exit code 0 or 1: use the probe results to inform Steps 1-3. Routing logic:
-    - If recipe_match is "full" AND transport_health.overall is "healthy" AND anti_bot shows no blocking AND js_rendering_signals show no SPA framework:
+    - If recipe_match is "full" AND transport_health is "healthy" AND anti_bot shows no blocking AND js_rendering_signals show no SPA framework:
       → Skip Steps 1-3, proceed to Step 4 using the probe data.
     - If recipe_match is "full" BUT anti_bot shows issues OR js_rendering_signals.text_to_html_ratio < 0.05:
       → Skip Steps 1-2, proceed to Step 3 for deeper investigation of the flagged concern.
@@ -49,7 +49,7 @@ Read and follow `references/workflow.md`.
   - Exit code 2: ignore the script output, fall back to manual Steps 1-3 entirely.
   - DO NOT modify the probe script. If it produces unexpected results, use manual reasoning to verify or override — the script output is evidence, not a verdict.
 - After writing the catalog assessment, run the validation script:
-  `uv run python .claude/skills/catalog-detector/scripts/validate_assessment.py docs/catalog-detector/{slug}.md --knowledgebase-dir docs/platform-knowledgebase 2>docs/catalog-detector/{slug}_validate_stderr.log`
+  `uv run .claude/skills/catalog-detector/scripts/validate_assessment.py docs/catalog-detector/{slug}/assessment.md --knowledgebase-dir docs/platform-knowledgebase --output-json docs/catalog-detector/{slug}/validate.json 2>docs/catalog-detector/{slug}/validate.log`
   Fix any failing gates. DO NOT modify the validation script.
 - **These scripts are infrastructure, not generated code. Never edit, patch, or fix them during a pipeline run — even if you can identify the bug. If a script fails (exit code 2) or produces unexpected results, fall back to manual reasoning for those steps. Record the issue in the catalog assessment's Platform-Specific Notes so it can be fixed in a dedicated maintenance pass. Editing scripts mid-pipeline risks introducing regressions that affect other companies.**
 - Read the company report first for the company URL, categories, and business model context.

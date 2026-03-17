@@ -41,10 +41,12 @@
 | Category pages at non-leaf levels return empty | Only leaf categories contain products; traverse to leaf level |
 | Custom themes override standard selectors | Use JSON-LD as primary data source; fall back to HTML only when needed |
 | Crawl delay in robots.txt | Respect the specified delay (commonly 10s) |
+| Spec table selector varies by theme | Standard `#product-attribute-specs-table` absent on Harlow theme — use `dl dt` / `dl dd` pairs inside `.product.data.items` Specifications tab instead |
+| JSON-LD missing sku field | Harlow theme JSON-LD has name/price/availability only — get SKU from "Product Code" page text or URL suffix |
 | VAT toggle changes displayed price | JSON-LD price is fixed (typically inc VAT); note which VAT state is used |
 | Per-unit pricing (metre, pack, each) | Unit of sale not in JSON-LD; extract from page text if needed |
 
 ## Sites Using This Platform
 | Company | Slug | Date | Notes |
 |---------|------|------|-------|
-| Harlow Bros | harlowbros | 2026-03-17 | Custom "Harlow" theme; JSON-LD verified; breadcrumb in `div.breadcrumbs` (not ol/ul); spec table in Specifications tab; SKU as "Product Code" `<strong>` label; sitemap-based discovery with priority 1.0 filter |
+| Harlow Bros | harlowbros | 2026-03-17 | Custom "Harlow" theme. JSON-LD present (name, price, availability only — no sku). Spec table is `<dl>/<dt>/<dd>` in Specifications tab, NOT `#product-attribute-specs-table`. SKU as "Product Code" text label, also in URL suffix. Product pages at domain root `/{slug}`; category pages at `/shop/{path}`. Sitemap at `/media/sitemap/sitemap.xml` (mix of category + product URLs). Crawl-delay: 10s. Probe `recipe_match: poor` is false negative — probe tested category pages not product pages. |

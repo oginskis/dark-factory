@@ -66,6 +66,8 @@ If the company's relationship to physical goods is unclear, escalate — see the
 
 ## Step 3: Classify into Taxonomy
 
+Navigate the site's product/category pages now (see Investigation Guidance below) and build a complete picture of what the company sells before classifying.
+
 Read the product taxonomy categories file. This file is the single source of truth for all category and subcategory values. Every value used in classification must appear in this file verbatim -- no paraphrasing, no invented categories, no abbreviations.
 
 Each subcategory line in the product taxonomy categories file has a display name and a taxonomy ID in backticks. Extract taxonomy IDs using this regex pattern: `re.match(r'^- (.+?) \x60([a-z][a-z0-9_.]+)\x60$', line.strip())` — group 1 is the display name, group 2 is the taxonomy ID (e.g., `machinery.power_tools`).
@@ -92,7 +94,7 @@ Check the company reports directory for an existing report matching `{slug}.md`,
 
 The slug is deterministic — if a report exists with this slug, it is the same company. Do not scan for similar slugs or fuzzy matches.
 
-**If a report exists:** Update it in place. Preserve any content that is still accurate while refreshing and expanding with new findings. Keep the same file path.
+**If a report exists:** Re-run Steps 1-3 from scratch and overwrite every section with fresh findings. The existing file is only used for slug/path resolution — do not selectively preserve old content. Keep the same file path.
 
 **If no report exists:** Create a new file at the standard location.
 
@@ -109,7 +111,7 @@ Use this exact structure. Every section is required -- if information is unavail
 
 **Slug:** {slug}
 **Website:** {URL}
-**Discovery date:** {today's date}
+**Discovery date:** {YYYY-MM-DD}
 
 ## Overview
 
@@ -143,6 +145,15 @@ This is a surface-level scan — the catalog-detector performs the deep technica
 
 **Has structured catalog:** {Yes / No}
 **Estimated catalog size:** {number or range, or "Unknown"}
+
+### Catalog Hints
+
+These fields pass forward investigation artifacts to save catalog-detector redundant work:
+
+- **Catalog entry URL:** {URL where product listings were found, or "None found"}
+- **Suspected platform:** {woocommerce / shopify / magento / prestashop / custom / unknown — based on HTML signals, headers, or path patterns observed during investigation}
+- **Access issues:** {none / cloudflare / login-gated / geo-restricted — any access barriers encountered}
+- **Site language:** {ISO 639-1 code, e.g., "en", "de", "fr"}
 
 ### Categories
 
@@ -198,8 +209,9 @@ Before presenting results, re-read the report you just wrote and check it agains
 | 6 | **Product lines described** | At least one `###` subsection under `## Products` |
 | 7 | **References populated** | At least two URLs visited during investigation are listed with markdown links |
 | 8 | **Catalog categories covered** | Walk each Level 1 bullet in `## Product Catalog Analysis (Preliminary)`. For each, either a matching taxonomy ID appears in the Subcategories row, or `## Findings` explains why it was excluded (services, digital-only, no taxonomy entry). A catalog section selling tangible goods with a matching taxonomy entry must appear in Subcategories — omitting it is the most common classification error. |
+| 9 | **Primary in Subcategories** | The Primary taxonomy ID also appears in the Subcategories row |
 
-If all 8 pass, the report is complete.
+If all 9 pass, the report is complete.
 
 ---
 
@@ -210,6 +222,8 @@ If all 8 pass, the report is complete.
 - Check the site's sitemap for pages that might be missed through navigation.
 - "For Professionals" or "B2B" sections often contain more detailed product specs than the consumer-facing pages.
 - When exploring catalogs, navigate into 2-3 different product categories to understand the breadth and structure of the company's offerings.
+- **Inaccessible sites:** If the primary site blocks automated access (Cloudflare, CAPTCHA gate, 403), try Playwright browser, cached versions, or alternative sources (Companies House, LinkedIn, industry directories). If product information can be gathered from any source, proceed — record the access issue in Catalog Hints. If no product information is available from any source, escalate — see the `inaccessible_site` decision.
+- **Subsidiaries and trading divisions:** If the company operates as a subsidiary, trading division, or sister brand of another company, classify it independently using its own domain and product range. Note the parent/sibling relationship in Findings. Each domain gets its own report — do not merge with the parent company's report.
 
 ---
 
@@ -237,6 +251,13 @@ If all 8 pass, the report is complete.
 **Autonomous resolution:** Proceed if the company sells any physical products directly to customers, even as a secondary business line. The threshold is "would a customer receive a physical item shipped to them?"
 **Escalate when:** Truly borderline -- the only physical goods are trivial (branded swag, promotional items) or the company's role in the physical supply chain is indirect (pure licensor, pure platform with no first-party inventory).
 **Escalation payload:** Company name, URL, description of what the company does, the specific reason tangibility is ambiguous, and examples of any physical products found.
+
+### Decision: inaccessible_site
+
+**Context:** The company's website blocks all automated and browser access (Cloudflare WAF, hard 403, CAPTCHA gate), and no alternative source (cached pages, industry directories, Companies House) provides enough product information to classify the company.
+**Autonomous resolution:** If product information can be gathered from any alternative source, proceed with classification using that information. Record the access issue in Catalog Hints.
+**Escalate when:** No product information is available from any source — the company cannot be classified.
+**Escalation payload:** Company name, URL, what access methods were tried (direct HTTP, Playwright, cached versions, alternative sources), and what was blocked.
 
 ### Decision: category_not_found
 

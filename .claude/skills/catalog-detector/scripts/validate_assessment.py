@@ -71,6 +71,13 @@ def extract_section(content: str, heading: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 def check_correct_template(template: str) -> dict:
+    """
+    WHAT IT CHECKS: Whether the document matches a known template (success or stop).
+    FAILURE MEANS: The document is missing key structural markers (## Extraction Blueprint
+        or **Stop reason:**). It may be incomplete or use a non-standard format.
+    HOW TO FIX: Ensure the document has either an '## Extraction Blueprint' section (success)
+        or both '**Scraping strategy:** none' and '**Stop reason:**' fields (stop).
+    """
     if template == "success":
         return {"pass": True, "details": "Success template detected: has Extraction Blueprint section"}
     if template == "stop":
@@ -79,6 +86,11 @@ def check_correct_template(template: str) -> dict:
 
 
 def check_heading_and_slug(content: str) -> dict:
+    """
+    WHAT IT CHECKS: H1 heading matches '# Catalog Assessment: {name}' and **Slug:** field exists.
+    FAILURE MEANS: The document header is malformed or the slug identifier is missing.
+    HOW TO FIX: Ensure line 1 is '# Catalog Assessment: Company Name' and add '**Slug:** company-slug'.
+    """
     h1_match = re.search(r"^# Catalog Assessment: .+", content, re.MULTILINE)
     slug = extract_slug(content)
     if h1_match and slug:
@@ -92,6 +104,11 @@ def check_heading_and_slug(content: str) -> dict:
 
 
 def check_strategy_valid(content: str) -> dict:
+    """
+    WHAT IT CHECKS: **Scraping strategy:** is one of {static_html, structured_data, pdf_pricelist, none}.
+    FAILURE MEANS: The strategy field is missing or uses a non-standard value.
+    HOW TO FIX: Set **Scraping strategy:** to one of the valid values.
+    """
     strategy = extract_field(content, "Scraping strategy")
     if strategy and strategy.split()[0] in VALID_STRATEGIES:
         return {"pass": True, "details": f"Strategy: {strategy}"}
@@ -99,6 +116,12 @@ def check_strategy_valid(content: str) -> dict:
 
 
 def check_platform_valid(content: str) -> dict:
+    """
+    WHAT IT CHECKS: **Platform:** is a recognized platform name.
+    FAILURE MEANS: Platform field is missing or uses an unrecognized name.
+    HOW TO FIX: Set **Platform:** to one of: woocommerce, shopify, magento, prestashop,
+        opencart, bigcommerce, squarespace, wix, drupal, custom, unknown.
+    """
     platform = extract_field(content, "Platform")
     if platform and platform.split()[0] in VALID_PLATFORMS:
         return {"pass": True, "details": f"Platform: {platform}"}
@@ -106,6 +129,11 @@ def check_platform_valid(content: str) -> dict:
 
 
 def check_data_source_concrete(content: str) -> dict:
+    """
+    WHAT IT CHECKS: ### Data Source section has **Primary method:** and **Endpoint/URL pattern:**.
+    FAILURE MEANS: The extraction method or URL pattern is not documented.
+    HOW TO FIX: Add both fields to the Data Source section with concrete values.
+    """
     section = extract_section(content, "Data Source")
     if not section:
         return {"pass": False, "details": "### Data Source section missing"}
@@ -118,6 +146,12 @@ def check_data_source_concrete(content: str) -> dict:
 
 
 def check_discovery_actionable(content: str) -> dict:
+    """
+    WHAT IT CHECKS: Product Discovery section has all 4 required fields: Discovery method,
+        Pagination mechanism, Products per page, Pagination URL pattern.
+    FAILURE MEANS: Discovery information is incomplete — scraper-generator won't know how to crawl.
+    HOW TO FIX: Add all 4 fields to the Product Discovery section.
+    """
     section = extract_section(content, "Product Discovery")
     if not section:
         return {"pass": False, "details": "### Product Discovery section missing"}
@@ -131,6 +165,12 @@ def check_discovery_actionable(content: str) -> dict:
 
 
 def check_category_tree_complete(content: str) -> dict:
+    """
+    WHAT IT CHECKS: All leaf categories in the Verified Category Tree table have product counts.
+    FAILURE MEANS: Some categories were listed without verifying how many products they contain.
+    HOW TO FIX: Visit each leaf category URL and record the product count. Use '*' if count
+        is acknowledged but unknown.
+    """
     section = extract_section(content, "Verified Category Tree")
     if not section:
         return {"pass": False, "details": "#### Verified Category Tree section missing"}
@@ -169,6 +209,12 @@ def check_category_tree_complete(content: str) -> dict:
 
 
 def check_price_verified(content: str) -> dict:
+    """
+    WHAT IT CHECKS: Price section contains >=2 URLs with observed price values.
+    FAILURE MEANS: Price selector was written without being tested on real pages.
+    HOW TO FIX: Navigate to 2+ product pages, observe the actual price rendered,
+        and record each URL with its observed price in the Verified on: block.
+    """
     section = extract_section(content, "Price")
     if not section:
         return {"pass": False, "details": "#### Price section missing"}
@@ -179,6 +225,12 @@ def check_price_verified(content: str) -> dict:
 
 
 def check_spec_table_verified(content: str) -> dict:
+    """
+    WHAT IT CHECKS: Spec Table / Attributes section has >=2 URLs with attribute counts.
+    FAILURE MEANS: Attribute selectors were written without being tested on real pages.
+    HOW TO FIX: Navigate to 2+ product pages, verify attributes are extractable,
+        and record each URL with observed attributes in the Verified on: block.
+    """
     # Look for "Spec Table" or "Attributes" section
     section = None
     for heading in ["Spec Table / Attributes", "Spec Table", "Attributes"]:
@@ -194,6 +246,11 @@ def check_spec_table_verified(content: str) -> dict:
 
 
 def check_product_count(content: str) -> dict:
+    """
+    WHAT IT CHECKS: **Estimated product count:** contains a numeric value.
+    FAILURE MEANS: No product count estimate was provided.
+    HOW TO FIX: Add **Estimated product count:** with a number (e.g., '~500' or '1200').
+    """
     count_str = extract_field(content, "Estimated product count")
     if count_str and re.search(r"\d+", count_str):
         return {"pass": True, "details": count_str}
@@ -201,6 +258,11 @@ def check_product_count(content: str) -> dict:
 
 
 def check_knowledgebase_updated(content: str, kb_dir: Path) -> dict:
+    """
+    WHAT IT CHECKS: The company slug appears in the platform knowledgebase file's Sites table.
+    FAILURE MEANS: The knowledgebase was not updated with this company's findings.
+    HOW TO FIX: Add a row for this company in the platform knowledgebase's Sites Using This Platform table.
+    """
     slug = extract_slug(content)
     platform = extract_field(content, "Platform")
     if not slug or not platform:
@@ -218,6 +280,12 @@ def check_knowledgebase_updated(content: str, kb_dir: Path) -> dict:
 
 
 def check_anti_bot_value(content: str) -> dict:
+    """
+    WHAT IT CHECKS: **Anti-bot:** is one of {none, light, moderate}.
+    FAILURE MEANS: Anti-bot severity is missing or uses an invalid value. 'severe' is a stop
+        condition (use stop template instead).
+    HOW TO FIX: Set **Anti-bot:** to none, light, or moderate with a parenthetical explanation.
+    """
     value = extract_field(content, "Anti-bot")
     if value and value.split()[0] in ("none", "light", "moderate"):
         return {"pass": True, "details": f"Anti-bot: {value.split()[0]}"}
@@ -229,6 +297,11 @@ def check_anti_bot_value(content: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def check_stop_template(content: str) -> dict:
+    """
+    WHAT IT CHECKS: Document has both '**Scraping strategy:** none' and '**Stop reason:**'.
+    FAILURE MEANS: Stop template is incomplete.
+    HOW TO FIX: Add both fields to the document header.
+    """
     has_strategy_none = "**Scraping strategy:** none" in content
     has_stop_reason = "**Stop reason:**" in content
     if has_strategy_none and has_stop_reason:
@@ -237,6 +310,12 @@ def check_stop_template(content: str) -> dict:
 
 
 def check_valid_stop_reason(content: str) -> dict:
+    """
+    WHAT IT CHECKS: **Stop reason:** is a recognized value.
+    FAILURE MEANS: Stop reason is missing or non-standard.
+    HOW TO FIX: Set to one of: no_public_catalog, auth_required, anti_bot_severe, js_only,
+        attributes_not_extractable.
+    """
     reason = extract_field(content, "Stop reason")
     if reason and reason.strip() in VALID_STOP_REASONS:
         return {"pass": True, "details": f"Stop reason: {reason}"}
@@ -244,6 +323,12 @@ def check_valid_stop_reason(content: str) -> dict:
 
 
 def check_findings_explain(content: str) -> dict:
+    """
+    WHAT IT CHECKS: ## Findings section exists and has at least one bullet point.
+    FAILURE MEANS: No explanation of why scraping was stopped.
+    HOW TO FIX: Add a ## Findings section with bullet points explaining what was found
+        and why scraping is not viable.
+    """
     section = extract_section(content, "Findings")
     if bool(section and section.count("\n-") > 0):
         bullet_count = section.count("\n-")
@@ -317,6 +402,8 @@ def main() -> None:
     parser.add_argument("file", type=Path, help="Path to catalog assessment markdown")
     parser.add_argument("--knowledgebase-dir", type=Path,
                         default=Path("docs/platform-knowledgebase"))
+    parser.add_argument("--output-json", type=Path, default=None,
+                        help="Write gate results to this JSON file in addition to stdout")
     args = parser.parse_args()
 
     if not args.file.exists():
@@ -330,7 +417,14 @@ def main() -> None:
 
     result = run_gates(content, args.knowledgebase_dir)
     result["file"] = str(args.file)
-    print(json.dumps(result, indent=2))
+
+    output = json.dumps(result, indent=2)
+    print(output)
+
+    if args.output_json:
+        args.output_json.parent.mkdir(parents=True, exist_ok=True)
+        args.output_json.write_text(output)
+
     sys.exit(0 if all(g.get("pass") is not None for g in result["gates"].values()) else 1)
 
 
