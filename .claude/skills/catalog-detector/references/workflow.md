@@ -51,11 +51,11 @@ Also during this step, examine the homepage for evidence of a public product cat
 
 ## Step 2: Fast Path (Known Platforms)
 
-This track applies when a platform knowledgebase file exists.
+This track applies when a platform knowledgebase exists.
 
 ### Step 2a: Load Platform Knowledgebase
 
-Read the platform knowledgebase file. Extract the known extraction recipe:
+Read the platform knowledgebase. Extract the known extraction recipe:
 - API endpoints and their parameters
 - CSS selectors for product data (links, prices, names, breadcrumbs, spec tables)
 - Pagination patterns (URL format, products per page, next-page detection)
