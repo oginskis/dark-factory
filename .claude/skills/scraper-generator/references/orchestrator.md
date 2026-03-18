@@ -329,6 +329,85 @@ If all 13 pass, the scraper is complete.
 
 ---
 
+## Fix Mode
+
+When invoked by `/scraper-remediation` with a fix request JSON (`mode: "fix"`), the workflow operates differently from fresh generation.
+
+### Fix Request Input
+
+```json
+{
+  "mode": "fix",
+  "cycle": 1,
+  "slug": "harlowbros",
+  "failing_checks": [
+    {
+      "check": "core_attribute_coverage",
+      "value": 0.0,
+      "threshold": 0.9,
+      "subcategory_details": { ... }
+    }
+  ],
+  "passing_checks": [
+    { "check": "price_sanity", "value": 1.0, "threshold": 1.0 }
+  ],
+  "scraper_path": "docs/scraper-generator/harlowbros/scraper.py",
+  "eval_config_path": "docs/eval-generator/harlowbros/eval_config.json"
+}
+```
+
+### Fix Mode Step Flow
+
+1. **Step 1 (load context):** Same as normal — read catalog assessment, company report, SKU schemas, config.json. This provides the reference data needed to understand what the scraper should extract.
+
+2. **Step 2a-2c (code patching — REPLACES fresh generation):** Read the existing `scraper.py`. Analyze the `failing_checks` from the fix request to determine what to patch:
+   - `core_attribute_coverage` / `extended_attribute_coverage` failures → add or fix enrichment patterns, alias mappings, description parsing for missing attributes. Use `subcategory_details.top_missing` to know exactly which attributes are missing and how many products lack them.
+   - `schema_conformance` failures → fix type conversions, ensure spec table values match expected types.
+   - `price_sanity` failures → fix price extraction logic.
+   - `pagination_completeness` / `category_diversity` failures → fix category traversal, pagination, URL patterns.
+   - `duplicate_detection` failures → fix SKU extraction or deduplication logic.
+   - Use `passing_checks` values to avoid regressions — don't change extraction logic that is working.
+   - If the problem requires a fundamental approach change (site switched from HTML to SPA, added bot protection, restructured all URLs), set `fix_outcome: "unfixable"` in `fix_summary` and return immediately without patching. Do not waste cycles on unfixable problems.
+
+3. **Step 3 (validation dispatch):** Same as normal — dispatch the validator sub-agent with probe, smoke test, and final verification. Validator internal retry counters reset fresh for each fix mode invocation.
+
+4. **Step 4 (diagnostic persistence):** Same as normal, plus write the `fix_summary` field to `validation.json`.
+
+### fix_summary Format
+
+Added to `validation.json` only in fix mode:
+
+```json
+{
+  "fix_summary": {
+    "summary": "Added name-enrichment patterns for wood_type, appearance_grade.",
+    "fix_outcome": "fixed",
+    "fix_targets": ["core_attribute_coverage", "schema_conformance"],
+    "changes": [
+      { "type": "enrichment_pattern", "attribute": "wood_type" },
+      { "type": "type_conversion", "scope": "spec_table_numeric" }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `summary` | string | Free-text description of changes made |
+| `fix_outcome` | string | `"fixed"` (patches applied, validation passed), `"partial"` (some fixes applied but validation has issues), `"unfixable"` (fundamental change needed) |
+| `fix_targets` | array of strings | Eval check names that the fix targeted |
+| `changes` | array of objects | Structured change records. `type` is free-form text describing the kind of change. Additional fields vary by type. |
+
+### Fix Mode Constraints
+
+- **Do not archive** the existing scraper directory — the remediation skill handles backup.
+- **Do not regenerate from scratch** — read and patch the existing scraper.py.
+- **Do not modify** eval_config.json or any eval-generator artifacts.
+- **Validator counters reset** each fix mode invocation — a new fix cycle gets the full retry budget.
+- Fix mode does not create config.json or generator_input.json — these already exist from the original generation.
+
+---
+
 ## Boundaries
 
 - This workflow generates scrapers only — it does not assess catalog scrapability (catalog-detector) or generate quality validation (eval-generator).

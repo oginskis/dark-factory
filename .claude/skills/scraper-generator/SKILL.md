@@ -24,12 +24,13 @@ Generate a production-ready Python scraper for a company's product catalog, vali
 | Resource | Path |
 |----------|------|
 | Company report | `docs/product-classifier/{slug}.md` |
-| Catalog assessment | `docs/catalog-detector/{slug}.md` |
+| Catalog assessment | `docs/catalog-detector/{slug}/assessment.md` |
 | Product taxonomy categories | `docs/product-taxonomy/categories.md` |
 | SKU schema | `docs/product-taxonomy/sku-schemas/{category-slug}.md` |
 | Platform knowledgebase | `docs/platform-knowledgebase/{platform-slug}.md` |
 | Persist hook implementations | `.claude/skills/scraper-generator/references/persist-hooks.md` |
 | Scraper output dir | `docs/scraper-generator/{slug}/` |
+| Archived previous runs | `docs/scraper-generator/{slug}-archived-{YYYYMMDDTHHMMSS}/` — never read these |
 | Scraper script (output) | `docs/scraper-generator/{slug}/scraper.py` |
 | Config metadata (output) | `docs/scraper-generator/{slug}/config.json` |
 | Product data (output) | `docs/scraper-generator/{slug}/output/products.jsonl` |
@@ -49,6 +50,7 @@ Generate a production-ready Python scraper for a company's product catalog, vali
 
 Read and follow `references/orchestrator.md`.
 
+- **Archive previous run:** Before starting, check if `docs/scraper-generator/{slug}/` exists. If it does, archive it: `mv docs/scraper-generator/{slug} docs/scraper-generator/{slug}-archived-$(date -u +%Y%m%dT%H%M%S)`. Then create the fresh directory: `mkdir -p docs/scraper-generator/{slug}/output`. Every invocation generates from scratch — never read from or make decisions based on archived directories (`{slug}-archived-*`).
 - Provide the file paths from the table above when the workflow references logical resources (e.g., "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the platform knowledgebase", "the persist hooks reference file", "the pre-processed generator input file", "the language seed file").
 - Dispatch the validator sub-agent using the Agent tool as directed by the orchestrator. Sub-agent file: `.claude/skills/scraper-generator/references/validator.md` — probe testing and smoke tests. The orchestrator specifies what data to pass and when to dispatch.
 - The orchestrator handles label mapping and code generation inline (no sub-agent dispatch for these). Reference file `references/code-generator.md` defines the canonical product record format, library selection, required behavior, and code quality rules — the orchestrator reads it inline during Step 2c.
@@ -64,6 +66,17 @@ Read and follow `references/orchestrator.md`.
 - Data persistence: read the persist hook implementations file for the `setup`/`persist`/`teardown` functions to include in the generated scraper. Write the scraper code to the scraper script path before running tests (so `uv run` can execute it). The scraper code is final once the validator returns `pass`. After config metadata is prepared (Step 4), persist it as JSON to the config metadata path.
 - Diagnostic persistence: after the validator returns (any status, any language), write its output plus `generated_at` as JSON to the validation diagnostics path. On re-dispatch, overwrite the previous file.
 - The canonical product record format definition lives in `references/code-generator.md`.
+
+## Fix Mode
+
+When invoked by `/scraper-remediation` with a fix request (`mode: "fix"`), the scraper-generator operates differently:
+
+- **Skip the archive step** — do not archive or regenerate from scratch. Patch the existing scraper in place.
+- The remediation skill creates `scraper.py.pre-remediation` backup before invoking fix mode — rollback is the remediation skill's responsibility.
+- Read the fix request JSON to understand which eval checks failed and what needs fixing.
+- Read and follow the "## Fix Mode" section in `references/orchestrator.md` for the step flow.
+- Validation (probe, smoke test, final verification) runs the same as normal mode.
+- Write a `fix_summary` field to `validation.json` describing what was changed and the `fix_outcome` (`"fixed"`, `"partial"`, or `"unfixable"`).
 
 ## Escalation handling
 

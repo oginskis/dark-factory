@@ -146,11 +146,12 @@ The generated scraper must:
    - Errors and retries (with details)
    - Final summary (total products found, total time)
 
-8. **Handle errors gracefully:**
+8. **Handle errors gracefully with adaptive backoff:**
+   - **NEVER add a fixed delay between requests.** No `time.sleep()` in the normal request path. No `REQUEST_DELAY` constant. No respecting `Crawl-delay` from `robots.txt`. The scraper fires requests as fast as the server responds. Speed is the default. This is non-negotiable — a 10-second crawl delay on a 3000-product catalog means 8+ hours of runtime.
+   - **Adaptive backoff on errors only:** When the server returns HTTP 429, 500, 502, 503, or 504, apply exponential backoff starting at 2 seconds (2s → 4s → 8s → 16s cap). Reset the backoff delay after 5 consecutive successful responses. Implement this as a stateful throttle class, not inline sleeps.
    - Retry failed HTTP requests up to 3 times with exponential backoff
    - Skip individual products that fail to parse rather than aborting the entire run
    - Log warnings for missing optional attributes, errors for missing universal attributes
-   - Respect rate limits — include reasonable delays between requests (1–2 seconds default)
    - Set request timeouts (30 seconds default)
 
 9. **Include a `main()` entry point** that accepts an optional `--limit N` argument via `argparse`. When provided, the scraper stops after extracting N products total. Use a custom `argparse` type function (e.g., `positive_int`) that raises `ArgumentTypeError` for values `<= 0` — do not use post-hoc `if` checks. Scraping configuration (target URL, request headers, delays) is embedded in the script. Always use `with httpx.Client(...) as client:` as a context manager — never manual `create_client()` / `client.close()` pairs.
@@ -174,6 +175,14 @@ The scraper must find every product in the catalog, not just the ones visible on
 3. **Category tree traversal.** Walk every leaf category from the catalog assessment's category structure. Follow nested subcategories to their deepest level — do not stop at parent categories. A parent category page may show aggregated products, but child categories often contain additional products. Exhaust pagination within each leaf category.
 
 4. **"All products" or "shop" pages.** When a single collection page lists every product (with pagination), prefer it over category-by-category traversal — it guarantees no products are missed due to navigation gaps.
+
+**Category page validation.** Before extracting product URLs from a category listing page, verify it is actually a category listing and not a search results page. Many platforms (especially Magento) redirect missing category URLs to a search results page instead of returning 404. Detect this by checking for search result indicators in the HTML (e.g., "Search results for:", `catalogsearch/result` in the URL, search-specific CSS classes). If a category page is actually a search results redirect, log a warning and skip it — do not extract product URLs from search results.
+
+**Product URL filtering.** When extracting product links from category listing pages, use the catalog assessment's verified URL patterns to distinguish product links from navigation, banner, footer, and promotional links. Product links have a specific URL structure (documented in the catalog assessment) — match against that structure, not against generic "has a hyphen" heuristics. Specifically:
+- Use the product URL pattern from the catalog assessment (e.g., product pages at domain root `/{slug}` vs category pages at `/shop/{path}`)
+- Use platform-specific product link selectors when available (e.g., `.product-item a` for Magento, `.product-card a` for Shopify)
+- Exclude links to static/informational pages (delivery info, about, contact, environment, branch locator, etc.)
+- Exclude promoted/banner product links that appear on every category page (same product URL appearing across unrelated categories is a signal)
 
 **Deduplication.** Products may appear in multiple categories or across different discovery sources. Deduplicate by product URL or SKU — maintain a set of seen identifiers and skip duplicates. When the same product appears in multiple categories, use the first occurrence's `category_path`.
 
@@ -208,7 +217,7 @@ List the exact libraries chosen in the Library Selection step.
 **Style:**
 - Target Python 3.10+.
 - Use expressive names and small focused functions — favor readability over inline comments.
-- Define constants at module level for magic values: URLs, delays, selectors, CSS class names.
+- Define constants at module level for magic values: URLs, backoff parameters, selectors, CSS class names.
 
 **Imports:**
 - Organize in standard order: standard library, third-party, local.

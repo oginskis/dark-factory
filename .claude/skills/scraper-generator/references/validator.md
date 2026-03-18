@@ -97,9 +97,9 @@ If the test exceeds 2 minutes:
    | Symptom | Likely cause | Fix |
    |---------|-------------|-----|
    | Repeated "Failed to parse" warnings with 0 products | Extraction logic broken | Fix selectors or JSON-LD parsing |
-   | Repeated HTTP errors or retries | Rate limiting or network issue | Increase delay, add random jitter |
+   | Repeated HTTP errors or retries | Rate limiting or network issue | Verify adaptive backoff is triggering correctly on 429/5xx responses |
    | Processing many categories with 0 products | Category traversal broken | Fix navigation logic |
-   | HTTP 429 responses | Rate limiting | Increase delay, add random jitter |
+   | HTTP 429 responses | Rate limiting | Verify adaptive backoff triggers on 429 and backoff cap is sufficient |
    | 200 responses but empty HTML | Geo-blocking or bot detection | Add realistic headers, rotate User-Agent |
    | Redirect chains to different domain | Localized redirect | Pin URL, set Accept-Language, handle redirects |
    | Garbled names or JSON failures | Encoding mismatch | Detect encoding, decode explicitly |
@@ -151,13 +151,19 @@ After the smoke test and taxonomy feedback, run the scraper with a larger sample
 
 ### Sample size
 
-```
-sample_size = min(ceil(expected_product_count * 0.2), 100)
-```
+20% of expected product count, minimum 20, maximum 500.
 
-Examples: 50 products → sample 10, 123 → sample 25, 500+ → sample 100.
+| Expected products | Sample size |
+|-------------------|-------------|
+| 50 | 20 |
+| 200 | 40 |
+| 500 | 100 |
+| 3,500 | 500 |
+| 10,000 | 500 |
 
-**When to skip:** If `sample_size <= 20`, skip this phase — the smoke test output is sufficient.
+The sample must be **spread across all top-level categories**, not taken sequentially from the first categories the scraper encounters. For multi-category scrapers, divide the sample proportionally by expected category size (from the catalog assessment's category tree) and run `--limit` per category, or run the full sample and verify that at least 80% of top-level categories appear in the output.
+
+**When to skip:** If `expected_product_count <= 20`, skip this phase — the smoke test already covered the full catalog.
 
 ### Timeout
 
@@ -170,6 +176,34 @@ Maximum seconds allowed: `max(120, sample_size * 6)`.
 3. `total_products` is between 1 and `sample_size`.
 
 If the verification fails, allow one retry, then return `status: test_failed`.
+
+---
+
+## Fix Mode Output
+
+When the scraper-generator runs in fix mode (invoked by `/scraper-remediation`), the validator adds a `fix_summary` field to `validation.json`:
+
+```json
+{
+  "fix_summary": {
+    "summary": "Free-text description of changes made.",
+    "fix_outcome": "fixed",
+    "fix_targets": ["core_attribute_coverage"],
+    "changes": [
+      { "type": "enrichment_pattern", "attribute": "wood_type" }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `summary` | string | Free-text description of changes made |
+| `fix_outcome` | string | `"fixed"`, `"partial"`, or `"unfixable"` |
+| `fix_targets` | array of strings | Eval check names that the fix targeted |
+| `changes` | array of objects | Structured change records. `type` is free-form. |
+
+This field is only present in fix mode. In normal generation mode, `fix_summary` is absent from `validation.json`.
 
 ---
 
