@@ -2,7 +2,7 @@
 name: eval-generator
 description: >
   Generate an eval config for a company that validates scraper quality using the shared eval script.
-  Produces an eval_config.json that the shared eval script reads to run twelve weighted checks (with core/extended attribute split) against scrape output and report degradation.
+  Produces an eval_config.json with per-subcategory attribute maps and optional semantic_validation that the shared eval script reads to run thirteen weighted checks against scrape output and report degradation.
   Use this skill when the user wants to create quality validation for an existing scraper —
   "generate eval for X scraper", "create eval config for X", "build eval for X",
   "add quality checks for X scraper", "configure eval for X". Requires a scraper from /scraper-generator to exist first.
@@ -12,7 +12,7 @@ user-invocable: true
 
 # Eval Generator
 
-Generate an eval config that validates scraper quality using twelve weighted checks against scrape output.
+Generate an eval config that validates scraper quality using thirteen weighted checks against scrape output.
 
 ## Input
 
@@ -23,7 +23,7 @@ Generate an eval config that validates scraper quality using twelve weighted che
 | Resource | Path |
 |----------|------|
 | Company report | `docs/product-classifier/{slug}.md` |
-| Catalog assessment | `docs/catalog-detector/{slug}.md` |
+| Catalog assessment | `docs/catalog-detector/{slug}/assessment.md` |
 | Scraper source | `docs/scraper-generator/{slug}/scraper.py` |
 | Product taxonomy categories | `docs/product-taxonomy/categories.md` |
 | SKU schema | `docs/product-taxonomy/sku-schemas/{category-slug}.md` |
@@ -55,6 +55,7 @@ The eval validates scraper output against the four-level product record format (
 
 Read and follow `references/workflow.md`.
 
+- **Archive previous run:** Before starting, check if `docs/eval-generator/{slug}/` exists. If it does, archive it: `mv docs/eval-generator/{slug} docs/eval-generator/{slug}-archived-$(date -u +%Y%m%dT%H%M%S)`. Then create the fresh directory: `mkdir -p docs/eval-generator/{slug}/output`. Every invocation generates from scratch — never read from or make decisions based on archived directories (`{slug}-archived-*`).
 - Provide the file paths from the table above when the workflow references logical resources (e.g., "the scraper source", "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the scrape output file", "the scrape run summary", "the shared eval script", "the eval config file", "the eval result file", "the eval history file", "the eval baseline file").
 - The `no_sku_schema` decision has an autonomous resolution path: when the subcategory exists in the taxonomy but the SKU schema hasn't been created yet, invoke `/product-taxonomy` for that subcategory to generate the schema, then continue. Only escalate if the subcategory itself is missing from the taxonomy.
 - Run the shared eval script for verification: `uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json`

@@ -85,7 +85,8 @@ class TransportTracker:
 def fetch(client: httpx.Client, url: str, *, timeout: float, delay: float,
           max_size: int, tracker: TransportTracker) -> tuple[str | None, int | None, bool, dict, str | None]:
     """Fetch URL. Returns (text, status, truncated, headers, final_url). Handles 429 retry."""
-    time.sleep(delay)
+    if delay > 0:
+        time.sleep(delay)
     try:
         resp = client.get(url, timeout=timeout)
     except httpx.TimeoutException:

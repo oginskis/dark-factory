@@ -591,6 +591,37 @@ def check_subagent_pattern(skill_name, skill_content, issues):
                 f"Sub-agent '{subagent_file.name}' is {word_count} words (target: ≤2,500)"))
 
 
+def check_script_test_coverage(skill_name, issues):
+    """Check that all Python scripts have corresponding test files."""
+    check = "test-coverage"
+    scripts_dir = SKILLS_DIR / skill_name / "scripts"
+    tests_dir = SKILLS_DIR / skill_name / "tests"
+
+    if not scripts_dir.is_dir():
+        return  # No scripts to test
+
+    script_files = [
+        f.stem for f in sorted(scripts_dir.glob("*.py"))
+        if not f.name.startswith("_")  # Library files tested indirectly
+    ]
+
+    if not script_files:
+        return
+
+    if not tests_dir.is_dir():
+        issues.append(Issue("critical", check,
+            f"Scripts directory exists with {len(script_files)} script(s) but no tests/ directory"))
+        return
+
+    test_files = {f.stem for f in tests_dir.glob("test_*.py")}
+
+    for script in script_files:
+        expected_test = f"test_{script}"
+        if expected_test not in test_files:
+            issues.append(Issue("critical", check,
+                f"Script '{script}.py' has no test file 'tests/{expected_test}.py'"))
+
+
 def check_word_count(skill_name, workflow_content, issues):
     """Check workflow reference word count and warn about decomposition needs."""
     check = "word-count"
@@ -648,6 +679,7 @@ def verify_skill(skill_name):
     # Standalone skills get reduced checks (no workflow reference, no wrapper+workflow conventions)
     if skill_name in STANDALONE_SKILLS:
         check_standalone_skill(skill_name, skill_content, issues)
+        check_script_test_coverage(skill_name, issues)
         return issues
 
     refs = references_dir(skill_name)
@@ -669,6 +701,7 @@ def verify_skill(skill_name):
     check_report_template(workflow_content, issues)
     check_subagent_pattern(skill_name, skill_content, issues)
     check_word_count(skill_name, workflow_content, issues)
+    check_script_test_coverage(skill_name, issues)
 
     return issues
 

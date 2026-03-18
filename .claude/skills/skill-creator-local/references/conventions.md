@@ -390,9 +390,92 @@ docs/{stage}/{slug}/
 
 This makes every intermediate result inspectable — when something goes wrong, you can check the individual JSON file instead of re-running the entire pipeline.
 
+### Script testing rules
+
+Every non-library script must have a corresponding test file. The `verify_skill.py` script enforces this as a critical issue.
+
+| Rule | Why |
+|------|-----|
+| **Test file per script** | `tests/test_{script_name}.py` for each `scripts/{script_name}.py` (excluding `_*.py` library files) |
+| **PEP 723 inline metadata** | Each test file declares its own dependencies so `uv run test_file.py` works standalone |
+| **`__main__` block** | `if __name__ == "__main__": raise SystemExit(pytest.main([__file__, "-v"]))` at end of each test file |
+| **Pure functions get unit tests** | Parsing, analysis, validation logic — no HTTP, no subprocess |
+| **HTTP calls get mocked** | Use `unittest.mock.patch` on `httpx.Client.get` — never hit real servers in unit tests |
+| **Integration tests marked** | `@pytest.mark.integration` for tests requiring real URLs or network access |
+| **Real data for validation** | Gate functions tested with realistic markdown content, real taxonomy files when tracked in repo |
+| **Class-based grouping** | Group related tests into classes (e.g., `TestDeriveSlug`, `TestAnalyzeAntiBot`). Follow `eval/test_eval.py` pattern |
+| **Tests run via uv** | `uv run --with pytest --with httpx --with selectolax python -m pytest -v` for full suite |
+
+```
+.claude/skills/{name}/
+├── scripts/
+│   ├── _lib.py              ← library file — tested indirectly through consumers
+│   ├── action.py            ← standalone script
+│   └── validate.py          ← validator script
+└── tests/
+    ├── conftest.py           ← shared fixtures (optional)
+    ├── test_action.py        ← tests for action.py
+    └── test_validate.py      ← tests for validate.py
+```
+
+Test files follow this structure:
+
+```python
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pytest", "httpx"]  # only what this test file needs
+# ///
+"""Tests for action.py — short description."""
+from __future__ import annotations
+import pytest
+from action import some_function
+
+class TestSomeFunction:
+    def test_basic_case(self):
+        assert some_function("input") == "expected"
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-v"]))
+```
+
 ### SKILL.md integration
 
 When a skill has scripts, the SKILL.md Workflow section includes:
 - The exact `uv run` command with argument placeholders
 - Routing logic based on script output fields (e.g., "if recipe_match is 'full' AND transport_health is 'healthy' → skip Steps 1-3")
 - The immutability rule: "DO NOT modify the script. If it produces unexpected results, fall back to manual reasoning."
+
+---
+
+## Convention 6: Archive-Before-Replay
+
+Every pipeline skill that produces per-company output under `docs/{stage}/{slug}/` must archive previous runs before starting. This ensures each invocation generates from scratch and never bases decisions on stale artifacts from a prior run.
+
+### Archive pattern
+
+When the skill is invoked for a company slug, the SKILL.md Workflow section must include this step **before** any other work:
+
+```
+**Archive previous run:** Before starting, check if `docs/{stage}/{slug}/` exists. If it does, archive it:
+`mv docs/{stage}/{slug} docs/{stage}/{slug}-archived-$(date -u +%Y%m%dT%H%M%S)`.
+Then create the fresh directory: `mkdir -p docs/{stage}/{slug}/output`.
+Every invocation generates from scratch — never read from or make decisions based on archived directories (`{slug}-archived-*`).
+```
+
+### Rules
+
+| Rule | Why |
+|------|-----|
+| **Archive before any reads** | Prevents accidentally reading stale data from a prior run |
+| **Timestamp in archive name** | `{slug}-archived-{YYYYMMDDTHHMMSS}` — preserves history without collisions |
+| **Never read archived dirs** | Archived directories are for human inspection only. The skill must never open, parse, or reference `{slug}-archived-*` paths |
+| **Fresh directory after archive** | `mkdir -p docs/{stage}/{slug}/output` — ensures clean state |
+| **One archive per invocation** | Only archive once at the start. Mid-run failures leave the current directory intact for debugging |
+
+### Which skills need this
+
+Any pipeline skill that writes per-company output to `docs/{stage}/{slug}/`. Currently: `catalog-detector`, `scraper-generator`, `eval-generator`. The `product-classifier` writes a single file (`{slug}.md`) rather than a directory, so it overwrites in place instead of archiving.
+
+### Gitignore interaction
+
+Archived directories are automatically gitignored because they live under `docs/{stage}/` which is already gitignored for per-company output. No additional gitignore entries are needed.

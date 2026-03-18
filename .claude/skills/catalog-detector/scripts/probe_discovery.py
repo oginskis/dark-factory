@@ -14,7 +14,7 @@ WHEN TO CALL: After probe_access confirms the site is reachable. Independent of
 ARGUMENTS:
     --url                Target website URL (required)
     --timeout            HTTP timeout in seconds (default: 15.0)
-    --delay              Inter-request delay in seconds (default: 0.5)
+    --delay              Inter-request delay in seconds (default: 0)
     --max-response-size  Max response bytes (default: 2_000_000)
     --max-product-samples  Number of product URLs to sample (default: 5)
 
@@ -26,7 +26,7 @@ EXIT CODES:
 INTERPRETATION:
     sitemap.found == false → use category traversal for product discovery; note in assessment
     sitemap.sample_success_rate below 80% → URLs may be stale or behind auth; verify manually
-    robots_txt.crawl_delay → copy value into scraper config; respect it between requests
+    robots_txt.crawl_delay → record in assessment for reference; scrapers use adaptive backoff instead
     sitemap.product_url_count == 0 AND homepage_links.catalog_links == [] →
         likely no_public_catalog stop
     sample_product_urls → pass directly to probe_recipe via --product-urls
@@ -171,7 +171,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Discover product URLs via robots/sitemap/links")
     parser.add_argument("--url", required=True, help="Target website URL")
     parser.add_argument("--timeout", type=float, default=15.0)
-    parser.add_argument("--delay", type=float, default=0.5)
+    parser.add_argument("--delay", type=float, default=0)
     parser.add_argument("--max-response-size", type=int, default=2_000_000)
     parser.add_argument("--max-product-samples", type=int, default=5)
     return parser.parse_args()

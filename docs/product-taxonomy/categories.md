@@ -183,6 +183,7 @@ This file is edited manually — the `product-taxonomy` skill reads from it but 
 - Ceramic Tiles & Sanitary Ware `construction.ceramic_tiles_sanitary`
 - Refractory Products & Technical Ceramics `construction.refractory_technical_ceramics`
 - Abrasives `construction.abrasives`
+- Building Hardware & Ironmongery (Handles, Hinges, Locks) `construction.building_hardware_ironmongery`
 
 ## Wood Products & Lumber
 - Softwood & Hardwood Lumber `wood.softwood_hardwood_lumber`

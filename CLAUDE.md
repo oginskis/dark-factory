@@ -44,6 +44,41 @@ uv run python -m module           # run a module
 uv pip install package            # install a package
 ```
 
+## Testing
+
+Every Python script under `.claude/skills/*/scripts/` must have a corresponding test file under `.claude/skills/*/tests/test_{script_name}.py`. The `verify_skill.py` script enforces this automatically.
+
+Run all tests:
+```bash
+uv run --with pytest --with httpx --with selectolax python -m pytest -v
+```
+
+Run tests for a specific skill:
+```bash
+uv run --with pytest --with httpx --with selectolax python -m pytest .claude/skills/catalog-detector/tests/ -v
+```
+
+Run a single test file standalone (PEP 723 deps resolve automatically):
+```bash
+uv run .claude/skills/catalog-detector/tests/test_probe_lib.py
+```
+
+Skip integration tests (no network):
+```bash
+uv run --with pytest --with httpx --with selectolax python -m pytest -m "not integration" -v
+```
+
+### Testing rules
+
+1. **One test file per script.** `scripts/foo.py` → `tests/test_foo.py`. Library files (`_*.py`) are tested indirectly through consumers.
+2. **PEP 723 metadata at top.** Each test file declares its dependencies inline so `uv run test_file.py` works standalone.
+3. **`__main__` block at bottom.** `if __name__ == "__main__": raise SystemExit(pytest.main([__file__, "-v"]))`.
+4. **Test pure functions, mock HTTP.** Keep parsing/analysis logic in testable functions. Use `unittest.mock.patch` for HTTP calls.
+5. **Class-based grouping.** Follow `eval/test_eval.py` pattern — `TestClassName` with `test_` methods.
+6. **Real data for validators.** Gate functions should use realistic markdown and real repo files (`categories.md`, knowledgebase files).
+7. **Mark integration tests.** `@pytest.mark.integration` for tests that hit real URLs. Skip in CI with `-m "not integration"`.
+8. **Tests must pass before committing skill changes.** Run `uv run --with pytest --with httpx --with selectolax python -m pytest` after modifying scripts.
+
 ## Git
 
 **Do not commit unless explicitly asked.** Present the diff and wait for approval.

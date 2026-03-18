@@ -43,7 +43,7 @@ If the catalog assessment does not contain an estimated product count, handle gr
 
 ## Step 3: Load the SKU Schema
 
-Read the SKU schema for the company's primary subcategory. For multi-subcategory companies, read ALL subcategory schemas and use the **union** of their core/extended Key lists — this ensures the eval config covers attributes from every subcategory the scraper handles. The schema tables have 6 columns: Attribute, **Key**, Data Type, Unit, Description, Example Values. The **Key** column contains the exact snake_case identifier that scrapers use in their output — use these Key values (not the display names) everywhere in the eval config.
+Read the SKU schema for the company's primary subcategory. For multi-subcategory companies, read ALL subcategory schemas and build a per-subcategory map. Each subcategory gets its own `core_attributes`, `extended_attributes`, and `expected_count`. Do NOT union them. Derive `expected_count` per subcategory from the catalog assessment's category tree — sum leaf category product counts that map to each subcategory. If not derivable, divide `expected_product_count` equally among subcategories. The schema tables have 6 columns: Attribute, **Key**, Data Type, Unit, Description, Example Values. The **Key** column contains the exact snake_case identifier that scrapers use in their output — use these Key values (not the display names) everywhere in the eval config.
 
 Extract:
 
@@ -58,18 +58,31 @@ If no SKU schema exists for the company's category, check the product taxonomy c
 
 ## Step 4: Generate the Eval Config
 
-Produce the eval config file with all 8 required fields:
+Produce the eval config file with all required fields:
 
 ```json
 {
   "company_slug": "<slug>",
-  "expected_product_count": <number>,
-  "expected_top_level_categories": ["<category>", ...],
-  "core_attributes": ["<attr>", ...],
-  "extended_attributes": ["<attr>", ...],
-  "type_map": {"<attr>": "<type>", ...},
-  "enum_attributes": {"<attr>": ["<value>", ...], ...},
-  "has_prices": <boolean>
+  "expected_product_count": 500,
+  "expected_top_level_categories": ["Category A", "Category B"],
+  "subcategories": {
+    "wood.softwood_hardwood_lumber": {
+      "core_attributes": ["wood_type", "structural_grade"],
+      "extended_attributes": ["species", "nominal_thickness"],
+      "expected_count": 300
+    },
+    "wood.millwork": {
+      "core_attributes": ["material", "joint_type"],
+      "extended_attributes": ["species", "profile_pattern"],
+      "expected_count": 200
+    }
+  },
+  "type_map": {"wood_type": "str", "structural_grade": "str"},
+  "enum_attributes": {},
+  "has_prices": true,
+  "semantic_validation": {
+    "numeric_fields": ["nominal_width", "nominal_thickness", "width", "thickness"]
+  }
 }
 ```
 
@@ -80,11 +93,11 @@ Produce the eval config file with all 8 required fields:
 | `company_slug` | Company report | The slug from the company report |
 | `expected_product_count` | Catalog assessment | The estimated product count. If missing, see the `missing_product_count_estimate` decision. |
 | `expected_top_level_categories` | Catalog assessment | The top-level category names from the category structure section. These are the catalog's own category names (e.g., "Riga Wood"), not taxonomy categories. |
-| `core_attributes` | SKU schema + scraper source | **Key** values from the schema's Core Attributes table (excluding universal keys `sku`, `product_name`, `url`, `price`, `currency`). Only include keys the scraper actually extracts. Universal fields (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) are handled by the shared eval script — do not include them here. |
-| `extended_attributes` | SKU schema + scraper source | **Key** values from the schema's Extended Attributes table. Only include keys the scraper actually extracts. |
+| `subcategories` | SKU schema + scraper source + catalog assessment | Per-subcategory map. Each entry has core_attributes (from schema Key column), extended_attributes (from schema Key column), and expected_count (from catalog assessment category tree). Only attributes the scraper actually extracts. |
 | `type_map` | SKU schema + scraper source | Maps every attribute **Key** (across core, extended, and extra) to its expected eval type: `"str"`, `"number"`, `"list"`, or `"bool"`. The SKU schema `Data Type` column maps directly — `text`/`enum` → `"str"`, `number` → `"number"`, `text (list)` → `"list"`, `boolean` → `"bool"`. Covers all attributes the scraper extracts. |
 | `enum_attributes` | SKU schema + scraper source | Maps attributes that have a closed set of allowed values to their value arrays. Only include attributes where the allowed values are known from the SKU schema or clearly enumerable from the scraper logic. Use an empty object `{}` when no enum constraints apply. |
 | `has_prices` | Catalog assessment + scraper source | `true` if the catalog has prices and the scraper extracts them, `false` otherwise. When `false`, the shared eval script skips the price sanity check. |
+| `semantic_validation` | SKU schema | Object with numeric_fields array listing attributes that should contain numeric values. Derived from SKU schema — include fields with Data Type 'number' or measurement fields like dimensions. |
 
 ### SKU schema → eval type mapping
 
@@ -99,9 +112,9 @@ The SKU schema `Data Type` column contains clean types (units are in the separat
 
 When in doubt, check the scraper source to see what Python type the attribute actually produces.
 
-### Checks (12 total)
+### Checks (13 total)
 
-The shared eval script implements 12 weighted checks. Weights sum to 100:
+The shared eval script implements 13 weighted checks. Weights sum to 100:
 
 | Check | Weight | Threshold | What it catches |
 |-------|--------|-----------|-----------------|
@@ -114,9 +127,10 @@ The shared eval script implements 12 weighted checks. Weights sum to 100:
 | `data_freshness` | 5 | 1.00 | Stale cache, broken upsert |
 | `schema_conformance` | 5 | 1.00 | Site redesign, new data format |
 | `row_count_trend` | 5 | 0.80 | Category removal, pagination break |
-| `duplicate_detection` | 10 | 0.99 | Duplicate products by SKU |
+| `duplicate_detection` | 5 | 0.99 | Duplicate products by SKU |
 | `field_level_regression` | 10 | 0.50 | Per-field fill rate drops vs previous run |
 | `extra_attributes_ratio` | 5 | 0.50 | Too many unmapped attributes — schema inadequate |
+| `semantic_validation` | 5 | 0.95 | Composite: value cleanliness, non-product detection, numeric format |
 
 ### Check implementation details
 
@@ -138,11 +152,13 @@ The shared eval script implements 12 weighted checks. Weights sum to 100:
 
 **row_count_trend** (weight 5, threshold 0.80): Compares current row count to previous run baseline. Skipped on first run or limited runs.
 
-**duplicate_detection** (weight 10, threshold 0.99): Checks for duplicate products by SKU. Ratio of unique SKUs to total must be >= 0.99.
+**duplicate_detection** (weight 5, threshold 0.99): Checks for duplicate products by SKU. Ratio of unique SKUs to total must be >= 0.99.
 
 **field_level_regression** (weight 10, threshold 0.50): Compares per-field fill rates against previous run baseline. Flags fields where fill rate dropped significantly. Skipped when no baseline exists.
 
 **extra_attributes_ratio** (weight 5, threshold 0.50): Computes `1 - (extra_count / (core_count + extended_count))` averaged across all products. Higher is better (fewer unmapped extras). Threshold: 0.50. This flags schemas that are inadequate for the company.
+
+**semantic_validation** (weight 5, threshold 0.95): Composite check covering value cleanliness, non-product detection, and numeric format. Uses the `semantic_validation` config field — when `numeric_fields` is provided, validates that those fields contain properly formatted numeric values.
 
 ### Weight redistribution
 
@@ -153,14 +169,15 @@ When checks are skipped (e.g., no baseline for `field_level_regression`, limited
 | Rule | Correct | Wrong |
 |------|---------|-------|
 | **Valid JSON** | Single JSON object, parseable | Trailing commas, comments, multiple objects |
-| **All 8 fields present** | Every field from the schema above | Missing fields, extra fields |
+| **All required fields present** | Every field from the schema above | Missing fields, extra fields |
 | **`company_slug` is a string** | `"finieris"` | Missing or numeric |
 | **`expected_product_count` is a positive integer** | `31` | `0`, negative, string, float |
 | **`expected_top_level_categories` is a non-empty array of strings** | `["Riga Wood"]` | Empty array, array of numbers |
-| **`core_attributes` contains only category-specific Key values** | `["material", "weight"]` | Includes universal/top-level fields: `"sku"`, `"name"`, `"url"`, `"price"`, `"currency"`, `"brand"`, `"scraped_at"`, `"product_category"`, `"category_path"` |
-| **`extended_attributes` is an array of strings** | `["color", "finish"]` or `[]` | Missing, null, array of numbers |
+| **`subcategories` must be an object where each key is a taxonomy ID (contains dot)** | `{"wood.softwood_hardwood_lumber": {...}}` | Array, flat attributes, keys without dots |
+| **Each subcategory value must have `core_attributes` (array), `extended_attributes` (array), and `expected_count` (number)** | `{"core_attributes": ["material"], "extended_attributes": ["color"], "expected_count": 200}` | Missing fields, wrong types |
+| **`semantic_validation` is optional, when present it must be an object with `numeric_fields` array** | `{"numeric_fields": ["width", "thickness"]}` | String, array, missing numeric_fields key |
 | **`type_map` values use exact type strings** | `"str"`, `"number"`, `"list"`, `"bool"` | `"string"`, `"int"`, `"float"`, `"array"`, `"boolean"` |
-| **`type_map` covers all attributes in `core_attributes` and `extended_attributes`** | Every core and extended attribute has a type entry | Attribute missing from type_map |
+| **`type_map` covers all attributes across all subcategories** | Every core and extended attribute from all subcategories has a type entry | Attribute missing from type_map |
 | **`enum_attributes` values are arrays of strings** | `{"surface_treatment": ["Uncoated", "Film-faced"]}` | Values as a single string, nested objects |
 | **`has_prices` is a boolean** | `true` or `false` | `"true"`, `"false"`, `0`, `1` |
 
@@ -180,7 +197,7 @@ If the shared eval script fails to run or produces an error, review the config f
 
 ## Step 6: Self-Verification
 
-After the run completes, read the eval result file and verify all 12 checks appear in the output:
+After the run completes, read the eval result file and verify all 13 checks appear in the output:
 
 | # | Check name | Verify |
 |---|------------|--------|
@@ -193,13 +210,14 @@ After the run completes, read the eval result file and verify all 12 checks appe
 | 7 | `data_freshness` | Present, weight 5, threshold 1.0 |
 | 8 | `schema_conformance` | Present, weight 5, threshold 1.0 |
 | 9 | `row_count_trend` | Present, weight 5, threshold 0.80 (or skipped on limited/first run) |
-| 10 | `duplicate_detection` | Present, weight 10, threshold 0.99 |
+| 10 | `duplicate_detection` | Present, weight 5, threshold 0.99 |
 | 11 | `field_level_regression` | Present, weight 10, threshold 0.50 (or skipped if no baseline) |
 | 12 | `extra_attributes_ratio` | Present, weight 5, threshold 0.50 |
+| 13 | `semantic_validation` | Present, weight 5, threshold 0.95 |
 
 Skipped checks have `"value": null` and `"skipped": true` — this is expected behavior, not an error.
 
-If the eval runs successfully and all 12 checks appear in the result, the config is verified.
+If the eval runs successfully and all 13 checks appear in the result, the config is verified.
 
 ---
 

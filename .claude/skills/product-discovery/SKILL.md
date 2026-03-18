@@ -150,7 +150,7 @@ When all four stages complete successfully, present a structured summary to the 
 | File | Path |
 |------|------|
 | Company report | `docs/product-classifier/{slug}.md` |
-| Catalog assessment | `docs/catalog-detector/{slug}.md` |
+| Catalog assessment | `docs/catalog-detector/{slug}/assessment.md` |
 | Scraper | `docs/scraper-generator/{slug}/scraper.py` |
 | Scraper config | `docs/scraper-generator/{slug}/config.json` |
 | Eval config | `docs/eval-generator/{slug}/eval_config.json` |

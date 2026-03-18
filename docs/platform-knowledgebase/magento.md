@@ -41,12 +41,15 @@
 | Category pages at non-leaf levels return empty | Only leaf categories contain products; traverse to leaf level |
 | Custom themes override standard selectors | Use JSON-LD as primary data source; fall back to HTML only when needed |
 | Crawl delay in robots.txt | Respect the specified delay (commonly 10s) |
-| Spec table selector varies by theme | Standard `#product-attribute-specs-table` absent on Harlow theme — use `dl dt` / `dl dd` pairs inside `.product.data.items` Specifications tab instead |
+| Spec table selector varies by theme | Standard `#product-attribute-specs-table` absent on some themes — try `table tr th`/`td` first, then `dl dt`/`dl dd` pairs inside Specifications tab |
 | JSON-LD missing sku field | Harlow theme JSON-LD has name/price/availability only — get SKU from "Product Code" page text or URL suffix |
 | VAT toggle changes displayed price | JSON-LD price is fixed (typically inc VAT); note which VAT state is used |
 | Per-unit pricing (metre, pack, each) | Unit of sale not in JSON-LD; extract from page text if needed |
+| Sparse spec tables | Some Magento sites only include dimensional attributes in spec tables. Core classification attributes (wood type, treatment, material) may need to be extracted from product names using pattern matching |
+| Product listing CSS varies by theme | Standard `.product-item-link` may not work. Also try `.products-grid a`, `.product-items a`, `ol.products a` |
+| Breadcrumb links contain category paths | `.breadcrumbs li a[href]` links under `/shop/` can be used to infer product category when the referrer category URL is unavailable (e.g., probe mode) |
 
 ## Sites Using This Platform
 | Company | Slug | Date | Notes |
 |---------|------|------|-------|
-| Harlow Bros | harlowbros | 2026-03-17 | Custom "Harlow" theme. JSON-LD present (name, price, availability only — no sku). Spec table is `<dl>/<dt>/<dd>` in Specifications tab, NOT `#product-attribute-specs-table`. SKU as "Product Code" text label, also in URL suffix. Product pages at domain root `/{slug}`; category pages at `/shop/{path}`. Sitemap at `/media/sitemap/sitemap.xml` (mix of category + product URLs). Crawl-delay: 10s. Probe `recipe_match: poor` is false negative — probe tested category pages not product pages. |
+| Harlow Bros | harlowbros | 2026-03-18 | Custom "Harlow" theme. JSON-LD present (name, price, availability only — no sku). Spec table uses standard `<table>` with `<th>`/`<td>` in Specifications tab. SKU as "Product Code" text label, also in URL suffix. Product pages at domain root `/{slug}`; category pages at `/shop/{path}`. Product links via `.products-grid a`. Sparse spec tables — core attributes enriched from product names. 8 subcategories across 10 top-level departments. |

@@ -32,6 +32,7 @@ The platform knowledgebase is both read and written by this skill. For known pla
 
 Read and follow `references/workflow.md`.
 
+- **Archive previous run:** Before starting, check if `docs/catalog-detector/{slug}/` exists. If it does, archive it: `mv docs/catalog-detector/{slug} docs/catalog-detector/{slug}-archived-$(date -u +%Y%m%dT%H%M%S)`. Then create the fresh directory: `mkdir -p docs/catalog-detector/{slug}`. Every invocation generates from scratch — never read from or make decisions based on archived directories (`{slug}-archived-*`).
 - Before starting the workflow, run the catalog probe script:
   `uv run .claude/skills/catalog-detector/scripts/catalog_probe.py --url {site_url} --slug {slug} --knowledgebase-dir docs/platform-knowledgebase --output-dir docs/catalog-detector/{slug}`
   Parse stdout as JSON. Individual probe results are saved as JSON files in the output directory. Read `docs/catalog-detector/{slug}/probe.log` for diagnostics if needed.

@@ -141,6 +141,8 @@ When a skill supports multiple variants, organize by domain with a reference fil
 | 16 | Mechanical steps are scripted, not in workflow prose (Convention 5) |
 | 17 | Scripts follow PEP 723 + exit code contract + JSON stdout (Convention 5) |
 | 18 | Script documentation has all 3 layers: docstring, inline comments, gate docstrings (Convention 5) |
+| 19 | All scripts have test files in `tests/` directory; tests pass (Convention 5) |
+| 20 | Skills with per-company output dirs include archive-before-replay step (Convention 6) |
 
 ## Workflow: Reviewing an Existing Skill
 
