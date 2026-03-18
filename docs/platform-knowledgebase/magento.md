@@ -48,8 +48,11 @@
 | Sparse spec tables | Some Magento sites only include dimensional attributes in spec tables. Core classification attributes (wood type, treatment, material) may need to be extracted from product names using pattern matching |
 | Product listing CSS varies by theme | Standard `.product-item-link` may not work. Also try `.products-grid a`, `.product-items a`, `ol.products a` |
 | Breadcrumb links contain category paths | `.breadcrumbs li a[href]` links under `/shop/` can be used to infer product category when the referrer category URL is unavailable (e.g., probe mode) |
+| Cloudflare Turnstile bot protection | Some Magento sites use Cloudflare with Turnstile challenge, returning HTTP 403 to standard HTTP clients (httpx, requests). Use `curl_cffi` with `impersonate="chrome"` to match Chrome's TLS fingerprint and bypass. Detected on harlowbros.co.uk. |
+| Cloudflare email obfuscation links | `/cdn-cgi/l/email-protection` links appear in product grids when email addresses are on the page. Filter these from product URL extraction with a `/cdn-cgi/` prefix check. |
+| Spec table label variants | Same attribute may use different labels across products (e.g., "Thickness" vs "Nominal Thickness", "Width" vs "Nominal Width"). Map both variants in label dictionaries. |
 
 ## Sites Using This Platform
 | Company | Slug | Date | Notes |
 |---------|------|------|-------|
-| Harlow Bros | harlowbros | 2026-03-18 | Custom "Harlow" theme. JSON-LD present (name, price, availability only — no sku). Spec table uses standard `<table>` with `<th>`/`<td>` in Specifications tab. SKU as "Product Code" text label, also in URL suffix. Product pages at domain root `/{slug}`; category pages at `/shop/{path}`. Product links via `.products-grid a`. Sparse spec tables — core attributes enriched from product names. 8 subcategories across 10 top-level departments. |
+| Harlow Bros | harlowbros | 2026-03-18 | Custom "Harlow" theme. Cloudflare Turnstile — requires `curl_cffi` with Chrome impersonation. JSON-LD present (name, price, availability only — no sku). Spec table uses standard `<table>` with `<th>`/`<td>` in `#additional` tab; labels include "Nominal Thickness"/"Nominal Width"/"Grade" variants. SKU as "Product Code" text label, also in URL suffix. Product pages at domain root `/{slug}`; category pages at `/shop/{path}`. Product links via `.products-grid a`. Sparse spec tables — core attributes enriched from product names. 7 subcategories across 10 top-level departments. `/cdn-cgi/` email obfuscation links in product grids. |

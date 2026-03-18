@@ -7,7 +7,7 @@
 
 ## Context
 
-This workflow generates a production-ready Python scraper that extracts structured product data from a company's catalog. It performs two inline steps — label mapping and code generation — and dispatches one sub-agent (validator). It owns all retry and escalation decisions. The scraper must be a single self-contained file with no imports from the rest of the codebase.
+This workflow generates a production-ready Python scraper that extracts structured product data from a company's catalog. The orchestrator is **pure coordination** — it never writes code and never runs the scraper. It dispatches two sub-agents: the **coder** (writes and patches `scraper.py`) and the **tester** (runs the scraper, evaluates output, writes `test_report.json`). The orchestrator owns all retry logic, escalation decisions, and state transitions. The scraper must be a single self-contained file with no imports from the rest of the codebase.
 
 ### Step flow
 
@@ -49,31 +49,32 @@ Step 2b: Build Label Map ──────────────────�
   ├─ coverage < 30%? ──► ESCALATE: label_coverage_insufficient ──► STOP
   │
   ▼
-Step 2c: Generate Scraper Code ────────────────────────────────────────────────
-  Write scraper.py using routing tables + extraction blueprint + label map
+DISPATCH: Coder (mode: "generate") ────────────────────────────────────────────
+  Writes scraper.py
   │
   ▼
-DISPATCH: Validator ───────────────────────────────────────────────────────────
-  Probe → smoke test → taxonomy feedback → final verification
+DISPATCH: Tester (mode: "full") ───────────────────────────────────────────────
+  Runs scraper, evaluates output, writes test_report.json
   │
-  ├─ pass ──────────────────────────────────────────────────────────► continue
+  ├─ "pass" ──────────────────────────────────────────────────────► Step 3
   │
-  ├─ label_coverage_dropped (budget remains)
-  │    ──► return to Step 2b, then Step 2c, then re-dispatch validator ─────┐
-  │                                                                         │
-  ├─ core_fill_rate_low                                                     │
-  │    ──► fix routing at Step 2a, re-run Step 2c, re-dispatch validator ──┤
-  │                                                                         │
-  ├─ probe_failed (after 5 internal fix cycles)                             │
-  │    ──► ESCALATE: probe_extraction_failed ──► STOP                       │
-  │                                                                         │
-  ├─ test_failed / timeout (first failure)                                  │
-  │    ──► fix at Step 2c, re-dispatch validator ──────────────────────────┤
-  │                                                                         │
-  ├─ test_failed / timeout (second failure)                                 │
-  │    ──► ESCALATE: scraper_test_failed ──► STOP                           │
-  │                                                                         │
-  ◄─────────────────────────────────────────────────────────────────────────┘
+  ├─ "needs_fix" ──► Fix→Retest Loop (max 3 cycles) ─────────────────────┐
+  │                                                                       │
+  │   DISPATCH: Coder (mode: "fix")                                       │
+  │     ← scraper.py patched                                              │
+  │   DISPATCH: Tester (mode: "retest")                                   │
+  │     ← test_report.json overwritten                                    │
+  │     ├─ "pass" ──► DISPATCH: Tester (mode: "final")                    │
+  │     │               ├─ "pass" ──────────────────────────────► Step 3   │
+  │     │               ├─ "needs_fix" / "unfixable" ──► ESCALATE         │
+  │     ├─ "needs_fix" ──► next fix cycle ────────────────────────────────┤
+  │     ├─ "unfixable" ──► ESCALATE: scraper_test_failed ──► STOP         │
+  │                                                                       │
+  │   Budget exhausted (3 cycles) ──► ESCALATE: scraper_test_failed ──► STOP
+  │                                                                       │
+  ├─ "unfixable" ──► ESCALATE: scraper_test_failed ──► STOP               │
+  │                                                                       │
+  ◄───────────────────────────────────────────────────────────────────────┘
   │
   ▼
 Step 3: Platform Knowledgebase ────────────────────────────────────────────────
@@ -101,7 +102,7 @@ Read the catalog assessment and extract: scraping strategy (`static_html`, `stru
 
 If no catalog assessment exists, escalate — see the `missing_catalog_assessment` decision.
 
-Read the pre-processed generator input file. This JSON contains attribute routing tables (core/extended key lists and types per subcategory) built from the SKU schemas by the pre-processing script. Use these tables directly in Steps 2a and 2c — do not re-read raw SKU schema files.
+Read the pre-processed generator input file. This JSON contains attribute routing tables (core/extended key lists and types per subcategory) built from the SKU schemas by the pre-processing script. Use these tables directly in Steps 2a and the coder dispatch — do not re-read raw SKU schema files.
 
 ---
 
@@ -134,7 +135,7 @@ If no SKU schema exists, check the product taxonomy categories file to verify th
 
 ## Step 2a: Map Attributes to Schema
 
-Build attribute routing tables per subcategory to pass to code generation.
+Build attribute routing tables per subcategory to pass to the coder.
 
 - Matched **core** Key → `core_attributes`
 - Matched **extended** Key → `extended_attributes`
@@ -143,6 +144,8 @@ Build attribute routing tables per subcategory to pass to code generation.
 Use **EXACT key values** from the schema's Key column. For multi-subcategory companies, build a separate routing table per subcategory — the same attribute may be core in one schema and extended in another.
 
 **`extra_attributes` governance:** `snake_case` keys; primitive values (`string`, `number`, `boolean`) or arrays of primitives; no nested objects.
+
+This step is handled by `prepare_generator_input.py`, which produces the `generator_input.json` file with routing tables and units per subcategory. The orchestrator uses this file for coder dispatch context.
 
 ---
 
@@ -165,87 +168,181 @@ Build the `LABEL_MAP` and `CATEGORY_ALIASES` dicts that the scraper will use to 
 
 ---
 
-## Step 2c: Generate Scraper Code
+## Dispatch: Coder (mode: "generate")
 
-Write a single standalone Python scraper file following the product record format defined in `references/code-generator.md`.
+Dispatch the coder sub-agent to write the initial `scraper.py`. The coder reads `references/coder.md` for the complete product record format, library selection, required behavior, product discovery strategy, CLI flags, persist hooks, and Python code quality rules.
 
-**Use the pre-processed routing tables** from `generator_input.json` (produced by the pre-processing script) for attribute classification. Do not re-read raw SKU schema files.
+### Input to coder
 
-**Use the extraction blueprint from the catalog assessment for verified selectors:**
-- Price extraction: use the method specified (dataLayer, CSS selector, JSON-LD, etc.)
-- Spec table: use the row/label/value selectors
-- Product name: use the verified selector
-- Breadcrumb: use the verified selector
-- Category URLs: use the verified category tree for `CATEGORY_MAPPING`
+| Field | Description |
+|---|---|
+| `mode` | `"generate"` |
+| `catalog_assessment_path` | Path to the catalog assessment file |
+| `routing_tables_path` | Path to `generator_input.json` |
+| `category_mapping` | URL prefix → taxonomy ID mapping from Step 1b |
+| `platform_knowledgebase_path` | Path to the platform knowledgebase file (if applicable) |
+| `label_map` | `LABEL_MAP` dict from Step 2b (non-English only, omit for English) |
+| `category_aliases` | `CATEGORY_ALIASES` dict from Step 2b (non-English only, omit for English) |
+| `scraper_output_path` | Path where the coder writes `scraper.py` |
 
-**Include in the generated scraper:**
-- PEP 723 inline script metadata with dependencies
-- `LABEL_MAP` and `CATEGORY_ALIASES` from Step 2b as static dicts
-- Value translation dicts from the language seed
-- Attribute routing tables from generator_input.json
-- Persist hook implementations from the persist hooks reference file
-- `--limit N` and `--probe URL` arguments via argparse
+### Output from coder
 
-Read `references/code-generator.md` for the complete product record format, library selection, required behavior (items 1-10), product discovery strategy, and Python code quality requirements.
+The coder writes `scraper.py` to the specified path. No structured return — the file on disk is the output.
 
 ---
 
-## Dispatch: Validation
+## Dispatch: Tester
 
-### Input contract
+Dispatch the tester sub-agent to run the scraper and evaluate its output. The tester reads `references/tester.md` for validation rules, run strategies, and report format.
+
+### Input to tester
 
 | Field | Description |
 |---|---|
-| `scraper` | The generated scraper artifact |
-| `catalog_structure` | Categories, navigation paths, top-level category list |
+| `mode` | One of: `"full"`, `"retest"`, `"final"` |
+| `scraper_path` | Path to `scraper.py` |
+| `catalog_structure` | Categories, navigation paths, top-level category list from catalog assessment |
 | `expected_product_count` | From the catalog assessment |
-| `label_coverage` | Coverage float from Step 2b (non-English only) |
-| `extension_attempts_used` | Label-discovery extension attempts already consumed (non-English only) |
+| `routing_tables_path` | Path to `generator_input.json` (for schema-aware validation rules) |
+| `test_report_path` | Path where the tester writes `test_report.json` |
+| `fix_targets` | (retest only) Rule IDs that the coder fixed — tester focuses verification on these |
+| `regression_sample_from` | (retest only) Categories that were passing before the fix — tester checks for regressions |
 
-### Output contract
+### Output from tester
+
+The tester writes `test_report.json` to the specified path. Format:
+
+```json
+{
+  "mode": "full",
+  "timestamp": "2026-03-18T15:00:00Z",
+  "status": "pass | needs_fix | unfixable",
+  "smoke_summary": {
+    "total_products": 20,
+    "errors_count": 0,
+    "duration_seconds": 45.2,
+    "scraper_crashed": false,
+    "persist_hook_verified": true
+  },
+  "final_summary": { "...": "same fields" },
+  "rule_results": [
+    {"id": "S01", "status": "pass", "value": 0.72, "threshold": 0.30, "per_category": {}},
+    {"id": "M01", "status": "fail", "value": 0.95, "detail": "95% of products have units embedded"}
+  ],
+  "issues": [
+    {
+      "rule_id": "M01",
+      "detail": "units embedded in values",
+      "affected_categories": ["/shop/timber-joinery/joinery-timber/decorative-mouldings"],
+      "affected_attributes": ["nominal_width", "nominal_thickness"],
+      "sample_urls": ["https://example.com/p1", "https://example.com/p2"],
+      "sample_values": {"nominal_width": ["18mm", "9mm", "12mm"]}
+    }
+  ],
+  "passing_categories": ["/shop/sheet-materials/plywood/marine-plywood"]
+}
+```
+
+Retest mode adds: `fix_results`, `regression_results`, `new_issues`.
+
+---
+
+## Fix→Retest Loop
+
+The orchestrator manages a state machine that iterates between the coder and tester until the scraper passes or budget is exhausted.
+
+### State machine
+
+```
+Read test_report.json
+  │
+  ├─ status: "pass" ──► continue to Step 3
+  │
+  ├─ status: "needs_fix" ──► enter fix loop
+  │     │
+  │     ▼
+  │   [cycle = 1..3]
+  │     │
+  │     ├─ DISPATCH: Coder (mode: "fix")
+  │     │    Pass: test_report.json path + full context (catalog assessment,
+  │     │          routing tables, category mapping, platform knowledgebase,
+  │     │          LABEL_MAP + CATEGORY_ALIASES if non-English)
+  │     │    ← scraper.py patched
+  │     │
+  │     ├─ DISPATCH: Tester (mode: "retest")
+  │     │    Pass: fix_targets (rule IDs from issues), regression_sample_from
+  │     │          (passing_categories from previous test_report)
+  │     │    ← test_report.json overwritten
+  │     │
+  │     ├─ Read test_report.json
+  │     │    ├─ "pass" ──► DISPATCH: Tester (mode: "final")
+  │     │    │               ├─ "pass" ──► continue to Step 3
+  │     │    │               ├─ "needs_fix" or "unfixable" ──► ESCALATE: scraper_test_failed
+  │     │    ├─ "needs_fix" ──► next cycle (if budget remains)
+  │     │    ├─ "unfixable" ──► ESCALATE: scraper_test_failed
+  │     │
+  │     ├─ Budget exhausted (cycle > 3) ──► ESCALATE: scraper_test_failed
+  │
+  ├─ status: "unfixable" ──► ESCALATE: scraper_test_failed
+```
+
+### Coder fix dispatch input
+
+Same fields as generate mode, plus:
 
 | Field | Description |
 |---|---|
-| `status` | One of: `pass`, `label_coverage_dropped`, `core_fill_rate_low`, `probe_failed`, `test_failed`, `timeout` |
-| `probe_results` | Per-URL probe outcomes |
-| `smoke_test_summary` | Summary from smoke test teardown, or `null` |
-| `final_verification_summary` | Summary from final verification, or `null` if skipped |
-| `taxonomy_feedback` | Extra attributes proposed for schema addition, or `null` if skipped |
-| `label_coverage_at_probe` | Recomputed label coverage after probing (non-English only) |
-| `fix_cycles_used` | Map of gate name → fix-reprobe cycles consumed |
+| `mode` | `"fix"` |
+| `test_report_path` | Path to the latest `test_report.json` |
+| `existing_scraper_path` | Path to the current `scraper.py` to patch |
 
-### Retry state machine
+The coder receives the full context on every dispatch — it always has the complete picture.
 
-```
-"pass"
-  → Steps 3, 4, 5
+### Circuit breakers
 
-"label_coverage_dropped" (extension_attempts_used < 3)
-  → return to Step 2b, then Step 2c, then re-dispatch validator
+| Breaker | Limit |
+|---|---|
+| Fix → retest cycles | Max 3 |
+| Same rule failing after fix | Max 2 attempts per rule. If a rule fails twice after targeted fixes, treat as unfixable. |
+| Retest timeout | 5 minutes |
+| Full/final timeout | max(120, sample_size * 6) seconds |
 
-"label_coverage_dropped" (extension_attempts_used = 3)
-  → ESCALATE: label_coverage_insufficient
+**Per-rule tracking:** The orchestrator tracks how many times each rule ID has been targeted for a fix. After 2 failed attempts for the same rule, the orchestrator stops retrying that rule and escalates.
 
-"core_fill_rate_low"
-  → fix routing at Step 2a, re-run Step 2c, re-dispatch validator
+---
 
-"probe_failed"
-  → ESCALATE: probe_extraction_failed
+## Label Extension Retry
 
-"test_failed" / "timeout" (first failure)
-  → fix at Step 2c with fix_guidance = validator diagnostics
-  → re-dispatch validator
+For non-English sites, the tester may discover new attribute labels that were not in the initial LABEL_MAP. When `test_report.json` reveals unmapped labels (through low coverage in rule results or issues referencing unknown labels), the orchestrator extends the workflow:
 
-"test_failed" / "timeout" (second failure)
-  → ESCALATE: scraper_test_failed
-```
+1. Read the unmapped labels from the test report.
+2. Extend LABEL_MAP with new mappings for the discovered labels.
+3. Re-dispatch the coder (mode: "fix") with the updated LABEL_MAP.
+4. Re-dispatch the tester to verify the fix.
 
-### Diagnostic persistence
+**Circuit breaker:** Max 3 label extension attempts. If label coverage remains insufficient after 3 extensions, escalate — see the `label_coverage_insufficient` decision.
 
-After the validator returns (any status, including failures), persist its output as the validation diagnostic file. Include all output contract fields verbatim, plus:
-- `generated_at` — ISO 8601 timestamp
+Label extension attempts are separate from the fix→retest cycle count. A label extension triggers a coder fix dispatch and tester retest, but uses its own counter.
 
-On re-dispatch (after code-generation fix), overwrite the file with the new attempt's results. The file always reflects the last validation run. Write this file for both English and non-English sites.
+---
+
+## Diagnostic Persistence
+
+### test_report.json
+
+Written by the tester after every dispatch. Overwritten on each re-dispatch. The file always reflects the last tester run. Path: `docs/scraper-generator/{slug}/output/test_report.json`.
+
+### validation.json
+
+After successful validation (tester returns "pass" in final or full mode), the orchestrator writes `validation.json` for eval-generator compatibility. This file is derived from `test_report.json` and uses the same format as the current validation diagnostics:
+
+- All test report fields are mapped to the validation.json schema.
+- `generated_at` — ISO 8601 timestamp added by the orchestrator.
+- In fix mode, `fix_summary` is included (see Fix Mode section).
+
+Path: `docs/scraper-generator/{slug}/output/validation.json`.
+
+On re-dispatch (after a fix cycle), overwrite the file with the new attempt's results. Write this file for both English and non-English sites.
 
 ---
 
@@ -312,7 +409,7 @@ Before presenting results, verify the scraper and config against these quality g
 | # | Check | Pass criteria |
 |---|-------|---------------|
 | 1 | **Scraper is standalone** | Single .py file, no imports from the codebase, only allowed libraries |
-| 2 | **Validation passed** | Validator returned `pass` |
+| 2 | **Validation passed** | Tester returned `pass` (test_report.json status is "pass") |
 | 3 | **Product data contract correct** | Flat list of product records with universal top-level fields plus three attribute buckets |
 | 4 | **`brand` is top-level** | `brand` appears as a top-level field in every product record, not inside any attribute bucket |
 | 5 | **`product_category` is valid** | `product_category` is a valid taxonomy ID from the product taxonomy categories file |
@@ -345,7 +442,7 @@ When invoked by `/scraper-remediation` with a fix request JSON (`mode: "fix"`), 
       "check": "core_attribute_coverage",
       "value": 0.0,
       "threshold": 0.9,
-      "subcategory_details": { ... }
+      "subcategory_details": { "..." : "..." }
     }
   ],
   "passing_checks": [
@@ -356,22 +453,45 @@ When invoked by `/scraper-remediation` with a fix request JSON (`mode: "fix"`), 
 }
 ```
 
+### Eval Check → Rule ID Mapping
+
+When `/scraper-remediation` sends eval check names, the orchestrator maps them to tester rule IDs for targeted fix dispatch:
+
+| Eval Check Name | Rule ID | Description |
+|---|---|---|
+| `core_attribute_coverage` | S01 | Core attribute fill rate |
+| `extended_attribute_coverage` | S02 | Extended attribute fill rate |
+| `schema_conformance` | M02 | Type conformance |
+| `price_sanity` | S03 | Required top-level fields (includes price) |
+| `pagination_completeness` | S06 | Category diversity / pagination |
+| `duplicate_detection` | S07 | Zero errors in run (includes duplicates) |
+| `category_diversity` | S06 | Category diversity |
+
+The orchestrator uses these mapped rule IDs when dispatching the coder in fix mode, so the coder can reference the same rule definitions from `references/tester.md`.
+
 ### Fix Mode Step Flow
 
-1. **Step 1 (load context):** Same as normal — read catalog assessment, company report, SKU schemas, config.json. This provides the reference data needed to understand what the scraper should extract.
+1. **Step 1 (load context):** Same as normal — read catalog assessment, company report, SKU schemas, config.json, generator_input.json. This provides the reference data needed to understand what the scraper should extract.
 
-2. **Step 2a-2c (code patching — REPLACES fresh generation):** Read the existing `scraper.py`. Analyze the `failing_checks` from the fix request to determine what to patch:
-   - `core_attribute_coverage` / `extended_attribute_coverage` failures → add or fix enrichment patterns, alias mappings, description parsing for missing attributes. Use `subcategory_details.top_missing` to know exactly which attributes are missing and how many products lack them.
-   - `schema_conformance` failures → fix type conversions, ensure spec table values match expected types.
-   - `price_sanity` failures → fix price extraction logic.
-   - `pagination_completeness` / `category_diversity` failures → fix category traversal, pagination, URL patterns.
-   - `duplicate_detection` failures → fix SKU extraction or deduplication logic.
-   - Use `passing_checks` values to avoid regressions — don't change extraction logic that is working.
-   - If the problem requires a fundamental approach change (site switched from HTML to SPA, added bot protection, restructured all URLs), set `fix_outcome: "unfixable"` in `fix_summary` and return immediately without patching. Do not waste cycles on unfixable problems.
+2. **Dispatch Coder (mode: "fix"):** Map the `failing_checks` from the fix request to rule IDs using the table above. Dispatch the coder with:
+   - The existing `scraper.py` path
+   - `test_report.json` (if available from a previous run) or a synthesized report from the eval check details
+   - Full context: catalog assessment, routing tables, category mapping, platform knowledgebase, LABEL_MAP + CATEGORY_ALIASES (non-English)
+   - The mapped rule IDs as fix targets
+   - `passing_checks` values so the coder avoids regressions
 
-3. **Step 3 (validation dispatch):** Same as normal — dispatch the validator sub-agent with probe, smoke test, and final verification. Validator internal retry counters reset fresh for each fix mode invocation.
+   The coder reads and patches the existing scraper. Fix guidance per eval check:
+   - `core_attribute_coverage` / `extended_attribute_coverage` → add or fix enrichment patterns, alias mappings, description parsing for missing attributes. Use `subcategory_details.top_missing` for specifics.
+   - `schema_conformance` → fix type conversions, ensure spec table values match expected types.
+   - `price_sanity` → fix price extraction logic.
+   - `pagination_completeness` / `category_diversity` → fix category traversal, pagination, URL patterns.
+   - `duplicate_detection` → fix SKU extraction or deduplication logic.
 
-4. **Step 4 (diagnostic persistence):** Same as normal, plus write the `fix_summary` field to `validation.json`.
+   If the problem requires a fundamental approach change (site switched from HTML to SPA, added bot protection, restructured all URLs), the coder sets `fix_outcome: "unfixable"` and the orchestrator returns immediately without further dispatch.
+
+3. **Dispatch Tester (mode: "full"):** Same as normal — the tester runs the patched scraper with full validation. Tester internal retry counters reset fresh for each fix mode invocation. If the tester returns "needs_fix", enter the normal fix→retest loop (max 3 cycles).
+
+4. **Diagnostic persistence:** Same as normal, plus write the `fix_summary` field to `validation.json`.
 
 ### fix_summary Format
 
@@ -401,9 +521,9 @@ Added to `validation.json` only in fix mode:
 ### Fix Mode Constraints
 
 - **Do not archive** the existing scraper directory — the remediation skill handles backup.
-- **Do not regenerate from scratch** — read and patch the existing scraper.py.
+- **Do not regenerate from scratch** — dispatch the coder to read and patch the existing scraper.py.
 - **Do not modify** eval_config.json or any eval-generator artifacts.
-- **Validator counters reset** each fix mode invocation — a new fix cycle gets the full retry budget.
+- **Tester counters reset** each fix mode invocation — a new fix cycle gets the full retry budget.
 - Fix mode does not create config.json or generator_input.json — these already exist from the original generation.
 
 ---
@@ -412,7 +532,9 @@ Added to `validation.json` only in fix mode:
 
 - This workflow generates scrapers only — it does not assess catalog scrapability (catalog-detector) or generate quality validation (eval-generator).
 - It does not define or modify the product taxonomy or SKU schemas.
-- It does not run the scraper in production — validation sub-agent performs dry-run tests during generation.
+- It does not run the scraper in production — the tester sub-agent performs dry-run tests during generation.
+- The orchestrator never writes scraper code — the coder sub-agent handles all code generation and patching.
+- The orchestrator never runs the scraper — the tester sub-agent handles all execution and evaluation.
 
 ---
 
@@ -441,21 +563,21 @@ Added to `validation.json` only in fix mode:
 
 ### Decision: label_coverage_insufficient
 
-**Context:** The site uses a non-English language and label coverage is too low for a viable scraper. Two paths trigger this decision: (1) the initial LABEL_MAP at Step 2b cannot reach 30% coverage, indicating a fundamental mismatch between the site's attribute vocabulary and the SKU schemas; (2) after 3 extension attempts (Step 2b → Step 2c → validator re-dispatch cycles), label coverage still stays below 70%, indicating the gap cannot be closed incrementally.
+**Context:** The site uses a non-English language and label coverage is too low for a viable scraper. Two paths trigger this decision: (1) the initial LABEL_MAP at Step 2b cannot reach 30% coverage, indicating a fundamental mismatch between the site's attribute vocabulary and the SKU schemas; (2) after 3 label extension attempts, label coverage still stays below 70%, indicating the gap cannot be closed incrementally.
 **Autonomous resolution:** Never. Both trigger paths indicate a structural mismatch that cannot be solved by adding more label mappings.
-**Escalate when:** Label coverage is below 30% at Step 2b (immediate), or label coverage remains below 70% after 3 extension attempts (retry budget exhausted).
+**Escalate when:** Label coverage is below 30% at Step 2b (immediate), or label coverage remains below 70% after 3 label extension attempts (retry budget exhausted).
 **Escalation payload:** Company slug, current label coverage percentage, the label inventory (all discovered labels), which labels have no schema mapping, and which subcategories are most affected.
 
 ### Decision: probe_extraction_failed
 
-**Context:** The probe found that the scraper's extraction logic does not work against the actual product pages — selectors don't match, JSON-LD structure is unexpected, or universal attributes cannot be extracted.
-**Autonomous resolution:** Fix the scraper code and re-probe. The validator handles up to 5 probe-fix cycles internally.
-**Escalate when:** The validator returns `probe_failed` — the 5-cycle internal circuit breaker was exhausted.
-**Escalation payload:** Company slug, the specific extraction failure, what was tried, sample HTML from the problematic page.
+**Context:** The tester found that the scraper's extraction logic does not work against the actual product pages — selectors don't match, JSON-LD structure is unexpected, or universal attributes cannot be extracted.
+**Autonomous resolution:** The orchestrator dispatches the coder in fix mode with the tester's diagnostics. The fix→retest loop handles up to 3 cycles.
+**Escalate when:** The fix→retest loop budget is exhausted (3 cycles with no resolution, or a rule fails after 2 targeted fix attempts).
+**Escalation payload:** Company slug, the specific extraction failure, what was tried across fix cycles, sample data from the problematic pages.
 
 ### Decision: scraper_test_failed
 
-**Context:** The scraper failed during the smoke test or final verification run — it crashed, produced no output, found far fewer products than expected, or had widespread missing data. The probe passed, so this is a structural issue (pagination, rate limiting, batching), not an extraction issue.
-**Autonomous resolution:** Re-run Step 2c with diagnostics and re-dispatch validation once.
-**Escalate when:** The validator returns `test_failed` or `timeout` a second time after the retry.
-**Escalation payload:** Company slug, error details or partial results, what was tried in the retry, the scraping strategy that was used.
+**Context:** The scraper failed during the full test or final verification run — it crashed, produced no output, found far fewer products than expected, or had widespread missing data.
+**Autonomous resolution:** The orchestrator enters the fix→retest loop (max 3 cycles).
+**Escalate when:** The fix→retest loop budget is exhausted, or the tester returns "unfixable", or the final run after all retests pass still fails.
+**Escalation payload:** Company slug, error details or partial results, what was tried across fix cycles, the scraping strategy that was used.

@@ -106,7 +106,7 @@ def parse_schema_table(content: str, section_name: str) -> list[dict]:
 
 
 def extract_routing_table(schema_path: Path) -> dict:
-    """Extract core/extended attribute keys and types from a schema file."""
+    """Extract core/extended attribute keys, types, and units from a schema file."""
     content = schema_path.read_text(encoding="utf-8")
 
     core_rows = parse_schema_table(content, "Core Attributes")
@@ -115,25 +115,33 @@ def extract_routing_table(schema_path: Path) -> dict:
     core_keys = []
     extended_keys = []
     types = {}
+    units = {}
 
     for row in core_rows:
         key = row.get("Key", "").strip()
         data_type = row.get("Data Type", "").strip()
+        unit = row.get("Unit", "").strip()
         if key and key not in UNIVERSAL_KEYS:
             core_keys.append(key)
             types[key] = TYPE_MAP.get(data_type, "str")
+            if unit and unit not in ("—", "-"):
+                units[key] = unit
 
     for row in extended_rows:
         key = row.get("Key", "").strip()
         data_type = row.get("Data Type", "").strip()
+        unit = row.get("Unit", "").strip()
         if key and key not in UNIVERSAL_KEYS:
             extended_keys.append(key)
             types[key] = TYPE_MAP.get(data_type, "str")
+            if unit and unit not in ("—", "-"):
+                units[key] = unit
 
     return {
         "core": core_keys,
         "extended": extended_keys,
         "types": types,
+        "units": units,
     }
 
 

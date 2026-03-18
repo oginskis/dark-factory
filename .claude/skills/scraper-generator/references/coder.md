@@ -1,24 +1,43 @@
-# Code Generator Reference
+# Coder Reference
 
-This reference defines the canonical product record format, library selection, required behavior, and code quality rules for generated scrapers. The orchestrator reads this inline during Step 2c — it is not dispatched as a sub-agent.
+This reference defines the canonical product record format, library selection, required behavior, and code quality rules for generated scrapers. The coder is dispatched as a sub-agent by the orchestrator.
 
-## Inputs
+## Modes
 
-The orchestrator provides the following when generating scraper code:
+The coder operates in one of two modes, determined by the orchestrator at dispatch time:
+
+| Mode | When | Goal |
+|------|------|------|
+| **`generate`** | First dispatch — no scraper.py exists yet | Write the complete scraper.py from scratch |
+| **`fix`** | Subsequent dispatches — scraper.py exists and a test report shows failures | Apply targeted patches to the existing scraper.py to resolve test failures |
+
+### Generate mode
+
+The coder receives a full context package and writes scraper.py from scratch. The input contract:
 
 | Input | What it contains |
 |-------|-----------------|
-| Scraping strategy | One of `static_html`, `structured_data`, `pdf_pricelist` — from the catalog assessment |
-| Catalog structure | Categories, navigation paths, pagination patterns, entry points, anti-bot notes |
-| Estimated product count | Used to validate discovery completeness |
-| Platform | CMS/e-commerce platform (e.g., `woocommerce`, `shopify`, `unknown`, `custom`) |
+| Catalog assessment | Extraction blueprint, CSS selectors, pagination patterns, anti-bot notes |
+| Routing tables | `generator_input.json` — core/extended/extra attribute routing per subcategory |
+| Category mapping | URL prefix → taxonomy ID mapping for multi-subcategory companies |
 | Platform knowledgebase | CSS selectors, JSON-LD patterns, pagination mechanisms, pitfalls from prior runs on the same platform (if available) |
 | SKU schema(s) | Core and extended attribute tables for each subcategory the company covers |
-| Attribute routing tables | Core/extended/extra routing per subcategory, built before this step |
 | LABEL_MAP + CATEGORY_ALIASES | Non-English sites only — source-language labels mapped to English schema Keys |
-| Category mapping | URL prefix → taxonomy ID mapping for multi-subcategory companies |
-| Default category | The company's primary taxonomy ID, used as fallback |
 | Persist hook implementations | `setup`, `persist`, `teardown` function bodies provided by the harness |
+
+### Fix mode
+
+The coder receives everything from generate mode (full context every dispatch) plus remediation-specific inputs:
+
+| Additional input | What it contains |
+|------------------|-----------------|
+| Latest `test_report.json` | Issues list, rule results, sample URLs, sample values |
+| Existing `scraper.py` | The current scraper code to patch |
+
+**Fix mode rules:**
+- **Never rewrite the entire scraper on a fix.** Apply targeted patches only — change the specific functions, selectors, or logic that the test report identifies as broken.
+- **Read `passing_categories` in the test report** before making changes. These categories already work. Do not modify extraction logic that would affect passing categories — avoid regressions.
+- **Each fix should address a specific issue** from the test report. If multiple issues exist, address them in order of severity (errors before warnings).
 
 ---
 
@@ -154,11 +173,21 @@ The generated scraper must:
    - Log warnings for missing optional attributes, errors for missing universal attributes
    - Set request timeouts (30 seconds default)
 
-9. **Include a `main()` entry point** that accepts an optional `--limit N` argument via `argparse`. When provided, the scraper stops after extracting N products total. Use a custom `argparse` type function (e.g., `positive_int`) that raises `ArgumentTypeError` for values `<= 0` — do not use post-hoc `if` checks. Scraping configuration (target URL, request headers, delays) is embedded in the script. Always use `with httpx.Client(...) as client:` as a context manager — never manual `create_client()` / `client.close()` pairs.
+9. **Include a `main()` entry point** that accepts CLI arguments via `argparse`. Use a custom `argparse` type function (e.g., `positive_int`) that raises `ArgumentTypeError` for values `<= 0` — do not use post-hoc `if` checks. Scraping configuration (target URL, request headers, delays) is embedded in the script. Always use `with httpx.Client(...) as client:` as a context manager — never manual `create_client()` / `client.close()` pairs.
 
-   When `--limit` is used, the scraper traverses categories normally and stops when the cumulative product count reaches N. The `limited` field in the teardown summary is `true` only when the limit was the binding constraint: `limited = (total_products >= limit)`. If the catalog is smaller than the limit, `limited` is `false`.
+   **CLI flags:**
 
-10. **Include a `--probe URL` argument** that accepts a single product-page URL, runs the extraction logic against it, and prints the result as formatted JSON to stdout. If extraction succeeds, the output is the full product record. If extraction fails, the output is a JSON object with `"error"` and `"details"` fields. `--probe` skips the persist hooks entirely (no `setup`/`persist`/`teardown` calls) and exits immediately after the single extraction. `--probe` and `--limit` are mutually exclusive — argparse enforces this.
+   - `--limit N` — stop after extracting N products total. When used, the scraper traverses categories normally and stops when the cumulative product count reaches N. The `limited` field in the teardown summary is `true` only when the limit was the binding constraint: `limited = (total_products >= limit)`. If the catalog is smaller than the limit, `limited` is `false`.
+
+   - `--probe URL` — accepts a single product-page URL, runs the extraction logic against it, and prints the result as formatted JSON to stdout. If extraction succeeds, the output is the full product record. If extraction fails, the output is a JSON object with `"error"` and `"details"` fields. `--probe` skips the persist hooks entirely (no `setup`/`persist`/`teardown` calls) and exits immediately after the single extraction.
+
+   - `--categories LIST` — comma-separated category prefixes. Filters the scraper's discovered leaf categories to only those whose URL path starts with any of the given prefixes. Runs normal pagination within matched categories. Can combine with `--limit`.
+
+   - `--append` — skips the `setup()` truncation of `products.jsonl`, appending to the existing file instead. Used when multiple category runs accumulate into one output file.
+
+   **Mutual exclusivity rules:** `--probe` is exclusive with all other flags — argparse enforces this. `--categories` and `--limit` can combine freely. `--append` can combine with `--categories` and/or `--limit`.
+
+10. **Handle `--categories` filtering.** When `--categories` is provided, the scraper discovers all leaf categories as usual, then filters to only those whose URL path starts with any of the given prefixes. For example, `--categories /tools/drills,/tools/saws` would match categories at `/tools/drills/`, `/tools/drills/hammer-drills`, `/tools/saws/circular`, etc. Categories that do not match any prefix are skipped entirely (no requests made to them). Logging must indicate how many categories were matched vs total discovered.
 
 ---
 
@@ -241,6 +270,46 @@ List the exact libraries chosen in the Library Selection step.
 
 ---
 
+## Persist Hook Implementations (NDJSON on Disk)
+
+Current backend: **NDJSON files on disk**.
+
+The coder defines the data contract (product record schema, config metadata schema) and the persist hook call pattern (setup/persist/teardown). This section defines what those hooks do for the current disk backend.
+
+Include these functions in the generated scraper:
+
+```python
+BATCH_SIZE = 100
+OUTPUT_DIR = Path(__file__).resolve().parent / "output"
+
+def setup(*, append: bool = False) -> Path:
+    """Prepare output destination. Clear previous run unless appending."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_file = OUTPUT_DIR / "products.jsonl"
+    if not append:
+        output_file.write_text("")  # Truncate previous run
+    return output_file
+
+def persist(records: list[dict], output_file: Path) -> None:
+    """Append a batch of product records as NDJSON."""
+    with open(output_file, "a") as f:
+        for record in records:
+            f.write(json.dumps(record) + "\n")
+
+def teardown(output_file: Path, summary: dict) -> None:
+    """Write run summary alongside the product data."""
+    summary_path = output_file.parent / "summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2))
+```
+
+The `setup()` function accepts an `append` keyword argument. When `--append` is passed on the command line, `main()` calls `setup(append=True)`, which skips the `output_file.write_text("")` truncation and preserves the existing `products.jsonl` content. When `--append` is not passed, `setup()` truncates as usual to ensure a clean run.
+
+**Output format:** NDJSON (one JSON object per line). Append-friendly, crash-safe (completed batches survive mid-run failures), and memory-efficient to read.
+
+To switch to a different backend (PostgreSQL, MongoDB), replace the hook implementations in this section — the scraper's scraping logic and data contract remain unchanged.
+
+---
+
 ## What NOT to Include
 
 - No imports from outside the script's declared dependencies
@@ -256,4 +325,4 @@ A single standalone Python file containing:
 - PEP 723 inline script metadata with declared dependencies
 - The scraper implementation following all Required Behavior rules above
 - The persist hook implementations (`setup`, `persist`, `teardown`) as provided by the harness
-- A `main()` entry point with `--limit` and `--probe` arguments
+- A `main()` entry point with `--limit`, `--probe`, `--categories`, and `--append` arguments

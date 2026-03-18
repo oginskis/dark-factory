@@ -268,10 +268,26 @@ class TestExtractRoutingTable:
         result = extract_routing_table(schema_file)
         assert result["types"]["is_active"] == "bool"
 
-    def test_structure_has_three_keys(self, tmp_path):
+    def test_structure_has_four_keys(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        assert set(result.keys()) == {"core", "extended", "types"}
+        assert set(result.keys()) == {"core", "extended", "types", "units"}
+
+    def test_units_extracted(self, tmp_path):
+        schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
+        result = extract_routing_table(schema_file)
+        assert result["units"]["weight"] == "kg"
+
+    def test_units_skips_dash(self, tmp_path):
+        schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
+        result = extract_routing_table(schema_file)
+        assert "widget_type" not in result["units"]
+        assert "color" not in result["units"]
+
+    def test_units_skips_universal_keys(self, tmp_path):
+        schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
+        result = extract_routing_table(schema_file)
+        assert "price" not in result["units"]
 
     def test_empty_schema(self, tmp_path):
         schema_file = self._write_schema(tmp_path, "# Empty Schema\n")
@@ -344,6 +360,19 @@ class TestExtractRoutingTableIntegration:
         assert result["types"]["application"] == "list"  # text (list) -> list
         assert result["types"]["certification"] == "list"
         assert result["types"]["pack_quantity"] == "number"
+
+    def test_softwood_hardwood_lumber_units(self):
+        schema_path = SCHEMAS_DIR / "softwood-hardwood-lumber.md"
+        if not schema_path.exists():
+            pytest.skip("Schema file not present in working tree")
+        result = extract_routing_table(schema_path)
+        assert "units" in result
+        # Numeric attributes with physical units should be present
+        assert result["units"].get("actual_thickness") is not None
+        assert result["units"].get("actual_width") is not None
+        # Enum/text fields should not have units
+        assert "wood_type" not in result["units"]
+        assert "species" not in result["units"]
 
     def test_plywood_panels_core_keys(self):
         schema_path = SCHEMAS_DIR / "plywood-engineered-wood-panels-osb-particle-board.md"
