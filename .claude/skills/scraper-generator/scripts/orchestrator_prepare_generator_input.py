@@ -1,16 +1,24 @@
-#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
 """
 Pre-process SKU schemas into attribute routing tables for the scraper-generator.
+
+Agent: SKILL.md (run before orchestrator starts)
 
 Reads SKU schema markdown files and extracts attribute keys, data types, and
 enum values. Outputs a compact JSON file that the LLM orchestrator reads instead
 of parsing raw schema files.
 
 Usage:
-    python prepare_generator_input.py \
+    uv run orchestrator_prepare_generator_input.py \
         --schemas wood.softwood_hardwood_lumber wood.flooring_decking \
         --output docs/scraper-generator/{slug}/generator_input.json
+
+Exit codes: 0 = all schemas resolved, 1 = some schemas missing, 2 = crash
 """
+from __future__ import annotations
 
 import argparse
 import json
@@ -138,9 +146,9 @@ def extract_routing_table(schema_path: Path) -> dict:
                 units[key] = unit
 
     return {
-        "core": core_keys,
-        "extended": extended_keys,
-        "types": types,
+        "core_attribute_keys": core_keys,
+        "extended_attribute_keys": extended_keys,
+        "attribute_types": types,
         "units": units,
     }
 
@@ -161,15 +169,26 @@ def main():
             continue
         routing_tables[taxonomy_id] = extract_routing_table(schema_path)
 
+    output = {"subcategory_schemas": routing_tables}
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(output, indent=2))
+
+    # Structured result to stdout (for callers); status messages to stderr
+    print(json.dumps({
+        "schemas_resolved": len(routing_tables),
+        "schemas_requested": len(args.schemas),
+        "errors": errors,
+        "output_path": str(output_path),
+    }))
+
     if errors:
         for error in errors:
             print(f"WARNING: {error}", file=sys.stderr)
 
-    output = {"routing_tables": routing_tables}
-    output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(output, indent=2))
-    print(f"Wrote routing tables for {len(routing_tables)} schemas to {args.output}")
+    # Exit 1 if some schemas were missing (partial result)
+    if errors:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

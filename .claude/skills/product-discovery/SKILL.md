@@ -76,15 +76,15 @@ This stage examines the company's website for a public product catalog, analyzes
 
 Invoke `/scraper-generator {slug}`.
 
-This stage generates a standalone Python scraper based on the catalog assessment, SKU schema, and platform knowledgebase (if available). Scrapers output the four-level product record format (see `.claude/skills/scraper-generator/references/code-generator.md` for the canonical definition). For multi-subcategory companies, the scraper classifies products by URL-prefix to taxonomy ID mapping at runtime. It validates the scraper via probe testing and a full test before finalizing.
+This stage generates a standalone Python scraper based on the catalog assessment, SKU schema, and platform knowledgebase (if available). Scrapers output the four-level product record format (see `.claude/skills/scraper-generator/references/coder.md` for the canonical definition). For multi-subcategory companies, the scraper classifies products by URL-prefix to taxonomy ID mapping at runtime. It validates the scraper via probe testing and a full test before finalizing.
 
 **Stop the pipeline if:**
 - No catalog assessment exists for the company (defensive — Stage 2 ensures this)
 - The company's subcategory is not found in the product taxonomy categories file (taxonomy integrity issue — should not happen if Stage 1 validated against the taxonomy)
 - A URL prefix cannot be mapped to any taxonomy subcategory (unmapped_url_prefix escalation)
 - Non-English label coverage stays below 70% after 3 extension attempts (label_coverage_insufficient escalation)
-- Probe extraction fails after 5 fix cycles (extraction logic cannot match the live site)
-- The scraper fails testing twice after adjustment (includes attribute fill rate failures — ≥30% of products must have non-empty core_attributes)
+- Probe extraction fails after 3 fix-retest cycles (extraction logic cannot match the live site)
+- The scraper fails testing after 3 fix-retest cycles (includes attribute fill rate failures — ≥30% of products must have non-empty core_attributes)
 
 If no SKU schema exists but the subcategory is valid, the scraper-generator will automatically invoke `/product-taxonomy` to generate it before continuing. **Before concluding a schema is missing, always list `docs/product-taxonomy/sku-schemas/` and search for the subcategory name** — never guess the filename from a partial slug.
 

@@ -42,7 +42,7 @@ Generate an eval config that validates scraper quality using thirteen weighted c
 
 ## Eval and the four-level product record
 
-The eval validates scraper output against the four-level product record format (see `.claude/skills/scraper-generator/references/code-generator.md` for the canonical definition). Check weights reflect the extraction effort hierarchy:
+The eval validates scraper output against the four-level product record format (see `.claude/skills/scraper-generator/references/coder.md` for the canonical definition). Check weights reflect the extraction effort hierarchy:
 
 | Level | Eval check | Weight | Threshold | Rationale |
 |-------|-----------|--------|-----------|-----------|

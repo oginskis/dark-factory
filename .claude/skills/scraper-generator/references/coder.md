@@ -1,43 +1,48 @@
-# Coder Reference
+# Coder Sub-Agent
 
-This reference defines the canonical product record format, library selection, required behavior, and code quality rules for generated scrapers. The coder is dispatched as a sub-agent by the orchestrator.
+**Input:** Mode (generate/fix), catalog assessment, routing tables, category mapping, SKU schemas, platform knowledgebase; fix mode adds test_report.json + existing scraper.py
+**Output:** A single standalone `scraper.py` written to the company's scraper-generator directory
+
+---
+
+## Input Contract
+
+| Field | Type | Description |
+|---|---|---|
+| `mode` | enum | `"generate"` (no scraper exists) or `"fix"` (patch existing scraper per test report) |
+| `catalog_assessment` | file | Extraction blueprint: CSS selectors, pagination patterns, anti-bot notes |
+| `routing_tables_path` | path | `generator_input.json` — core/extended/extra attribute routing per subcategory. Contains pre-processed core/extended/extra attribute routing, types, and units per subcategory (replaces raw SKU schemas). |
+| `category_mapping` | object | URL prefix to taxonomy ID mapping (multi-subcategory companies) |
+| `platform_knowledgebase` | file | Platform-specific selectors, JSON-LD patterns, pagination mechanisms, pitfalls |
+| `LABEL_MAP` + `CATEGORY_ALIASES` | dicts | Non-English sites only — source-language labels mapped to English schema Keys |
+| `scraper_output_path` | path | Path where the coder writes `scraper.py` |
+| `test_report_path` | path | (fix mode only) Path to `test_report.json` — issues list, rule results, sample URLs, sample values |
+| `existing_scraper_path` | path | (fix mode only) Path to current `scraper.py` to patch |
+
+Persist hooks are built into this reference (see Persist Hook Implementations section below) — not passed as input.
+
+---
+
+## Output Contract
+
+Write a single standalone `scraper.py` to disk containing PEP 723 metadata, the scraper implementation, persist hook implementations, and a `main()` entry point with `--limit`, `--probe`, `--categories`, and `--append` arguments.
+
+---
 
 ## Modes
 
-The coder operates in one of two modes, determined by the orchestrator at dispatch time:
-
-| Mode | When | Goal |
-|------|------|------|
-| **`generate`** | First dispatch — no scraper.py exists yet | Write the complete scraper.py from scratch |
-| **`fix`** | Subsequent dispatches — scraper.py exists and a test report shows failures | Apply targeted patches to the existing scraper.py to resolve test failures |
-
 ### Generate mode
 
-The coder receives a full context package and writes scraper.py from scratch. The input contract:
-
-| Input | What it contains |
-|-------|-----------------|
-| Catalog assessment | Extraction blueprint, CSS selectors, pagination patterns, anti-bot notes |
-| Routing tables | `generator_input.json` — core/extended/extra attribute routing per subcategory |
-| Category mapping | URL prefix → taxonomy ID mapping for multi-subcategory companies |
-| Platform knowledgebase | CSS selectors, JSON-LD patterns, pagination mechanisms, pitfalls from prior runs on the same platform (if available) |
-| SKU schema(s) | Core and extended attribute tables for each subcategory the company covers |
-| LABEL_MAP + CATEGORY_ALIASES | Non-English sites only — source-language labels mapped to English schema Keys |
-| Persist hook implementations | `setup`, `persist`, `teardown` function bodies provided by the harness |
+Write scraper.py from scratch using the full context package.
 
 ### Fix mode
 
-The coder receives everything from generate mode (full context every dispatch) plus remediation-specific inputs:
-
-| Additional input | What it contains |
-|------------------|-----------------|
-| Latest `test_report.json` | Issues list, rule results, sample URLs, sample values |
-| Existing `scraper.py` | The current scraper code to patch |
+Receives everything from generate mode plus test report and existing scraper.
 
 **Fix mode rules:**
-- **Never rewrite the entire scraper on a fix.** Apply targeted patches only — change the specific functions, selectors, or logic that the test report identifies as broken.
-- **Read `passing_categories` in the test report** before making changes. These categories already work. Do not modify extraction logic that would affect passing categories — avoid regressions.
-- **Each fix should address a specific issue** from the test report. If multiple issues exist, address them in order of severity (errors before warnings).
+- **Never rewrite the entire scraper.** Apply targeted patches only to functions, selectors, or logic the test report identifies as broken.
+- **Read `passing_categories` first.** Do not modify extraction logic that would affect passing categories — avoid regressions.
+- **Address issues by severity** — errors before warnings.
 
 ---
 
@@ -131,105 +136,104 @@ Choose based on the scraping strategy from the catalog assessment:
 
 ## Required Behavior
 
-The generated scraper must:
+1. **Extract universal top-level fields** for every product: `sku`, `name`, `url`, `price` (float or null), `currency` (ISO 4217 or null), `brand` (top-level, never in attribute buckets), `product_category` (taxonomy ID — from URL-based category mapping for multi-subcategory, primary ID for single), `scraped_at` (ISO 8601).
 
-1. **Extract universal top-level fields for every product:**
-   - `sku` — the retailer or manufacturer identifier
-   - `name` — full product name
-   - `url` — direct link to the product page
-   - `price` — numeric price (float, no currency symbols), or `null` if unavailable
-   - `currency` — ISO 4217 currency code, or `null` if unavailable
-   - `brand` — the product's brand name (promoted to top-level, not inside attribute buckets)
-   - `product_category` — the taxonomy ID. For multi-subcategory companies, determine from the URL-based category mapping. For single-subcategory companies, use the company's primary taxonomy ID.
-   - `scraped_at` — ISO 8601 timestamp of when this product was extracted
+2. **Extract category-specific attributes** per routing tables. Route into correct bucket per Product Record Format. For units: extract from site when SKU schema `Unit` column is not `—`, include in `attribute_units`. No unit conversions. Infer from regional context when site omits units; use per-product logic when units vary.
 
-2. **Extract category-specific attributes** using the routing tables from the attribute mapping step. Route each attribute into the correct bucket per the Product Record Format above. For unit extraction: when the SKU schema's `Unit` column is not `—`, extract the unit from the source site and include it in `attribute_units`. Units are site-derived — no conversions. When the site does not explicitly state a unit, infer from context (e.g., regional conventions) and embed as a static value in the generated code. When units vary per product within the same site, use per-product extraction logic.
+3. **Handle pagination completely** — follow all pages using whatever pattern the site uses. Never stop at an arbitrary limit.
 
-3. **Handle pagination completely** — follow all pages, not just the first. Support whichever pagination pattern the site uses (page numbers, next buttons, cursor-based, infinite scroll). Never stop at an arbitrary page limit.
+4. **Build `category_path`** from the site's breadcrumb or navigation hierarchy.
 
-4. **Build the `category_path`** for each product from the site's breadcrumb or navigation hierarchy (e.g., `"Tools > Saws > Plunge-Cut Saws"`).
+5. **Produce structured records** conforming to Product Record Format. Attribute keys must exactly match SKU schema Key values — no inventing or renaming.
 
-5. **Produce structured product records** conforming to the Product Record Format section above. Universal top-level fields are always present. Attribute bucket keys use the exact Key values from the SKU schema — no inventing names, no renaming, no inferring snake_case from display names.
+6. **Three-phase persist hook** — never accumulate more than one batch in memory:
+   - `setup()` — once before scraping, returns context object.
+   - `persist(records, context)` — after each batch of up to 100 records.
+   - `teardown(context, summary)` — always called (normal exit, `--limit`, or error). Summary dict: `total_products`, `batches_written`, `duration_seconds`, `errors_count`, `limited` (bool), `timestamp`.
 
-6. **Deliver product data in batches through a three-phase persist hook.** The scraper never accumulates more than one batch in memory. The hook has three functions — the scraper defines when they are called, the harness defines what they do:
+7. **Structured logging** via JSON lines to stderr. Every log line must have `level` (`info`, `warning`, `error`), `message`, and `timestamp`. Log these events:
+   - Scraper start (target URL, strategy)
+   - Each page/section processed (category, page number, product count)
+   - **Every HTTP request:** URL, status code, latency in ms. Example: `{"level": "info", "message": "GET 200 in 342ms", "url": "https://...", "status": 200, "latency_ms": 342, "timestamp": "..."}`
+   - **HTTP errors (4xx, 5xx):** log at `warning` level — URL, status code, response body snippet (first 200 chars), retry attempt. Example: `{"level": "warning", "message": "GET 429 in 89ms — retry 1/3", "url": "https://...", "status": 429, "latency_ms": 89, "retry": 1, "timestamp": "..."}`
+   - Backoff events (delay applied, reason)
+   - Parse errors (URL, what failed, why)
+   - Final summary (total products, total time, total requests, error count)
 
-   - `setup()` — called once before scraping begins. Returns a context object (e.g., file handle, DB connection) that `persist` and `teardown` receive.
-   - `persist(records, context)` — called after each batch of up to 100 product records. Hands the batch to the harness for storage.
-   - `teardown(context, summary)` — called once after scraping completes, even if the scraper exits early due to `--limit`. `summary` is a dict with: `total_products` (int), `batches_written` (int), `duration_seconds` (float), `errors_count` (int), `limited` (bool), `timestamp` (ISO 8601 string).
+8. **Error handling with adaptive backoff:**
+   - **NEVER add fixed delays.** No `time.sleep()` in normal path, no `REQUEST_DELAY`, no `Crawl-delay`. Fire requests as fast as the server responds. Non-negotiable.
+   - **Backoff on errors only:** HTTP 429/500/502/503/504 triggers exponential backoff (2s → 4s → 8s → 16s cap). Reset after 5 consecutive successes. Implement as a stateful throttle class.
+   - Retry failed requests up to 3 times. Skip unparseable products instead of aborting. Log warnings for optional, errors for universal attributes. 30s request timeout.
 
-   Batch size is 100 records. The last batch may be smaller. The scraper must call `teardown()` in all cases — normal completion, `--limit` reached, or graceful error exit.
-
-7. **Log structured output** using JSON lines to stderr. Each log line must include a `level` (`info`, `warning`, `error`), a `message`, and a `timestamp`. Key events to log:
-   - Scraper start (with target URL and strategy)
-   - Each page or section processed (with product count)
-   - Errors and retries (with details)
-   - Final summary (total products found, total time)
-
-8. **Handle errors gracefully with adaptive backoff:**
-   - **NEVER add a fixed delay between requests.** No `time.sleep()` in the normal request path. No `REQUEST_DELAY` constant. No respecting `Crawl-delay` from `robots.txt`. The scraper fires requests as fast as the server responds. Speed is the default. This is non-negotiable — a 10-second crawl delay on a 3000-product catalog means 8+ hours of runtime.
-   - **Adaptive backoff on errors only:** When the server returns HTTP 429, 500, 502, 503, or 504, apply exponential backoff starting at 2 seconds (2s → 4s → 8s → 16s cap). Reset the backoff delay after 5 consecutive successful responses. Implement this as a stateful throttle class, not inline sleeps.
-   - Retry failed HTTP requests up to 3 times with exponential backoff
-   - Skip individual products that fail to parse rather than aborting the entire run
-   - Log warnings for missing optional attributes, errors for missing universal attributes
-   - Set request timeouts (30 seconds default)
-
-9. **Include a `main()` entry point** that accepts CLI arguments via `argparse`. Use a custom `argparse` type function (e.g., `positive_int`) that raises `ArgumentTypeError` for values `<= 0` — do not use post-hoc `if` checks. Scraping configuration (target URL, request headers, delays) is embedded in the script. Always use `with httpx.Client(...) as client:` as a context manager — never manual `create_client()` / `client.close()` pairs.
+9. **`main()` entry point** with `argparse`. Use custom type function (e.g., `positive_int`) raising `ArgumentTypeError` for values <= 0. Use `with httpx.Client(...) as client:` context manager.
 
    **CLI flags:**
+   - `--limit N` — stop after N products. `limited = (total_products >= limit)`.
+   - `--probe URL` — extract single product, print JSON to stdout. Skips persist hooks. Exclusive with all other flags (argparse-enforced).
+   - `--categories LIST` — comma-separated URL prefixes. Filters discovered leaf categories to matching prefixes (e.g., `/tools/drills` matches `/tools/drills/hammer-drills`). Skipped categories get no requests. Log matched vs total count. Combines with `--limit`.
+   - `--append` — skip `setup()` truncation, append to existing `products.jsonl`. Combines with `--categories` and/or `--limit`.
 
-   - `--limit N` — stop after extracting N products total. When used, the scraper traverses categories normally and stops when the cumulative product count reaches N. The `limited` field in the teardown summary is `true` only when the limit was the binding constraint: `limited = (total_products >= limit)`. If the catalog is smaller than the limit, `limited` is `false`.
+---
 
-   - `--probe URL` — accepts a single product-page URL, runs the extraction logic against it, and prints the result as formatted JSON to stdout. If extraction succeeds, the output is the full product record. If extraction fails, the output is a JSON object with `"error"` and `"details"` fields. `--probe` skips the persist hooks entirely (no `setup`/`persist`/`teardown` calls) and exits immediately after the single extraction.
+## Validation Checklist
 
-   - `--categories LIST` — comma-separated category prefixes. Filters the scraper's discovered leaf categories to only those whose URL path starts with any of the given prefixes. Runs normal pagination within matched categories. Can combine with `--limit`.
+The scraper output will be validated against these rules. Code must pass all of them.
 
-   - `--append` — skips the `setup()` truncation of `products.jsonl`, appending to the existing file instead. Used when multiple category runs accumulate into one output file.
+### Structural rules
 
-   **Mutual exclusivity rules:** `--probe` is exclusive with all other flags — argparse enforces this. `--categories` and `--limit` can combine freely. `--append` can combine with `--categories` and/or `--limit`.
+| Rule | Pass criteria |
+|------|---------------|
+| S01 | ≥ 30% of products have non-empty `core_attributes` (at least one non-null value). Per-category breakdown — every top-level category must meet the threshold. |
+| S02 | ≥ 20% of products have non-empty `extended_attributes`. Warning only. |
+| S03 | 100% of products have all top-level fields: `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`, `category_path`. All non-null except `price`/`currency` (may be null if catalog has no prices). |
+| S04 | 100% of products have a `product_category` value that exists in `categories.md`. |
+| S05 | `brand` is a top-level field in every product. Never inside `core_attributes`, `extended_attributes`, or `extra_attributes`. |
+| S06 | ≥ 2 distinct top-level `category_path` values across products (auto-passes for single-category catalogs). |
+| S07 | `errors_count` in `summary.json` is 0. |
+| S08 | Scraper exits with code 0 (no crash). |
+| S09 | `products.jsonl` exists and is non-empty after the run. |
 
-10. **Handle `--categories` filtering.** When `--categories` is provided, the scraper discovers all leaf categories as usual, then filters to only those whose URL path starts with any of the given prefixes. For example, `--categories /tools/drills,/tools/saws` would match categories at `/tools/drills/`, `/tools/drills/hammer-drills`, `/tools/saws/circular`, etc. Categories that do not match any prefix are skipped entirely (no requests made to them). Logging must indicate how many categories were matched vs total discovered.
+### Semantic rules
+
+| Rule | Pass criteria |
+|------|---------------|
+| M01 | For attributes typed `number` in the routing tables AND listed in `units`: the value must be numeric (`int`/`float`), and `attribute_units` must contain the key. **Wrong:** `"nominal_width": "18mm"`. **Right:** `"nominal_width": 18` + `"attribute_units": {"nominal_width": "mm"}`. |
+| M02 | All attributes typed `number` in routing tables must be `int`/`float`, not strings. Warning only. |
+| M03 | When the routing table `units` dict has an entry for an attribute and the product has that attribute, `attribute_units` must contain the key. Warning only. |
+| M04 | Regex `\d+\s*(mm|cm|m|kg|g|lb|oz|ml|l|V|W|A|Hz|kW|MPa)$` must NOT match any value in attributes typed `number` or listed in `units`. Catches embedded units like `"18mm"`. |
+
+### Key takeaway
+
+**Always separate values from units.** Parse `"18mm"` into `value=18` + `attribute_units={"attr": "mm"}`. This is the most common validation failure.
 
 ---
 
 ## Product Discovery Strategy
 
-The scraper must find every product in the catalog, not just the ones visible on the first page of the most obvious categories. The catalog assessment provides primary navigation paths, but the scraper should be robust against incomplete navigation — especially on custom or unknown platforms where catalog structure may be irregular.
+Find every product in the catalog, not just the first page of obvious categories. Use multiple discovery sources when available:
 
-**Discovery sources — use multiple when available:**
+1. **Sitemap-based discovery.** Parse product sitemaps for all `<loc>` entries matching the site's product URL pattern. Most comprehensive source — includes products unreachable via navigation.
+2. **JSON API endpoints.** Platform bulk APIs (e.g., Shopify `/products.json`) return complete data without page-by-page crawling — use as primary source when available.
+3. **Category tree traversal.** Walk every leaf category to its deepest level. Exhaust pagination within each leaf.
+4. **"All products" pages.** When a single paginated collection lists everything, prefer it over category-by-category traversal.
 
-1. **Sitemap-based discovery.** When the catalog assessment identifies a product sitemap, parse it for all product URLs. Sitemaps are the most comprehensive source — they often include products not reachable through category navigation. Extract all `<loc>` entries matching the site's product URL pattern.
+**Category page validation.** Before extracting URLs, verify the page is a real category listing, not a search results redirect (common on Magento). Check for `catalogsearch/result` in URL or "Search results for:" in HTML. Log a warning and skip search result pages.
 
-2. **JSON API endpoints.** Known platforms expose bulk product APIs (e.g., Shopify's `/products.json`). When available, these return complete product data without page-by-page crawling — use them as the primary source.
+**Product URL filtering.** Use the catalog assessment's verified URL patterns and platform-specific selectors to distinguish product links from navigation/banner/footer links. Exclude static pages and promoted links appearing across unrelated categories.
 
-3. **Category tree traversal.** Walk every leaf category from the catalog assessment's category structure. Follow nested subcategories to their deepest level — do not stop at parent categories. A parent category page may show aggregated products, but child categories often contain additional products. Exhaust pagination within each leaf category.
+**Deduplication.** Deduplicate by URL or SKU. Use the first occurrence's `category_path`.
 
-4. **"All products" or "shop" pages.** When a single collection page lists every product (with pagination), prefer it over category-by-category traversal — it guarantees no products are missed due to navigation gaps.
+**Discovery validation.** Log a warning if discovered count is <50% or >5x the catalog assessment's estimate.
 
-**Category page validation.** Before extracting product URLs from a category listing page, verify it is actually a category listing and not a search results page. Many platforms (especially Magento) redirect missing category URLs to a search results page instead of returning 404. Detect this by checking for search result indicators in the HTML (e.g., "Search results for:", `catalogsearch/result` in the URL, search-specific CSS classes). If a category page is actually a search results redirect, log a warning and skip it — do not extract product URLs from search results.
-
-**Product URL filtering.** When extracting product links from category listing pages, use the catalog assessment's verified URL patterns to distinguish product links from navigation, banner, footer, and promotional links. Product links have a specific URL structure (documented in the catalog assessment) — match against that structure, not against generic "has a hyphen" heuristics. Specifically:
-- Use the product URL pattern from the catalog assessment (e.g., product pages at domain root `/{slug}` vs category pages at `/shop/{path}`)
-- Use platform-specific product link selectors when available (e.g., `.product-item a` for Magento, `.product-card a` for Shopify)
-- Exclude links to static/informational pages (delivery info, about, contact, environment, branch locator, etc.)
-- Exclude promoted/banner product links that appear on every category page (same product URL appearing across unrelated categories is a signal)
-
-**Deduplication.** Products may appear in multiple categories or across different discovery sources. Deduplicate by product URL or SKU — maintain a set of seen identifiers and skip duplicates. When the same product appears in multiple categories, use the first occurrence's `category_path`.
-
-**Discovery validation.** Compare unique product URLs found against the catalog assessment's estimate. Log a warning if discovered count is <50% (missing categories or pagination) or >5x (following non-product links). Neither is an automatic stop.
-
-**Custom and unknown platform guidance.** When the platform is `custom` or `unknown`:
-- Use URL patterns from the catalog assessment for link discovery — do not depend on platform-specific CSS classes.
-- Follow the navigation tree to any depth. Check all pagination mechanisms (page numbers, "next" links, AJAX endpoints, offset/cursor params).
-- When both a sitemap and category navigation exist, use the sitemap as the authoritative product URL list. Use navigation only for `category_path`.
-- Log products found per category and per discovery source. Flag 0-product categories (possible selector mismatch) and source count discrepancies.
+**Custom/unknown platforms:** Use catalog assessment URL patterns (not platform CSS classes). Follow navigation to any depth. When both sitemap and navigation exist, use sitemap as authoritative URL list, navigation only for `category_path`. Log per-category and per-source counts; flag 0-product categories.
 
 ---
 
 ## Python Code Quality
 
-The generated scraper is production code that runs daily as a CronJob. Write it to the same standard as hand-written Python.
+Production code running daily as a CronJob — same standard as hand-written Python.
 
-**File structure:** Start with PEP 723 inline script metadata, then `from __future__ import annotations`. This makes the script fully self-contained:
+**File structure:** PEP 723 inline script metadata first, then `from __future__ import annotations`:
 
 ```python
 # /// script
@@ -241,40 +245,19 @@ The generated scraper is production code that runs daily as a CronJob. Write it 
 # ///
 ```
 
-List the exact libraries chosen in the Library Selection step.
-
-**Style:**
-- Target Python 3.10+.
-- Use expressive names and small focused functions — favor readability over inline comments.
-- Define constants at module level for magic values: URLs, backoff parameters, selectors, CSS class names.
-
-**Imports:**
-- Organize in standard order: standard library, third-party, local.
-- No unused imports. Consolidate related imports (`from x import a, b`).
-
-**Type hints:**
-- Type all function signatures (parameters and return types).
-- Use PEP 604 syntax: `str | None` not `Optional[str]`, `list[str]` not `List[str]`.
-
-**Error handling:**
-- Never use bare `except:` or broad `except Exception` — catch specific exception types.
-- When catching exceptions, always log context (URL, product ID, what was being attempted).
-
-**HTTP discipline:**
-- Validate responses: check status codes before parsing.
-- Reuse a single `httpx.Client` instance throughout the scraper rather than creating new connections per request.
-
-**Data hygiene:**
-- Use `pathlib.Path` for file paths, not strings.
-- Filter None values from product attribute dicts before output: `{k: v for k, v in d.items() if v is not None}`. Use `is not None` rather than truthiness to preserve valid falsy values like `0` and `False`.
+**Rules:**
+- Python 3.10+. PEP 604 types (`str | None`, `list[str]`). Type all function signatures.
+- Expressive names, small focused functions, module-level constants for magic values.
+- Standard import order (stdlib, third-party, local). No unused imports.
+- Never bare `except:` or broad `except Exception` — catch specific types, always log context.
+- Reuse a single `httpx.Client` instance. Validate status codes before parsing.
+- `pathlib.Path` for file paths. Filter None values with `is not None` (preserves `0`, `False`).
 
 ---
 
 ## Persist Hook Implementations (NDJSON on Disk)
 
 Current backend: **NDJSON files on disk**.
-
-The coder defines the data contract (product record schema, config metadata schema) and the persist hook call pattern (setup/persist/teardown). This section defines what those hooks do for the current disk backend.
 
 Include these functions in the generated scraper:
 
@@ -315,14 +298,4 @@ To switch to a different backend (PostgreSQL, MongoDB), replace the hook impleme
 - No imports from outside the script's declared dependencies
 - No hardcoded credentials or API keys
 - No interactive prompts
-- No persistence logic beyond the harness-provided hook implementations — the scraper defines the hook call pattern (`setup`/`persist`/`teardown`), the harness defines what each hook does
-
----
-
-## Expected Output
-
-A single standalone Python file containing:
-- PEP 723 inline script metadata with declared dependencies
-- The scraper implementation following all Required Behavior rules above
-- The persist hook implementations (`setup`, `persist`, `teardown`) as provided by the harness
-- A `main()` entry point with `--limit`, `--probe`, `--categories`, and `--append` arguments
+- No persistence logic beyond the harness-provided hook implementations

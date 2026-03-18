@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = ["pytest"]
 # ///
-"""Tests for compare_baseline.py — JSONL regression detection."""
+"""Tests for tester_compare_baseline.py — JSONL regression detection."""
 from __future__ import annotations
 
 import json
@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import pytest
 
-from compare_baseline import compare_products, load_jsonl
+from tester_compare_baseline import compare_products, load_jsonl
 
 
 class TestLoadJsonl:
@@ -35,6 +35,16 @@ class TestLoadJsonl:
         f.write_text('{"sku": "A"}\n\n{"sku": "B"}\n')
         products = load_jsonl(f)
         assert len(products) == 2
+
+    def test_skips_malformed_json(self, tmp_path):
+        f = tmp_path / "products.jsonl"
+        f.write_text('{"sku": "A"}\nnot valid json{{\n{"sku": "B"}\n')
+        products = load_jsonl(f)
+        assert len(products) == 2
+
+    def test_missing_file_returns_empty(self, tmp_path):
+        products = load_jsonl(tmp_path / "nonexistent.jsonl")
+        assert products == []
 
 
 class TestCompareProducts:

@@ -5,8 +5,10 @@
 """
 Print human-readable status from test_reports.json (array of all iterations).
 
+Agent: none (human utility)
+
 Usage:
-    uv run show_test_status.py docs/scraper-generator/harlowbros/output/test_reports.json
+    uv run util_show_test_status.py docs/scraper-generator/harlowbros/output/test_reports.json
 
 Supports both:
 - Array format (new): [{report1}, {report2}, ...]
@@ -106,7 +108,7 @@ def format_report(report: dict, index: int | None = None) -> str:
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: show_test_status.py <test_reports.json>", file=sys.stderr)
+        print("Usage: util_show_test_status.py <test_reports.json>", file=sys.stderr)
         sys.exit(1)
 
     path = Path(sys.argv[1])

@@ -1,13 +1,27 @@
 # Tester Sub-Agent
 
-**Input:** Scraper path, catalog structure, expected product count, routing tables, mode, fix targets (retest only)
+**Input:** Scraper path, catalog structure, expected product count, routing tables, mode, iteration, fix targets (retest only)
 **Output:** `test_report.json` — structured results with rule-level pass/fail, per-category breakdowns, sample evidence
 
 ---
 
-## Key Rule
+## Key Rules
 
-The tester NEVER edits `scraper.py`. It only runs the scraper and evaluates output.
+1. The tester NEVER edits `scraper.py`. It only runs the scraper and evaluates output.
+2. Use the helper scripts for all mechanical work. The tester's job is to call them, read their output, aggregate results, and handle failures.
+
+---
+
+## Scripts
+
+| Script | Purpose | Output |
+|--------|---------|--------|
+| `tester_run_scraper.py` | Run scraper with correct flags, capture stderr, manage iteration files | JSON traces to stdout |
+| `tester_tester_evaluate_structural.py` | S01-S09 structural validation | JSON with `rule_results` + `issues` to stdout |
+| `tester_tester_evaluate_semantic.py` | M01-M04 semantic validation | JSON with `rule_results` + `issues` to stdout |
+| `tester_tester_compare_baseline.py` | Regression detection (retest mode) | JSON with `status` + `regressions` to stdout |
+
+All scripts are at `.claude/skills/scraper-generator/scripts/`.
 
 ---
 
@@ -18,54 +32,37 @@ The tester NEVER edits `scraper.py`. It only runs the scraper and evaluates outp
 | `scraper_path` | path | Path to `scraper.py` |
 | `catalog_structure` | object | Verified category tree from catalog assessment |
 | `expected_product_count` | int | From catalog assessment |
-| `routing_tables_path` | path | Path to `generator_input.json` (for semantic rules — contains `types` and `units` dicts) |
+| `routing_tables_path` | path | Path to `generator_input.json` |
 | `mode` | enum | `"full"`, `"retest"`, or `"final"` |
+| `iteration` | int | Iteration number (1, 2, 3...) |
 | `fix_targets` | list | (retest only) Rules and categories to re-verify |
 | `regression_sample_from` | list | (retest only) Passing categories to sample for regression |
+| `test_report_path` | path | Path where the tester writes `test_report.json` |
+
+**Derived paths:** `output_dir = scraper_path.parent / "output"`. All scripts receive this as `--output-dir`. The tester writes all output files to this directory.
 
 ---
 
 ## Output Contract
 
-Write two output files to the scraper's output directory after each dispatch:
+The tester writes these files to the scraper's output directory. The scripts handle most of this — the tester aggregates and writes the final report.
 
-1. **`test_reports.json`** — JSON array of all iterations. Read the existing file, append the new entry, write back. If the file doesn't exist, create it with a single-element array. This preserves the full history of every full/retest/final run.
+| File | Written by | Description |
+|------|-----------|-------------|
+| `test_report.json` | tester | Current iteration's results (orchestrator reads this) |
+| `test_reports.json` | tester | Cumulative array of all iterations |
+| `test_summary.txt` | tester | Human-readable summary of all iterations |
+| `products_iteration_{N}.jsonl` | `tester_run_scraper.py --step save-iteration` | Per-iteration product snapshot |
+| `debug_iteration_{N}.log` | `tester_run_scraper.py` (stderr capture) | Per-iteration debug log |
+| `debug.log` | `tester_run_scraper.py --step save-iteration` | Copy of latest iteration's debug log |
+| `baseline_products.jsonl` | `tester_run_scraper.py --step save-baseline` | Regression baseline (full mode only) |
 
-2. **`test_summary.txt`** — Human-readable summary of all iterations. Overwrite on each dispatch. Use this format:
-
-```
-=== ITERATION 1: FULL mode — NEEDS_FIX === (2026-03-18T15:00:00Z)
-
-  FAILED:
-    M04: 43 products have value/unit concatenation in nominal_width, nominal_thickness
-  PASSED: S01, S02, S03, S04, S05, S06, S07, S08, S09, M01, M02
-  WARNINGS:
-    M03: 12 attributes missing from attribute_units
-
-  ISSUES:
-    [M04] Regex found "18mm" pattern in number-typed attributes
-      Attributes: nominal_width, nominal_thickness
-      nominal_width: ["18mm", "9mm", "12mm"]
-
----
-=== ITERATION 2: RETEST mode — PASS === (2026-03-18T15:05:00Z)
-
-  FIX RESULTS:
-    M04: PASS — 0 violations after fix
-  REGRESSIONS: PASS (49 compared)
-  PASSED: S01, S02, S03, S04, S05, S07, S08, S09, M01, M02, M04
-
----
-=== ITERATION 3: FINAL mode — PASS === (2026-03-18T15:20:00Z)
-  ...
-```
-
-The user can `cat output/test_summary.txt` at any time to see the full story of what was tested, what failed, what was fixed, and where things stand.
+### test_report.json format
 
 ```json
 {
-  "mode": "full | retest | final",
-  "timestamp": "ISO 8601",
+  "mode": "full",
+  "timestamp": "2026-03-18T15:00:00Z",
   "status": "pass | needs_fix | unfixable",
   "smoke_summary": {
     "scraper_crashed": false,
@@ -80,305 +77,209 @@ The user can `cat output/test_summary.txt` at any time to see the full story of 
     "persist_hook_verified": true
   },
   "rule_results": [
-    {
-      "id": "S01",
-      "status": "pass | fail | warn | skip",
-      "value": 0.72,
-      "threshold": 0.30,
-      "per_category": {
-        "/shop/timber-joinery": 0.65,
-        "/shop/fencing": 0.12
-      }
-    },
-    {
-      "id": "M01",
-      "status": "fail",
-      "value": 0.95,
-      "detail": "95% of products have units embedded in nominal_width, nominal_thickness"
-    }
+    {"id": "S01", "status": "pass", "value": 0.72, "threshold": 0.30, "per_category": {}},
+    {"id": "M01", "status": "fail", "value": 0.95}
   ],
   "issues": [
     {
       "rule_id": "M01",
       "detail": "units embedded in values",
-      "affected_categories": ["/shop/timber-joinery/joinery-timber/decorative-mouldings"],
-      "affected_attributes": ["nominal_width", "nominal_thickness"],
-      "sample_values": {"nominal_width": ["18mm", "9mm", "12mm"]},
+      "affected_categories": ["/shop/timber-joinery"],
+      "affected_attributes": ["nominal_width"],
+      "sample_values": {"nominal_width": ["18mm", "9mm"]},
       "sample_urls": ["https://example.com/p1", "https://example.com/p2", "https://example.com/p3"]
     }
   ],
-  "passing_categories": ["/shop/sheet-materials/plywood/marine-plywood"]
+  "passing_categories": ["/shop/sheet-materials/plywood"]
 }
 ```
 
-`issues[].sample_values` and `issues[].sample_urls` must contain at least 3 entries, up to 10. This gives the coder enough evidence to diagnose and fix without re-running.
+### Retest mode extensions
 
-**Retest additions:** When `mode` is `"retest"`, the report also includes:
+Retest mode adds three fields to the report:
+
+```json
+{
+  "fix_results": {
+    "S01": {"status": "fixed", "before": 0.15, "after": 0.45},
+    "M01": {"status": "still_failing", "before": 0.80, "after": 0.60}
+  },
+  "regression_results": {
+    "status": "pass",
+    "products_compared": 12,
+    "regressions": [],
+    "category_dropouts": []
+  },
+  "new_issues": [
+    {"rule_id": "S03", "detail": "brand missing after fix", "affected_categories": ["/shop/tools"], "sample_urls": ["https://example.com/p1"]}
+  ]
+}
+```
 
 | Field | Description |
 |---|---|
-| `fix_results` | Per-rule pass/fail for each `fix_target` |
-| `regression_results` | Output of `compare_baseline.py` — pass/fail + regression details |
-| `new_issues` | Any issues found outside the fix targets |
+| `fix_results` | Dict keyed by rule ID. Each value: `status` (`"fixed"` or `"still_failing"`), `before` (value from previous report), `after` (value from this retest). Only includes rules listed in `fix_targets`. |
+| `regression_results` | Verbatim output from `tester_compare_baseline.py` — `status` (`"pass"` or `"fail"`), `products_compared`, `regressions` (field-level), `category_dropouts`. |
+| `new_issues` | Issues NOT in the previous report — new failures introduced by the fix. Same structure as `issues[]` entries. |
 
 ---
 
-## Three Modes
+## Full Mode
 
-### Full Mode
-
-Run after the coder writes the initial scraper. Validates everything from extraction to pagination.
-
-**Step 1 — Probe.** Select 3-5 product URLs across different top-level categories from `catalog_structure`. Run for each:
+**Step 1 — Probe.** Select 3-5 product URLs across different top-level categories from `catalog_structure`. Run:
 
 ```bash
-uv run {scraper_path} --probe {url}
+uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
+  --scraper docs/scraper-generator/acme/scraper.py \
+  --step probe \
+  --probe-urls "https://www.acme.com/p1,https://www.acme.com/p2,https://www.acme.com/p3" \
+  --iteration 1
 ```
 
-Evaluate all rules on probe output. This is a fast sanity check before committing to a full run. Timeout: **30 seconds per URL**.
+Read the JSON traces from stdout. Each trace has `"phase": "probe"` with `status` ("ok", "error", "timeout", "parse_error"). If all probes fail, the scraper's extraction is broken — skip to evaluation (S09 will catch it).
 
-**Step 2 — Per-category sampling.** For each top-level category in `catalog_structure`, run:
+**Step 2 — Per-category sampling.** Compute limit per category: `max(5, min(expected_count * 0.2, 500) / num_categories)`. Run:
 
 ```bash
-uv run {scraper_path} --categories "{cat}" --limit {N}
+uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
+  --scraper docs/scraper-generator/acme/scraper.py \
+  --step categories \
+  --categories "/shop/tools,/shop/wood,/shop/paint" \
+  --limit-per-cat {computed_limit} \
+  --iteration 1
+# Example: 1200 expected, 3 categories → max(5, min(240, 500)/3) = 80
 ```
 
-Where `N` is proportional to estimated category size. Total sample = 20% of expected products, max 500, min 5 per category. Use `--append` after the first category run so outputs accumulate into one `products.jsonl`.
+Read traces: `"phase": "category"` with status per category.
 
-Timeout per invocation: **`max(60, limit * 6)` seconds**.
-
-**Step 3 — Depth check.** Run with no `--categories` to verify pagination and deduplication:
+**Step 3 — Depth check.**
 
 ```bash
-uv run {scraper_path} --limit 100
+uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
+  --scraper docs/scraper-generator/acme/scraper.py \
+  --step depth \
+  --iteration 1
 ```
 
-Timeout: **600 seconds**.
+**Step 4 — Save iteration files.**
 
-**Step 4 — Evaluate.** Run all rules (S01-S09, M01-M04) on the combined `products.jsonl` output.
+```bash
+uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
+  --scraper docs/scraper-generator/acme/scraper.py \
+  --step save-iteration \
+  --iteration 1
+```
 
-**Step 5 — Save baseline.** Copy `products.jsonl` to `baseline_products.jsonl` in the same output directory.
+**Step 5 — Save baseline.**
 
-**Step 6 — Write `test_report.json`.**
+```bash
+uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
+  --scraper docs/scraper-generator/acme/scraper.py \
+  --step save-baseline \
+  --iteration 1
+```
+
+**Step 6 — Evaluate structural rules.** Determine the worst exit code from Steps 1-3 by reading the `exit_code` field from each trace line (every trace from `tester_run_scraper.py` includes `"exit_code": N`). Use the highest non-zero value, or 0 if all succeeded. Pass it to `--exit-code`:
+
+```bash
+uv run .claude/skills/scraper-generator/scripts/tester_tester_evaluate_structural.py \
+  --output-dir docs/scraper-generator/acme/output \
+  --exit-code 0 \
+  --iteration 1
+```
+
+Parse the JSON stdout: `rule_results` array (S01-S09) and `issues` array.
+
+**Step 7 — Evaluate semantic rules.**
+
+```bash
+uv run .claude/skills/scraper-generator/scripts/tester_tester_evaluate_semantic.py \
+  --output-dir docs/scraper-generator/acme/output \
+  --routing-tables docs/scraper-generator/acme/generator_input.json \
+  --iteration 1
+```
+
+Parse the JSON stdout: `rule_results` array (M01-M04) and `issues` array.
+
+**Step 8 — Aggregate and write report.** Merge `rule_results` and `issues` from both scripts. Determine overall status:
+- Any error-severity rule (`S01, S03, S04, S05, S07, S08, S09, M01, M04`) failed → `"needs_fix"`
+- S08 or S09 failed → `"unfixable"` (crash or no output)
+- All pass → `"pass"`
+
+Write `test_report.json`, append to `test_reports.json`, write `test_summary.txt`.
+
+**Compute `passing_categories`:** For each top-level category prefix (first ` > ` segment of `category_path`), check whether all error-severity rules (S01, S03, S04, S05, S07, M01, M04) pass for products in that category. List the prefixes of all passing categories. Categories with only warning-severity failures (S02, S06, M02, M03) still count as passing.
 
 ---
 
-### Retest Mode
+## Retest Mode
 
-Run after the coder patches a fix. Only tests affected areas plus a regression sample.
-
-**Step 1 — Fix verification.** For each fix target, run:
+**Step 1 — Fix verification.** Run categories that had failures. This starts with a clean `products.jsonl` (no `--append`). Step 1 products remain in the file — Step 2 appends to them.
 
 ```bash
-uv run {scraper_path} --categories "{affected_categories}" --limit 10
+uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
+  --scraper docs/scraper-generator/acme/scraper.py \
+  --step categories \
+  --categories "/shop/tools" \
+  --limit-per-cat 10 \
+  --iteration 2
 ```
 
-Re-evaluate the specific failing rule on the output.
-
-**Step 2 — Regression check.** Run:
+**Step 2 — Regression check.** Run categories that were passing. Use `--append` so regression products accumulate alongside fix products:
 
 ```bash
-uv run {scraper_path} --categories "{regression_sample_from}" --limit 10 --append
+uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
+  --scraper docs/scraper-generator/acme/scraper.py \
+  --step categories \
+  --categories "/shop/wood,/shop/paint" \
+  --limit-per-cat 10 \
+  --append \
+  --iteration 2
 ```
 
-Then run the regression comparison:
+Then compare against baseline:
 
 ```bash
-uv run .claude/skills/scraper-generator/scripts/compare_baseline.py --baseline {output_dir}/baseline_products.jsonl --retest {output_dir}/products.jsonl
+uv run .claude/skills/scraper-generator/scripts/tester_tester_compare_baseline.py \
+  --baseline docs/scraper-generator/acme/output/baseline_products.jsonl \
+  --retest docs/scraper-generator/acme/output/products.jsonl
 ```
 
-If `compare_baseline.py` returns status `"fail"`, include the regressions list in `test_report.json` under `regression_results`.
+**Step 3 — Save iteration files + evaluate.** Run in this order (save-iteration must run first — evaluation scripts read the snapshot):
+1. Save iteration: `tester_run_scraper.py --step save-iteration --iteration {N}`
+2. Structural: `tester_evaluate_structural.py --output-dir {output_dir} --exit-code {worst_exit} --skip-s06 --iteration {N}`
+3. Semantic: `tester_evaluate_semantic.py --output-dir {output_dir} --routing-tables {routing_tables_path} --iteration {N}`
 
-**Step 3 — Rule evaluation.** Run all structural and semantic rules on the combined output.
+Do NOT save baseline in retest mode — only full and final modes save baselines.
 
-**Step 4 — Write `test_report.json`** with `fix_results`, `regression_results`, and `new_issues`.
+**Step 4 — Aggregate.** Same as full mode Step 8, plus include `regression_results` from tester_compare_baseline. **Regression results influence the overall status:** if `compare_baseline` returns `"status": "fail"` (field regressions or category dropouts detected), the overall status must be `"needs_fix"` even if all S01-S09 and M01-M04 rules pass. This prevents regressions from silently propagating through final mode.
+
+**Note on combined evaluation:** Structural/semantic rules run on the combined output of fix-verification + regression-sample products. If aggregate scores are misleading (e.g., a correct fix lowered by pre-existing issues in regression samples), note this in the report but still use the combined result for status determination.
+
+Pass `--retest-categories` to `tester_compare_baseline.py` with the list of passing categories that were retested, enabling category-level dropout detection.
 
 **Total retest timeout: 5 minutes.**
 
 ---
 
-### Final Mode
+## Final Mode
 
-Run after all retests pass. Same as full mode's per-category sampling + depth check, but **skip probe**. Fresh run to confirm at scale.
+Same as full mode but **skip probe** (Step 1). Start from per-category sampling. Use the next iteration number.
 
-Write `test_report.json`.
-
----
-
-## Validation Rules
-
-### Structural Rules (S01-S09)
-
-#### S01 — Core attribute fill rate
-
-| | |
-|---|---|
-| **Severity** | error |
-| **Threshold** | >= 30% of products must have non-empty `core_attributes` |
-| **Check** | For each product, test whether `core_attributes` is non-empty (at least one key with a non-null value). Compute the percentage across all products. |
-| **Metric** | `value` = count of products with non-empty core_attributes / total products |
-| **Per-category** | Report `per_category` breakdown: for each top-level category path, compute the fill rate separately. This catches categories where extraction is broken while others are fine. |
-| **On failure** | Include in `issues[]`: affected categories (those below threshold), sample URLs from failing products, sample values showing what core_attributes look like for failing products. |
-
-#### S02 — Extended attribute fill rate
-
-| | |
-|---|---|
-| **Severity** | warning |
-| **Threshold** | >= 20% of products must have non-empty `extended_attributes` |
-| **Check** | Same as S01 but for `extended_attributes`. |
-| **Metric** | `value` = count of products with non-empty extended_attributes / total products |
-| **On failure** | Include in `issues[]` with affected categories and sample URLs. Status is `warn`, not `fail` — does not block. |
-
-#### S03 — Required top-level fields present
-
-| | |
-|---|---|
-| **Severity** | error |
-| **Threshold** | 100% of products |
-| **Check** | Every product record must have all of: `sku`, `name`, `url`, `price`, `brand`, `product_category`, `scraped_at`. Each must be non-null (except `price` which may be null if the catalog does not display prices). |
-| **Metric** | `value` = count of fully compliant products / total products |
-| **On failure** | Include in `issues[]`: which fields are missing, sample URLs of non-compliant products, sample values showing the missing field pattern. |
-
-#### S04 — product_category is valid taxonomy ID
-
-| | |
-|---|---|
-| **Severity** | error |
-| **Threshold** | 100% of products |
-| **Check** | Read `docs/product-taxonomy/categories.md` and extract all valid taxonomy IDs. For each product, verify `product_category` appears in the valid set. |
-| **Metric** | `value` = count of products with valid taxonomy ID / total products |
-| **On failure** | Include in `issues[]`: invalid taxonomy IDs found, sample URLs, the invalid values. |
-
-#### S05 — brand is top-level, not inside attributes
-
-| | |
-|---|---|
-| **Severity** | error |
-| **Threshold** | 100% of products |
-| **Check** | Verify `brand` exists as a top-level field. Check that `core_attributes`, `extended_attributes`, and `extra_attributes` do not contain a `brand` key. |
-| **Metric** | `value` = count of compliant products / total products |
-| **On failure** | Include in `issues[]`: sample URLs, sample values showing where brand appears incorrectly. |
-
-#### S06 — Category diversity
-
-| | |
-|---|---|
-| **Severity** | warning |
-| **Threshold** | >= 2 distinct top-level `category_path` values |
-| **Check** | Collect all unique top-level category path prefixes from products. Count distinct values. If the catalog has only one category, auto-pass. |
-| **Metric** | `value` = count of distinct top-level category paths |
-| **Skip** | Skip in retest mode. |
-| **On failure** | Include in `issues[]`: the single category path found, expected categories from catalog_structure. |
-
-#### S07 — Zero errors
-
-| | |
-|---|---|
-| **Severity** | error |
-| **Threshold** | `errors_count == 0` in `summary.json` |
-| **Check** | Read `summary.json` from the scraper's output directory. Verify `errors_count` is 0. |
-| **Metric** | `value` = errors_count from summary.json |
-| **On failure** | Include in `issues[]`: the error count and any error details from the summary. |
-
-#### S08 — Scraper completed without crash
-
-| | |
-|---|---|
-| **Severity** | error |
-| **Threshold** | Process exit code 0 |
-| **Check** | After each scraper invocation, check the process exit code. |
-| **Metric** | `value` = exit code (0 = pass) |
-| **On failure** | Include in `issues[]`: exit code, stderr output, last few log lines. |
-
-#### S09 — Persist hooks functional
-
-| | |
-|---|---|
-| **Severity** | error |
-| **Threshold** | `products.jsonl` exists and is non-empty after run |
-| **Check** | Verify the output file exists and contains at least one line. |
-| **Metric** | `value` = line count of products.jsonl |
-| **On failure** | Include in `issues[]`: whether file is missing or empty, any persist hook errors from logs. |
+**Baseline overwrite:** Final mode saves a new baseline (Step 5 of full mode). This is intentional — the latest successful run becomes the reference for future retests.
 
 ---
 
-### Semantic Rules (M01-M04)
+## Handling Script Failures
 
-The tester reads `generator_input.json` (at `routing_tables_path`) to get:
-- `types` — dict of attribute name to type string (`"str"`, `"number"`, `"list"`, `"bool"`) per subcategory
-- `units` — dict of attribute name to unit string (e.g., `"mm"`, `"kg"`) per subcategory
+If any script exits with a non-zero code:
 
-These dicts are the source of truth for what type and unit each attribute should have.
+1. Read stdout — partial traces may show how far it got
+2. Read `debug_iteration_{N}.log` — scraper's stderr shows HTTP requests, errors, timing
+3. Diagnose: was it the scraper (extraction broken) or the script (bug)?
+4. Write a `test_report.json` with `"status": "unfixable"` and the error details so the orchestrator knows what happened
 
-#### M01 — Units separated from values
-
-| | |
-|---|---|
-| **Severity** | error |
-| **Check** | For each product: find attributes where the routing table type is `"number"` AND the `units` dict has an entry for that attribute. The attribute value must be numeric (`int` or `float`), and `attribute_units` must contain the key with the correct unit. Fails when the value is something like `"18mm"` where `18` + `{"attr": "mm"}` is expected. |
-| **On failure** | Include in `issues[]`: affected attributes, sample values showing the concatenated value (e.g., `"18mm"`), sample URLs, affected categories. Minimum 3 samples, up to 10. |
-
-#### M02 — Type conformance
-
-| | |
-|---|---|
-| **Severity** | warning |
-| **Check** | For each product: all attributes typed `"number"` in the routing tables should be `int` or `float`, not strings. Catches `"18mm"` (string with unit) and `"3"` (string that should be numeric). Overlaps with M01 for unit-bearing attributes. |
-| **On failure** | Include in `issues[]`: affected attributes, sample values with their actual types, sample URLs. |
-
-#### M03 — attribute_units populated
-
-| | |
-|---|---|
-| **Severity** | warning |
-| **Check** | For each product: when the routing table `units` dict has an entry for an attribute AND the product has that attribute in any bucket (`core_attributes`, `extended_attributes`, `extra_attributes`), `attribute_units` should contain the key. |
-| **On failure** | Include in `issues[]`: affected attributes (those missing from attribute_units), sample URLs, the expected unit from the routing table. |
-
-#### M04 — Value/unit concatenation scan
-
-| | |
-|---|---|
-| **Severity** | error |
-| **Check** | Apply regex `\d+\s*(mm|cm|m|kg|g|lb|oz|ml|l|V|W|A|Hz|kW|MPa)$` to attribute values — but ONLY on attributes where the routing table type is `"number"` OR the `units` dict has an entry. Do NOT flag string-typed attributes that happen to contain unit-like suffixes. |
-| **On failure** | Include in `issues[]`: affected attributes, the matching values, sample URLs, affected categories. |
-
----
-
-### Rule Evaluation per Mode
-
-| Rule | Full | Retest (fix verification) | Retest (regression) | Final |
-|---|---|---|---|---|
-| S01-S05 | All products | Affected categories only | Compare baseline | All products |
-| S06 | All products | Skip | Skip | All products |
-| S07-S09 | All runs | All runs | All runs | All runs |
-| M01-M04 | All products | Affected categories only | Compare baseline | All products |
-
----
-
-## Regression Detection
-
-During retest mode, after running the regression sample, invoke:
-
-```bash
-uv run .claude/skills/scraper-generator/scripts/compare_baseline.py --baseline {output_dir}/baseline_products.jsonl --retest {output_dir}/products.jsonl
-```
-
-If the script returns status `"fail"`, include the `regressions` list in `test_report.json` under `regression_results`. The orchestrator will dispatch the coder with both the original fix targets and the regression details.
-
----
-
-## Timeouts
-
-| Mode | Timeout |
-|---|---|
-| Probe | 30 seconds per URL |
-| Full per-category run | `max(60, limit * 6)` seconds per invocation |
-| Full depth check | 600 seconds |
-| Retest total | 5 minutes |
-| Final per-category run | `max(60, limit * 6)` seconds per invocation |
-
-If a timeout is exceeded, kill the process immediately. Record the timeout in `test_report.json` under the relevant rule (S08 for crash, or as a top-level note). A timeout counts as a failure for the affected run.
+Do NOT retry a script silently. Report the failure with evidence.
 
 ---
 
@@ -386,6 +287,44 @@ If a timeout is exceeded, kill the process immediately. Record the timeout in `t
 
 | Status | Meaning |
 |---|---|
-| `pass` | All rules pass |
-| `needs_fix` | One or more error-severity rules failed — coder needs to fix |
-| `unfixable` | Fundamental issue (site down, complete extraction failure, all probes return empty) |
+| `pass` | All error-severity rules pass. Warning-severity rules (S02, S06, M02, M03) may fail — they do NOT affect status. |
+| `needs_fix` | One or more error-severity rules failed — coder can fix |
+| `unfixable` | Scraper crashed (S08) or produced no output (S09) — fundamental issue |
+
+### Rule severity classification
+
+| Severity | Rules | Effect on status |
+|----------|-------|-----------------|
+| **error** | S01, S03, S04, S05, S07, S08, S09, M01, M04 | Any failure → `"needs_fix"` (or `"unfixable"` for S08/S09) |
+| **warning** | S02, S06, M02, M03 | Failures are logged in `rule_results` and `issues` but **never** trigger `"needs_fix"`. A scraper with only warning failures is `"pass"`. |
+
+The tester always reports warning failures in the output for visibility, but the status determination ignores them entirely.
+
+---
+
+## Validation Rules Reference
+
+The scripts implement these rules. This table tells the tester what each result means and what fix guidance to give the coder.
+
+### Structural (tester_evaluate_structural.py)
+
+| Rule | Severity | What it checks | What to fix if it fails |
+|------|----------|---------------|------------------------|
+| S01 | error | >=30% products have non-empty core_attributes | Extraction logic isn't finding spec tables or product attributes. Check CSS selectors in the catalog assessment against the live page. Look at `per_category` to find which categories are broken. |
+| S02 | warning | >=20% products have non-empty extended_attributes | Same as S01 but lower priority. Only a warning — does not block. |
+| S03 | error | 100% products have all required top-level fields | Missing `sku`, `name`, `url`, `brand`, `product_category`, `scraped_at`, or `category_path`. Check which fields are missing from `issues[].detail`. Usually a selector issue for the missing field. |
+| S04 | error | 100% products have valid taxonomy ID in product_category | The scraper is emitting an ID that doesn't exist in categories.md. Check the `category_mapping` in config — a URL prefix may map to a wrong or misspelled taxonomy ID. |
+| S05 | error | brand is top-level, never inside attribute buckets | The scraper puts brand inside core/extended/extra_attributes instead of as a top-level field. Fix the extraction to set `brand` at root level. |
+| S06 | warning | >=2 distinct top-level category_path values (skip in retest) | Scraper only produces one category path — pagination or category traversal may be broken. Only a warning. |
+| S07 | error | errors_count in summary.json is 0. `tester_run_scraper.py` accumulates summary.json across all scraper invocations within a step, so errors_count reflects the total across all category runs. | Scraper logged errors during the run. Read `debug_iteration_{N}.log` for details — usually HTTP errors or parse failures. |
+| S08 | error | Scraper exit code 0 (no crash) | Scraper crashed. Read `debug_iteration_{N}.log` for the traceback. If exit code is -1, it timed out. |
+| S09 | error | products.jsonl exists and is non-empty | Scraper ran but produced zero products. Extraction logic doesn't match the site. This is unfixable by patching — likely needs a full rewrite of extraction selectors. |
+
+### Semantic (tester_evaluate_semantic.py)
+
+| Rule | Severity | What it checks | What to fix if it fails |
+|------|----------|---------------|------------------------|
+| M01 | error | Number-typed attrs with units must be numeric, not "18mm" | The scraper stores "18mm" as a string instead of `18` + `attribute_units: {"attr": "mm"}`. Fix: parse the numeric value out, put the unit in `attribute_units`. Check `issues[].affected_attributes` for which attrs and `issues[].sample_values` for examples. |
+| M02 | warning | All number-typed attrs must be int/float, not strings | String values like `"3"` where `3` (int) is expected. Fix: add `int()` or `float()` conversion in the extraction logic. Warning only — does not block. |
+| M03 | warning | attribute_units must have entries for attrs with units in routing table | Product has the attribute but `attribute_units` doesn't have the corresponding key. Fix: add the unit to `attribute_units` when extracting the attribute. Warning only. |
+| M04 | error | No embedded units (regex scan for "18mm", "5kg", "220V" patterns) | Same root cause as M01 — values have units concatenated. Check `issues[].sample_values` for the exact patterns. Fix: split value from unit during extraction. |

@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = ["pytest"]
 # ///
-"""Unit tests for prepare_generator_input.py — SKU schema pre-processing."""
+"""Unit tests for orchestrator_prepare_generator_input.py — SKU schema pre-processing."""
 from __future__ import annotations
 
 import sys
@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import pytest
 
-from prepare_generator_input import (
+from orchestrator_prepare_generator_input import (
     extract_routing_table,
     find_schema_file,
     parse_schema_table,
@@ -226,52 +226,52 @@ class TestExtractRoutingTable:
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
         # sku, product_name, url, price, currency, brand are all UNIVERSAL_KEYS
-        assert "sku" not in result["core"]
-        assert "product_name" not in result["core"]
-        assert "url" not in result["core"]
-        assert "price" not in result["core"]
-        assert "currency" not in result["core"]
-        assert "brand" not in result["core"]
+        assert "sku" not in result["core_attribute_keys"]
+        assert "product_name" not in result["core_attribute_keys"]
+        assert "url" not in result["core_attribute_keys"]
+        assert "price" not in result["core_attribute_keys"]
+        assert "currency" not in result["core_attribute_keys"]
+        assert "brand" not in result["core_attribute_keys"]
         # Non-universal core keys should be present
-        assert "widget_type" in result["core"]
-        assert "weight" in result["core"]
+        assert "widget_type" in result["core_attribute_keys"]
+        assert "weight" in result["core_attribute_keys"]
 
     def test_extended_keys(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        assert "color" in result["extended"]
-        assert "tags" in result["extended"]
-        assert "is_active" in result["extended"]
+        assert "color" in result["extended_attribute_keys"]
+        assert "tags" in result["extended_attribute_keys"]
+        assert "is_active" in result["extended_attribute_keys"]
 
     def test_type_mapping_enum(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        assert result["types"]["widget_type"] == "str"
+        assert result["attribute_types"]["widget_type"] == "str"
 
     def test_type_mapping_number(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        assert result["types"]["weight"] == "number"
+        assert result["attribute_types"]["weight"] == "number"
 
     def test_type_mapping_text(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        assert result["types"]["color"] == "str"
+        assert result["attribute_types"]["color"] == "str"
 
     def test_type_mapping_text_list(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        assert result["types"]["tags"] == "list"
+        assert result["attribute_types"]["tags"] == "list"
 
     def test_type_mapping_boolean(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        assert result["types"]["is_active"] == "bool"
+        assert result["attribute_types"]["is_active"] == "bool"
 
     def test_structure_has_four_keys(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        assert set(result.keys()) == {"core", "extended", "types", "units"}
+        assert set(result.keys()) == {"core_attribute_keys", "extended_attribute_keys", "attribute_types", "units"}
 
     def test_units_extracted(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
@@ -292,15 +292,15 @@ class TestExtractRoutingTable:
     def test_empty_schema(self, tmp_path):
         schema_file = self._write_schema(tmp_path, "# Empty Schema\n")
         result = extract_routing_table(schema_file)
-        assert result["core"] == []
-        assert result["extended"] == []
-        assert result["types"] == {}
+        assert result["core_attribute_keys"] == []
+        assert result["extended_attribute_keys"] == []
+        assert result["attribute_types"] == {}
 
     def test_universal_keys_not_in_types(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
         for key in UNIVERSAL_KEYS:
-            assert key not in result["types"]
+            assert key not in result["attribute_types"]
 
     def test_unknown_data_type_defaults_to_str(self, tmp_path):
         content = textwrap.dedent("""\
@@ -312,7 +312,7 @@ class TestExtractRoutingTable:
         """)
         schema_file = self._write_schema(tmp_path, content)
         result = extract_routing_table(schema_file)
-        assert result["types"]["foo"] == "str"
+        assert result["attribute_types"]["foo"] == "str"
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +320,7 @@ class TestExtractRoutingTable:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 class TestExtractRoutingTableIntegration:
     """Integration tests using actual SKU schema files from the repository."""
 
@@ -336,7 +337,7 @@ class TestExtractRoutingTableIntegration:
             "treatment_type",
             "use_class",
         ]
-        assert result["core"] == expected_core
+        assert result["core_attribute_keys"] == expected_core
 
     def test_softwood_hardwood_lumber_extended_keys(self):
         schema_path = SCHEMAS_DIR / "softwood-hardwood-lumber.md"
@@ -344,22 +345,22 @@ class TestExtractRoutingTableIntegration:
             pytest.skip("Schema file not present in working tree")
         result = extract_routing_table(schema_path)
         # Verify some expected extended attributes
-        assert "species" in result["extended"]
-        assert "nominal_thickness" in result["extended"]
-        assert "moisture_content" in result["extended"]
-        assert "certification" in result["extended"]
-        assert "janka_hardness" in result["extended"]
+        assert "species" in result["extended_attribute_keys"]
+        assert "nominal_thickness" in result["extended_attribute_keys"]
+        assert "moisture_content" in result["extended_attribute_keys"]
+        assert "certification" in result["extended_attribute_keys"]
+        assert "janka_hardness" in result["extended_attribute_keys"]
 
     def test_softwood_hardwood_lumber_types(self):
         schema_path = SCHEMAS_DIR / "softwood-hardwood-lumber.md"
         if not schema_path.exists():
             pytest.skip("Schema file not present in working tree")
         result = extract_routing_table(schema_path)
-        assert result["types"]["wood_type"] == "str"  # enum -> str
-        assert result["types"]["actual_thickness"] == "number"
-        assert result["types"]["application"] == "list"  # text (list) -> list
-        assert result["types"]["certification"] == "list"
-        assert result["types"]["pack_quantity"] == "number"
+        assert result["attribute_types"]["wood_type"] == "str"  # enum -> str
+        assert result["attribute_types"]["actual_thickness"] == "number"
+        assert result["attribute_types"]["application"] == "list"  # text (list) -> list
+        assert result["attribute_types"]["certification"] == "list"
+        assert result["attribute_types"]["pack_quantity"] == "number"
 
     def test_softwood_hardwood_lumber_units(self):
         schema_path = SCHEMAS_DIR / "softwood-hardwood-lumber.md"
@@ -386,17 +387,17 @@ class TestExtractRoutingTableIntegration:
             "glue_type",
             "structural_class",
         ]
-        assert result["core"] == expected_core
+        assert result["core_attribute_keys"] == expected_core
 
     def test_plywood_panels_types(self):
         schema_path = SCHEMAS_DIR / "plywood-engineered-wood-panels-osb-particle-board.md"
         if not schema_path.exists():
             pytest.skip("Schema file not present in working tree")
         result = extract_routing_table(schema_path)
-        assert result["types"]["panel_type"] == "str"  # enum -> str
-        assert result["types"]["glue_type"] == "str"  # enum -> str
-        assert result["types"]["thickness"] == "number"
-        assert result["types"]["surface_treatment"] == "str"  # enum -> str
+        assert result["attribute_types"]["panel_type"] == "str"  # enum -> str
+        assert result["attribute_types"]["glue_type"] == "str"  # enum -> str
+        assert result["attribute_types"]["thickness"] == "number"
+        assert result["attribute_types"]["surface_treatment"] == "str"  # enum -> str
 
 
 # ---------------------------------------------------------------------------
@@ -404,6 +405,7 @@ class TestExtractRoutingTableIntegration:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 class TestFindSchemaFile:
     """Verify taxonomy ID to schema file resolution."""
 
@@ -456,6 +458,7 @@ class TestFindSchemaFile:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 class TestEndToEnd:
     """Verify full pipeline: taxonomy ID -> find schema -> extract routing table."""
 
@@ -467,28 +470,28 @@ class TestEndToEnd:
         routing = extract_routing_table(schema_path)
 
         # Structure check
-        assert "core" in routing
-        assert "extended" in routing
-        assert "types" in routing
+        assert "core_attribute_keys" in routing
+        assert "extended_attribute_keys" in routing
+        assert "attribute_types" in routing
 
         # Core should have non-universal keys
-        assert len(routing["core"]) > 0
-        assert "wood_type" in routing["core"]
+        assert len(routing["core_attribute_keys"]) > 0
+        assert "wood_type" in routing["core_attribute_keys"]
 
         # Extended should have additional detail keys
-        assert len(routing["extended"]) > 0
-        assert "species" in routing["extended"]
-        assert "nominal_thickness" in routing["extended"]
+        assert len(routing["extended_attribute_keys"]) > 0
+        assert "species" in routing["extended_attribute_keys"]
+        assert "nominal_thickness" in routing["extended_attribute_keys"]
 
         # Types mapping should cover all core + extended keys
-        all_keys = set(routing["core"]) | set(routing["extended"])
-        assert all_keys == set(routing["types"].keys())
+        all_keys = set(routing["core_attribute_keys"]) | set(routing["extended_attribute_keys"])
+        assert all_keys == set(routing["attribute_types"].keys())
 
         # No universal keys should leak through
         for key in UNIVERSAL_KEYS:
-            assert key not in routing["core"]
-            assert key not in routing["extended"]
-            assert key not in routing["types"]
+            assert key not in routing["core_attribute_keys"]
+            assert key not in routing["extended_attribute_keys"]
+            assert key not in routing["attribute_types"]
 
     def test_plywood_panels_full_pipeline(self):
         if not TAXONOMY_FILE.exists():
@@ -497,14 +500,14 @@ class TestEndToEnd:
         assert schema_path is not None, "Schema file not found for wood.plywood_engineered_panels"
         routing = extract_routing_table(schema_path)
 
-        assert "panel_type" in routing["core"]
-        assert routing["types"]["panel_type"] == "str"
-        assert "thickness" in routing["extended"]
-        assert routing["types"]["thickness"] == "number"
+        assert "panel_type" in routing["core_attribute_keys"]
+        assert routing["attribute_types"]["panel_type"] == "str"
+        assert "thickness" in routing["extended_attribute_keys"]
+        assert routing["attribute_types"]["thickness"] == "number"
 
         # Every key in core/extended should have a type entry
-        for key in routing["core"] + routing["extended"]:
-            assert key in routing["types"], f"Missing type for key: {key}"
+        for key in routing["core_attribute_keys"] + routing["extended_attribute_keys"]:
+            assert key in routing["attribute_types"], f"Missing type for key: {key}"
 
 
 # ---------------------------------------------------------------------------

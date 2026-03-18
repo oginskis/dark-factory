@@ -98,7 +98,7 @@ After researching multiple companies, synthesize a **two-tier attribute schema**
 
 ### Two-tier attribute split
 
-Produce two attribute tables — **Core Attributes** and **Extended Attributes** — not a single flat list. These two tiers drive how scrapers prioritize extraction effort (see `.claude/skills/scraper-generator/references/code-generator.md` for the full four-level product record format).
+Produce two attribute tables — **Core Attributes** and **Extended Attributes** — not a single flat list. These two tiers drive how scrapers prioritize extraction effort (see `.claude/skills/scraper-generator/references/coder.md` for the full four-level product record format).
 
 **Core attributes (5-10):** The most important category-specific attributes — scrapers put **high effort** into extracting these. They define what makes a product identifiable and comparable within its subcategory. Selection criteria:
 - **Identity**: what kind of product (tool_type, fastener_type, dosage_form)
