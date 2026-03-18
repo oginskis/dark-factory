@@ -12,87 +12,49 @@ This workflow generates a production-ready Python scraper that extracts structur
 ### Step flow
 
 ```
-Step 1: Load Context ──────────────────────────────────────────────────────────
-  Read company report + catalog assessment + generator_input.json
-  │
-  ├─ No catalog assessment? ──► ESCALATE: missing_catalog_assessment ──► STOP
-  │
-  ▼
-Step 1b: Build Category Mapping ───────────────────────────────────────────────
-  Map URL prefixes → taxonomy IDs
-  │
-  ├─ Unmapped URL prefix? ──► ESCALATE: unmapped_url_prefix ──► STOP
-  │
-  ▼
-Step 2: Load SKU Schemas ──────────────────────────────────────────────────────
-  Load schema for each subcategory
-  │
-  ├─ Schema missing, subcategory exists? ──► Auto-generate via /product-taxonomy
-  │                                          (max 5 auto-generations per run)
-  ├─ Schema missing, subcategory NOT in taxonomy? ──► ESCALATE: no_sku_schema ──► STOP
-  │
-  ▼
-Step 2a: Map Attributes to Schema ─────────────────────────────────────────────
-  Build core/extended/extra routing tables per subcategory
-  │
-  ▼
-  ┌─ English site? ──────────────────────────────────────────────────────────┐
-  │  skip Step 2b                                                            │
-  └──────────────────────────────────────────────────────────────────────────┘
-  │
-  ▼ non-English only
-Step 2b: Build Label Map ──────────────────────────────────────────────────────
-  Build LABEL_MAP + CATEGORY_ALIASES from language seed + blueprint labels
-  │
-  ├─ coverage ≥ 70%? ──► continue
-  ├─ coverage 30–70%? ──► log warning, continue
-  ├─ coverage < 30%? ──► ESCALATE: label_coverage_insufficient ──► STOP
-  │
-  ▼
-DISPATCH: Coder (mode: "generate") ────────────────────────────────────────────
-  Writes scraper.py
-  │
-  ▼
-DISPATCH: Tester (mode: "full") ───────────────────────────────────────────────
-  Runs scraper, evaluates output, writes test_report.json
-  │
-  ├─ "pass" ──────────────────────────────────────────────────────► Step 3
-  │
-  ├─ "needs_fix" ──► Fix→Retest Loop (max 3 cycles) ─────────────────────┐
-  │                                                                       │
-  │   DISPATCH: Coder (mode: "fix")                                       │
-  │     ← scraper.py patched                                              │
-  │   DISPATCH: Tester (mode: "retest")                                   │
-  │     ← test_report.json overwritten                                    │
-  │     ├─ "pass" ──► DISPATCH: Tester (mode: "final")                    │
-  │     │               ├─ "pass" ──────────────────────────────► Step 3   │
-  │     │               ├─ "needs_fix" / "unfixable" ──► ESCALATE         │
-  │     ├─ "needs_fix" ──► next fix cycle ────────────────────────────────┤
-  │     ├─ "unfixable" ──► ESCALATE: probe_extraction_failed               │
-  │     │                             or scraper_test_failed ──► STOP      │
-  │                                                                       │
-  │   Budget exhausted (3 cycles) ──► ESCALATE: probe_extraction_failed   │
-  │                                   or scraper_test_failed ──► STOP
-  │                                                                       │
-  ├─ "unfixable" ──► ESCALATE: probe_extraction_failed or                 │
-  │                             scraper_test_failed ──► STOP               │
-  │                                                                       │
-  ◄───────────────────────────────────────────────────────────────────────┘
-  │
-  ▼
-Step 3: Platform Knowledgebase ────────────────────────────────────────────────
-  Write discoveries (skip for custom/unknown platforms)
-  │
-  ▼
-Step 4: Config Metadata ───────────────────────────────────────────────────────
-  Write config.json
-  │
-  ▼
-Step 5: Self-Verification ─────────────────────────────────────────────────────
-  Check orchestrator-level quality gates
-  │
-  ▼
-  DONE ── scraper.py + config.json + output/products.jsonl ready for eval
+Step 1   Load Context
+         Read company report + catalog assessment + generator_input.json
+         ├─ missing? ──► ESCALATE: missing_catalog_assessment ──► STOP
+         ▼
+Step 1b  Build Category Mapping
+         Map URL prefixes → taxonomy IDs
+         ├─ unmapped prefix? ──► ESCALATE: unmapped_url_prefix ──► STOP
+         ▼
+Step 2   Verify SKU Schemas
+         Check generator_input.json for each subcategory
+         ├─ missing + subcategory exists? ──► auto-generate (max 5), re-run prep script
+         ├─ missing + NOT in taxonomy? ──► ESCALATE: no_sku_schema ──► STOP
+         ▼
+Step 2a  Map Attributes to Schema (handled by prep script)
+         ▼
+Step 2b  Build Label Map (non-English only, skip for English)
+         ├─ coverage ≥ 70% ──► continue
+         ├─ coverage 30–70% ──► warn, continue
+         ├─ coverage < 30% ──► ESCALATE: label_coverage_insufficient ──► STOP
+         ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  DISPATCH Coder (generate) ──► writes scraper.py                           │
+│  DISPATCH Tester (full) ──► writes test_report.json                        │
+│                                                                            │
+│  status = "pass"       ──► Tester (final) ──► pass? ──► Step 3             │
+│  status = "needs_fix"  ──► Fix→Retest Loop (max 3 cycles):                 │
+│                             Coder (fix) → Tester (retest)                  │
+│                             retest pass? → Tester (final) → pass? → Step 3 │
+│                             retest needs_fix? → next cycle                 │
+│  status = "unfixable"  ──► ESCALATE                                        │
+│  budget exhausted      ──► ESCALATE                                        │
+│                                                                            │
+│  ESCALATE routing: extraction issue → probe_extraction_failed              │
+│                    runtime issue   → scraper_test_failed                   │
+└────────────────────────────────────────────────────────────────────────────┘
+         ▼
+Step 3   Platform Knowledgebase (skip for custom/unknown)
+         ▼
+Step 4   Config Metadata → config.json
+         ▼
+Step 5   Self-Verification (13 quality gates)
+         ▼
+         DONE ── scraper.py + config.json + products.jsonl ready for eval
 ```
 
 ---
@@ -179,16 +141,7 @@ Dispatch the coder sub-agent to write the initial `scraper.py`. The coder reads 
 
 ### Input to coder
 
-| Field | Description |
-|---|---|
-| `mode` | `"generate"` |
-| `catalog_assessment` | Path to the catalog assessment file |
-| `routing_tables_path` | Path to `generator_input.json` |
-| `category_mapping` | URL prefix → taxonomy ID mapping from Step 1b |
-| `platform_knowledgebase` | Path to the platform knowledgebase file (if applicable) |
-| `LABEL_MAP` | Label map dict from Step 2b (non-English only, omit for English) |
-| `CATEGORY_ALIASES` | Category aliases dict from Step 2b (non-English only, omit for English) |
-| `scraper_output_path` | Path where the coder writes `scraper.py` |
+Pass these fields (full contract in `references/coder.md` Input Contract): `mode` (`"generate"`), `catalog_assessment`, `routing_tables_path`, `category_mapping` (from Step 1b), `platform_knowledgebase` (if applicable), `scraper_output_path`. For non-English sites, add `LABEL_MAP` and `CATEGORY_ALIASES` from Step 2b.
 
 ### Output from coder
 
@@ -216,44 +169,14 @@ Dispatch the tester sub-agent to run the scraper and evaluate its output. The te
 
 ### Output from tester
 
-The tester writes `test_report.json` to the specified path. Format:
+The tester writes `test_report.json` to the specified path. Full format is defined in `references/tester.md`. The orchestrator reads these fields:
 
-```json
-{
-  "mode": "full",
-  "timestamp": "2026-03-18T15:00:00Z",
-  "status": "pass | needs_fix | unfixable",
-  "smoke_summary": {
-    "scraper_crashed": false,
-    "persist_hook_verified": true,
-    "duration_seconds": 45.2
-  },
-  "final_summary": {
-    "total_products": 150,
-    "errors_count": 0,
-    "duration_seconds": 320.5,
-    "scraper_crashed": false,
-    "persist_hook_verified": true
-  },
-  "rule_results": [
-    {"id": "S01", "status": "pass", "value": 0.72, "threshold": 0.30, "per_category": {}},
-    {"id": "M01", "status": "fail", "value": 0.95, "detail": "95% of products have units embedded"}
-  ],
-  "issues": [
-    {
-      "rule_id": "M01",
-      "detail": "units embedded in values",
-      "affected_categories": ["/shop/timber-joinery/joinery-timber/decorative-mouldings"],
-      "affected_attributes": ["nominal_width", "nominal_thickness"],
-      "sample_urls": ["https://example.com/p1", "https://example.com/p2"],
-      "sample_values": {"nominal_width": ["18mm", "9mm", "12mm"]}
-    }
-  ],
-  "passing_categories": ["/shop/sheet-materials/plywood/marine-plywood"]
-}
-```
+- **`status`** — `"pass"`, `"needs_fix"`, or `"unfixable"` — drives the fix→retest state machine
+- **`rule_results`** — per-rule pass/fail with values — used for per-rule fix attempt tracking
+- **`issues`** — rule IDs, affected categories, sample URLs/values — passed to coder as fix targets
+- **`passing_categories`** — passed to tester as `regression_sample_from` in retest mode
 
-Retest mode adds: `fix_results`, `regression_results`, `new_issues`.
+Retest mode adds: `fix_results`, `regression_results`, `new_issues` (schemas in `references/tester.md`).
 
 ---
 
@@ -336,24 +259,6 @@ The coder receives the full context on every dispatch — it always has the comp
 | Full/final timeout | max(120, sample_size * 6) seconds |
 
 **Per-rule tracking:** The orchestrator maintains a dict `rule_fix_attempts: {rule_id: int}` counting how many times each rule has been explicitly listed in `fix_targets` for a coder dispatch. Only explicit targets increment the counter — a rule that fails as collateral damage from a fix aimed at a different rule does NOT count.
-
-**Decision logic after each retest:**
-
-```
-for each failing rule in test_report:
-    if rule_fix_attempts[rule] >= 2:
-        mark rule as exhausted
-    else:
-        add to next fix_targets
-
-if all failing rules are exhausted:
-    ESCALATE (no fixable rules remain)
-else if fix cycle > 3:
-    ESCALATE (budget exhausted)
-else:
-    dispatch coder with remaining fix_targets
-    increment rule_fix_attempts for each target
-```
 
 **Worked example:**
 
@@ -450,35 +355,7 @@ After successful validation (tester returns "pass" in final or full mode), the o
 
 Path: `docs/scraper-generator/{slug}/output/validation.json`.
 
-**Schema — field mapping from test_report.json:**
-
-```json
-{
-  "status": "pass",
-  "probe_results": [],
-  "smoke_test_summary": {},
-  "final_verification_summary": {},
-  "rule_results": [],
-  "issues": [],
-  "label_coverage_at_probe": null,
-  "fix_cycles_used": 0,
-  "generated_at": "2026-03-18T15:00:00Z",
-  "fix_summary": null
-}
-```
-
-| validation.json field | Source | Description |
-|---|---|---|
-| `status` | `test_report.status` | Overall pass/needs_fix/unfixable (always "pass" when written) |
-| `probe_results` | Collected during full mode Step 1 | Array of probe trace objects from `tester_run_scraper.py --step probe` |
-| `smoke_test_summary` | `test_report.smoke_summary` | Crash status, persist hook check, duration |
-| `final_verification_summary` | `test_report.final_summary` | Total products, errors, duration |
-| `rule_results` | `test_report.rule_results` | Array of per-rule pass/fail objects (S01-S09, M01-M04) |
-| `issues` | `test_report.issues` | Array of issue details (empty when status is "pass") |
-| `label_coverage_at_probe` | Orchestrator state | Float (0.0-1.0) for non-English sites, `null` for English |
-| `fix_cycles_used` | Orchestrator state | Number of fix→retest cycles used (0 if passed on first try) |
-| `generated_at` | Orchestrator | ISO 8601 timestamp when the orchestrator wrote this file |
-| `fix_summary` | Fix mode only | Fix summary object (see Fix Mode section), `null` in normal mode |
+**Contents:** Derive from `test_report.json` — copy `status`, `smoke_summary` (as `smoke_test_summary`), `final_summary` (as `final_verification_summary`), `rule_results`, `issues`. Add orchestrator state: `probe_results` (array of probe traces from full mode Step 1), `label_coverage_at_probe` (float for non-English, null for English), `fix_cycles_used` (int), `generated_at` (ISO 8601). In fix mode, add `fix_summary` (see Fix Mode section); null otherwise.
 
 On re-dispatch (after a fix cycle), overwrite the file with the new attempt's results. Write this file for both English and non-English sites.
 
@@ -524,19 +401,7 @@ Produce config metadata for the scraper:
 
 ### Strict format rules
 
-| Rule | Correct | Wrong |
-|------|---------|-------|
-| **Product data is a flat list of records** | One record per product, all at same level | Nested grouping by category, hierarchical structures |
-| **`brand` is a top-level field** | `"brand": "Milwaukee Tool"` at root | `"brand"` inside `core_attributes` or any attribute bucket |
-| **`product_category` is a valid taxonomy ID** | `"product_category": "machinery.power_tools"` | Display names like `"Machinery > Power Tools"`, missing field |
-| **Price is a float, no currency symbols** | `224.99` | `"$224.99"`, `"224.99"`, `"USD 224.99"` |
-| **Currency is ISO 4217** | `"USD"`, `"EUR"`, `"GBP"` | `"$"`, `"dollars"`, `"us"` |
-| **SKU is a string** | `"871WAR1926F"` | `871` (numeric), `null` |
-| **Core attributes match schema core list** | `"core_attributes": {"voltage": 18}` with `voltage` in schema core | Invented names, extended attrs in core bucket |
-| **Extended attributes match schema extended list** | `"extended_attributes": {"chuck_size": 13}` with `chuck_size` in schema extended | Core attrs in extended bucket, invented names |
-| **Extra attributes are governed** | `snake_case` keys, primitive values (string/number/boolean/array of primitives) | camelCase keys, nested objects |
-| **`category_path` uses ` > ` separator** | `"Tools > Saws > Plunge-Cut Saws"` | `"Tools / Saws"`, `"Tools>Saws"` (no spaces) |
-| **Config metadata matches schema** | All fields present with correct types | Missing fields, wrong types |
+Product records and config metadata must conform to `references/coder.md` Product Record Format. Key rules verified in Step 5: brand is top-level (never in attribute buckets), product_category is a valid taxonomy ID (not a display name), price is float (not string with `$`), currency is ISO 4217, attribute keys match schema exactly, `category_path` uses ` > ` separator, extra_attributes keys are `snake_case` with primitive values only.
 
 ---
 
