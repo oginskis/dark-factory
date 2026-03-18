@@ -5,16 +5,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import subprocess
 import sys
 from datetime import datetime, timezone, timedelta
+from math import ceil
 from pathlib import Path
 from statistics import median
+from typing import Any
 
 # Universal fields hardcoded — these live at product top level, not in attributes
 UNIVERSAL_FIELDS = ["sku", "name", "url", "price", "currency", "brand", "scraped_at"]
 UNIVERSAL_FIELDS_NO_PRICE = ["sku", "name", "url", "brand", "scraped_at"]
 
-# 12 checks with weights summing to 100
+# 13 checks with weights summing to 100
 CHECKS = {
     "core_attribute_coverage":     {"weight": 20, "threshold": 0.90},
     "extended_attribute_coverage": {"weight":  5, "threshold": 0.50},
@@ -25,10 +29,22 @@ CHECKS = {
     "data_freshness":              {"weight":  5, "threshold": 1.00},
     "schema_conformance":          {"weight":  5, "threshold": 1.00},
     "row_count_trend":             {"weight":  5, "threshold": 0.80},
-    "duplicate_detection":         {"weight": 10, "threshold": 0.99},
+    "duplicate_detection":         {"weight":  5, "threshold": 0.99},
     "field_level_regression":      {"weight": 10, "threshold": 0.50},
     "extra_attributes_ratio":      {"weight":  5, "threshold": 0.50},
+    "semantic_validation":         {"weight":  5, "threshold": 0.95},
 }
+
+# Semantic validation regex constants
+NUMERIC_VALUE_RE = re.compile(r'^\d+(\.\d+)?\s*[a-zA-Z/"]*(\s+\d+(\.\d+)?\s*[a-zA-Z/"]*)?$')
+NON_PRODUCT_NAME_RE = re.compile(
+    r'Delivery|Contact Us|FAQ|Branch Locator|Information|Privacy|Terms|Cookie',
+    re.IGNORECASE,
+)
+NON_PRODUCT_URL_RE = re.compile(
+    r'/contact|/about|/faq|/terms|/privacy|/delivery|/cookie',
+    re.IGNORECASE,
+)
 
 
 def find_project_root(config_path: Path) -> Path:
@@ -43,18 +59,40 @@ def find_project_root(config_path: Path) -> Path:
 
 
 def load_config(config_path: Path) -> dict:
-    """Read and validate eval_config.json."""
+    """Read eval_config.json. Supports both per-subcategory and flat formats."""
     if not config_path.exists():
         print(f"Error: config not found at {config_path}", file=sys.stderr)
         sys.exit(1)
     config = json.loads(config_path.read_text())
-    required = ["company_slug", "expected_product_count", "expected_top_level_categories",
-                "core_attributes", "extended_attributes", "type_map", "enum_attributes",
-                "has_prices"]
-    missing = [k for k in required if k not in config]
-    if missing:
-        print(f"Error: config missing required fields: {missing}", file=sys.stderr)
-        sys.exit(1)
+
+    # Required in all formats
+    for field in ["company_slug", "expected_product_count", "has_prices"]:
+        if field not in config:
+            print(f"Error: config missing required field: {field}", file=sys.stderr)
+            sys.exit(1)
+
+    # Build per-subcategory lookup
+    if "subcategories" in config:
+        config["_sub_configs"] = config["subcategories"]
+        # Build union for checks that need flat lists (schema_conformance, extra_attributes_ratio)
+        all_core = set()
+        all_extended = set()
+        for sub in config["subcategories"].values():
+            all_core.update(sub.get("core_attributes", []))
+            all_extended.update(sub.get("extended_attributes", []))
+        config.setdefault("core_attributes", sorted(all_core))
+        config.setdefault("extended_attributes", sorted(all_extended))
+    else:
+        # Old flat format — no per-subcategory data
+        config["_sub_configs"] = {}
+        for field in ["core_attributes", "extended_attributes", "type_map", "enum_attributes"]:
+            if field not in config:
+                print(f"Error: flat-format config missing: {field}", file=sys.stderr)
+                sys.exit(1)
+
+    config.setdefault("type_map", {})
+    config.setdefault("enum_attributes", {})
+    config.setdefault("expected_top_level_categories", [])
     return config
 
 
@@ -82,52 +120,241 @@ def load_json(path: Path) -> dict | list | None:
 
 
 # ---------------------------------------------------------------------------
-# Check functions — each returns float (measured value) or None (skip)
+# Sample size
 # ---------------------------------------------------------------------------
 
 
-def check_core_attribute_coverage(products: list[dict], config: dict) -> float:
-    """Fraction of products with >80% of core attributes populated."""
+def eval_sample_size(config: dict) -> dict:
+    """Compute recommended sample sizes for eval."""
+    expected = config.get("expected_product_count", 0)
+    total_target = min(max(ceil(expected * 0.3), 50), 300)
+    sub_configs = config.get("_sub_configs", {})
+    n_subs = len(sub_configs) or 1
+    per_sub = {}
+    for sub_id, sub_config in sub_configs.items():
+        sub_expected = sub_config.get("expected_count", expected // n_subs)
+        per_sub[sub_id] = max(ceil(sub_expected * 0.1), 10)
+    actual_total = max(total_target, sum(per_sub.values())) if per_sub else total_target
+    return {"total": actual_total, "per_subcategory": per_sub}
+
+
+# ---------------------------------------------------------------------------
+# Check functions
+# ---------------------------------------------------------------------------
+
+
+def check_core_attribute_coverage(products: list[dict], config: dict) -> tuple[float, dict]:
+    """Per-subcategory core attribute coverage. Returns (score, detail)."""
     if not products:
-        return 0.0
+        return 0.0, {}
+    sub_configs = config.get("_sub_configs", {})
     universals = UNIVERSAL_FIELDS_NO_PRICE if not config["has_prices"] else UNIVERSAL_FIELDS
-    core_nested = config["core_attributes"]
-    total_core = len(universals) + len(core_nested)
-    if total_core == 0:
-        return 1.0
+    default_core = config.get("core_attributes", [])
+
+    sub_stats: dict[str, dict] = {}
     passing = 0
+
     for product in products:
+        cat = product.get("product_category", "_unclassified")
+        sub = sub_configs.get(cat)
+        core_nested = sub.get("core_attributes", default_core) if sub else default_core
+        total_core = len(universals) + len(core_nested)
+        if total_core == 0:
+            passing += 1
+            continue
+
         populated = 0
+        missing = []
         for field in universals:
             val = product.get(field)
             if val is not None and val != "" and val != []:
                 populated += 1
+            else:
+                missing.append(field)
         attrs = product.get("core_attributes", {})
         for field in core_nested:
             val = attrs.get(field)
             if val is not None and val != "" and val != []:
                 populated += 1
-        if populated / total_core > 0.80:
+            else:
+                missing.append(field)
+
+        passed = populated / total_core > 0.80
+        if passed:
             passing += 1
-    return passing / len(products)
+
+        if cat not in sub_stats:
+            sub_stats[cat] = {"passing": 0, "total": 0, "missing_fields": {}}
+        sub_stats[cat]["total"] += 1
+        if passed:
+            sub_stats[cat]["passing"] += 1
+        for f in missing:
+            sub_stats[cat]["missing_fields"][f] = sub_stats[cat]["missing_fields"].get(f, 0) + 1
+
+    detail = {}
+    for cat, st in sub_stats.items():
+        detail[cat] = {
+            "coverage": round(st["passing"] / st["total"], 4) if st["total"] else 0,
+            "products": st["total"],
+            "top_missing": sorted(st["missing_fields"].items(), key=lambda x: -x[1])[:5],
+        }
+
+    return passing / len(products), detail
 
 
 def check_extended_attribute_coverage(
     products: list[dict], config: dict
-) -> float | None:
-    """Fraction of products with >50% of extended attributes populated."""
-    extended_attrs = config.get("extended_attributes", [])
-    if not extended_attrs:
+) -> tuple[float, dict] | None:
+    """Per-subcategory extended attribute coverage. Returns (score, detail) or None."""
+    default_extended = config.get("extended_attributes", [])
+    if not default_extended:
         return None
     if not products:
-        return 0.0
+        return 0.0, {}
+
+    sub_configs = config.get("_sub_configs", {})
+    sub_stats: dict[str, dict] = {}
     passing = 0
+
     for product in products:
+        cat = product.get("product_category", "_unclassified")
+        sub = sub_configs.get(cat)
+        extended_attrs = sub.get("extended_attributes", default_extended) if sub else default_extended
+        if not extended_attrs:
+            passing += 1
+            continue
+
         ext = product.get("extended_attributes", {})
         populated = sum(1 for a in extended_attrs if ext.get(a) not in (None, "", []))
-        if populated / len(extended_attrs) > 0.50:
+        missing = [a for a in extended_attrs if ext.get(a) in (None, "", [])]
+        passed = populated / len(extended_attrs) > 0.50
+        if passed:
             passing += 1
-    return passing / len(products)
+
+        if cat not in sub_stats:
+            sub_stats[cat] = {"passing": 0, "total": 0, "missing_fields": {}}
+        sub_stats[cat]["total"] += 1
+        if passed:
+            sub_stats[cat]["passing"] += 1
+        for f in missing:
+            sub_stats[cat]["missing_fields"][f] = sub_stats[cat]["missing_fields"].get(f, 0) + 1
+
+    detail = {}
+    for cat, st in sub_stats.items():
+        detail[cat] = {
+            "coverage": round(st["passing"] / st["total"], 4) if st["total"] else 0,
+            "products": st["total"],
+            "top_missing": sorted(st["missing_fields"].items(), key=lambda x: -x[1])[:5],
+        }
+
+    return passing / len(products), detail
+
+
+def check_semantic_validation(products: list[dict], config: dict) -> tuple[float, dict] | None:
+    """Composite semantic check. Returns (min_score, detail_dict) or None if no config."""
+    sem_config = config.get("semantic_validation")
+    if sem_config is None:
+        return None
+    if not products:
+        return 0.0, {}
+
+    scores: list[float] = []
+    detail: dict[str, Any] = {}
+    has_prices = config.get("has_prices", True)
+
+    # Sub-check 1: Value cleanliness
+    clean = 0
+    dirty_examples: list[str] = []
+    for p in products:
+        all_vals: list[str] = []
+        for bucket in ("core_attributes", "extended_attributes", "extra_attributes"):
+            all_vals.extend(str(v) for v in p.get(bucket, {}).values() if v is not None)
+        all_vals.append(str(p.get("sku", "")))
+        dirty = any(
+            (re.search(r'<[a-z]', v) or len(v) > 200 or any(ord(c) < 32 and c not in '\n\r\t' for c in v))
+            for v in all_vals if v
+        )
+        if not dirty:
+            clean += 1
+        elif len(dirty_examples) < 3:
+            dirty_examples.append(p.get("name", "?")[:60])
+    cleanliness_score = clean / len(products)
+    scores.append(cleanliness_score)
+    detail["value_cleanliness"] = {
+        "score": round(cleanliness_score, 4),
+        "dirty_count": len(products) - clean,
+        "examples": dirty_examples,
+    }
+
+    # Sub-check 2: Non-product detection
+    real = 0
+    non_product_examples: list[str] = []
+    for p in products:
+        name = p.get("name", "")
+        url = p.get("url", "")
+        has_attrs = bool(p.get("core_attributes") or p.get("extended_attributes"))
+        has_data = bool(p.get("price") or has_attrs)
+        if has_prices:
+            is_non_product = (
+                (NON_PRODUCT_NAME_RE.search(name) and not has_data)
+                or (NON_PRODUCT_URL_RE.search(url) and not has_data)
+                or (not p.get("price") and not p.get("sku") and not has_attrs)
+            )
+        else:
+            is_non_product = (
+                (NON_PRODUCT_NAME_RE.search(name) and not has_attrs)
+                or (NON_PRODUCT_URL_RE.search(url) and not has_attrs)
+                or (not p.get("sku") and not has_attrs)
+            )
+        if not is_non_product:
+            real += 1
+        elif len(non_product_examples) < 3:
+            non_product_examples.append(p.get("name", "?")[:60])
+    non_product_score = real / len(products)
+    scores.append(non_product_score)
+    detail["non_product_detection"] = {
+        "score": round(non_product_score, 4),
+        "flagged_count": len(products) - real,
+        "examples": non_product_examples,
+    }
+
+    # Sub-check 3: Numeric field format
+    numeric_fields = sem_config.get("numeric_fields", [])
+    if numeric_fields:
+        valid_products = 0
+        checked_products = 0
+        bad_examples: list[dict] = []
+        for p in products:
+            all_attrs = {
+                **p.get("core_attributes", {}),
+                **p.get("extended_attributes", {}),
+                **p.get("extra_attributes", {}),
+            }
+            relevant = {
+                k: v for k, v in all_attrs.items()
+                if k in numeric_fields and v is not None and str(v).strip()
+            }
+            if not relevant:
+                continue
+            checked_products += 1
+            all_valid = all(NUMERIC_VALUE_RE.match(str(v).strip()) for v in relevant.values())
+            if all_valid:
+                valid_products += 1
+            elif len(bad_examples) < 3:
+                bad_vals = {k: str(v) for k, v in relevant.items() if not NUMERIC_VALUE_RE.match(str(v).strip())}
+                bad_examples.append(bad_vals)
+        if checked_products > 0:
+            num_score = valid_products / checked_products
+            scores.append(num_score)
+            detail["numeric_format"] = {
+                "score": round(num_score, 4),
+                "invalid_count": checked_products - valid_products,
+                "checked": checked_products,
+                "examples": bad_examples,
+            }
+
+    composite = min(scores) if scores else 1.0
+    return composite, detail
 
 
 def check_duplicate_detection(products: list[dict]) -> float:
@@ -173,12 +400,10 @@ def check_schema_conformance(products: list[dict], config: dict) -> float:
                 continue
             total += 1
             expected_type = type_map[attr_name]
-            # Enum check takes precedence
             if attr_name in enum_attrs:
                 if attr_val in enum_attrs[attr_name]:
                     conforming += 1
                 continue
-            # Type check
             if expected_type == "str" and isinstance(attr_val, str) and attr_val.strip():
                 conforming += 1
             elif expected_type == "number" and isinstance(attr_val, (int, float)):
@@ -223,7 +448,6 @@ def check_field_level_regression(
     all_core = list(universals) + list(core_nested)
     if not all_core:
         return 1.0
-    # Compute current fill rates
     current_rates: dict[str, float] = {}
     for attr in all_core:
         if not products:
@@ -238,7 +462,6 @@ def check_field_level_regression(
             if val is not None and val != "" and val != []:
                 filled += 1
         current_rates[attr] = filled / len(products)
-    # Compare against baseline
     not_regressed = 0
     checked = 0
     for attr in all_core:
@@ -351,9 +574,23 @@ def compute_results(
     products_found = summary.get("total_products", len(products))
     is_limited = summary.get("limited", False)
 
+    # Functions returning (value, detail)
+    core_value, core_detail = check_core_attribute_coverage(products, config)
+    ext_result = check_extended_attribute_coverage(products, config)
+    if ext_result is not None:
+        ext_value, ext_detail = ext_result
+    else:
+        ext_value, ext_detail = None, {}
+
+    sem_result = check_semantic_validation(products, config)
+    if sem_result is not None:
+        sem_value, sem_detail = sem_result
+    else:
+        sem_value, sem_detail = None, {}
+
     raw_values = {
-        "core_attribute_coverage": check_core_attribute_coverage(products, config),
-        "extended_attribute_coverage": check_extended_attribute_coverage(products, config),
+        "core_attribute_coverage": core_value,
+        "extended_attribute_coverage": ext_value,
         "pagination_completeness": check_pagination_completeness(products_found, config, is_limited),
         "category_diversity": check_category_diversity(products, config, is_limited),
         "category_classification": check_category_classification(products, is_limited),
@@ -364,6 +601,13 @@ def compute_results(
         "duplicate_detection": check_duplicate_detection(products),
         "field_level_regression": check_field_level_regression(products, config, baseline),
         "extra_attributes_ratio": check_extra_attributes_ratio(products),
+        "semantic_validation": sem_value,
+    }
+
+    check_details = {
+        "core_attribute_coverage": core_detail,
+        "extended_attribute_coverage": ext_detail,
+        "semantic_validation": sem_detail,
     }
 
     # Weight redistribution
@@ -399,6 +643,11 @@ def compute_results(
     else:
         status = "fail"
 
+    # Minimum scoreable checks — override status if too few checks ran
+    scoreable = sum(1 for v in raw_values.values() if v is not None)
+    if scoreable < 3:
+        status = "insufficient_data"
+
     # Consecutive degradation count
     consecutive_degraded = 0
     if status == "degraded":
@@ -418,6 +667,7 @@ def compute_results(
         "products_found": products_found,
         "recommend_rediscovery": recommend_rediscovery,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "check_details": check_details,
     }
 
 
@@ -457,7 +707,6 @@ def maybe_create_baseline(
         return None
     if not products:
         return None
-    # Create baseline
     top_cats: set[str] = set()
     for p in products:
         cat = p.get("category_path", "")
@@ -478,6 +727,141 @@ def maybe_create_baseline(
 
 
 # ---------------------------------------------------------------------------
+# Output formatting
+# ---------------------------------------------------------------------------
+
+
+def format_text_summary(result: dict, config: dict) -> str:
+    """Human-readable text summary for stdout."""
+    slug = config["company_slug"]
+    status = result["status"].upper()
+    score = result["degradation_score"]
+    lines = [f"=== EVAL: {slug} -- {status} (score: {score}) ===", ""]
+
+    failing = [(n, c) for n, c in result["checks"].items() if not c.get("skipped") and c.get("score", 0) > 0]
+    passing = [(n, c) for n, c in result["checks"].items() if not c.get("skipped") and c.get("score", 0) == 0]
+    skipped = [(n, c) for n, c in result["checks"].items() if c.get("skipped")]
+    details = result.get("check_details", {})
+
+    if failing:
+        lines.append(f"FAILING ({len(failing)}):")
+        for name, check in failing:
+            val = check.get("value", 0) or 0
+            pct = min(int(val * 100), 100)
+            thr = int(check["threshold"] * 100)
+            lines.append(f"  [FAIL] {name}: {pct}% (need {thr}%)")
+            # Per-subcategory breakdown for attribute coverage checks
+            if name in details and name in ("core_attribute_coverage", "extended_attribute_coverage"):
+                for cat, d in details[name].items():
+                    cat_pct = int(d["coverage"] * 100)
+                    miss = ", ".join(f[0] for f in d.get("top_missing", [])[:3])
+                    line = f"         {cat}: {cat_pct}% ({d['products']} products)"
+                    if miss:
+                        line += f" -- missing: {miss}"
+                    lines.append(line)
+            # Semantic validation detail
+            elif name == "semantic_validation" and name in details:
+                sem = details[name]
+                parts = []
+                if sem.get("value_cleanliness", {}).get("dirty_count", 0):
+                    parts.append(f"{sem['value_cleanliness']['dirty_count']} dirty values")
+                if sem.get("non_product_detection", {}).get("flagged_count", 0):
+                    parts.append(f"{sem['non_product_detection']['flagged_count']} non-products")
+                if sem.get("numeric_format", {}).get("invalid_count", 0):
+                    parts.append(f"{sem['numeric_format']['invalid_count']} bad numeric values")
+                if parts:
+                    lines.append(f"         {', '.join(parts)}")
+        lines.append("")
+
+    if passing:
+        lines.append(f"PASSING ({len(passing)}):")
+        for name, check in passing:
+            val = check.get("value", 0) or 0
+            pct = min(int(val * 100), 100)
+            lines.append(f"  [PASS] {name}: {pct}%")
+        lines.append("")
+
+    if skipped:
+        lines.append(f"SKIPPED ({len(skipped)}):")
+        for name, _ in skipped:
+            lines.append(f"  [SKIP] {name}")
+        lines.append("")
+
+    # Sample size info
+    sample = eval_sample_size(config)
+    needed = sample["total"]
+    found = result["products_found"]
+    sub_cats = set()
+    core_detail = details.get("core_attribute_coverage", {})
+    sub_cats.update(core_detail.keys())
+    sub_count = len(sub_cats) if sub_cats else "?"
+    sample_line = f"SAMPLE: {found} products from {sub_count} subcategories"
+    if found < needed:
+        sample_line += f" (need {needed} for full eval)"
+    lines.append(sample_line)
+    return "\n".join(lines)
+
+
+def format_markdown_report(result: dict, config: dict, products: list[dict]) -> str:
+    """Markdown report written to output directory."""
+    lines = [f"# Eval Report: {config['company_slug']}", ""]
+    lines.append(f"**Status:** {result['status'].upper()}")
+    lines.append(f"**Degradation score:** {result['degradation_score']}")
+    lines.append(f"**Products scored:** {result['products_found']}")
+
+    sample = eval_sample_size(config)
+    needed = sample["total"]
+    if result["products_found"] < needed:
+        lines.append(f"**Sample gap:** have {result['products_found']}, need {needed} for full eval")
+    lines.append("")
+
+    details = result.get("check_details", {})
+    core_detail = details.get("core_attribute_coverage", {})
+    if core_detail:
+        lines.append("## Core Attribute Coverage by Subcategory")
+        lines.append("")
+        lines.append("| Subcategory | Coverage | Products | Top Missing Fields |")
+        lines.append("|---|---|---|---|")
+        for cat, d in sorted(core_detail.items()):
+            pct = int(d["coverage"] * 100)
+            miss = ", ".join(f[0] for f in d.get("top_missing", [])[:5])
+            lines.append(f"| {cat} | {pct}% | {d['products']} | {miss or 'none'} |")
+        lines.append("")
+
+    sem_detail = details.get("semantic_validation", {})
+    if sem_detail:
+        lines.append("## Semantic Validation Detail")
+        lines.append("")
+        for sub_check, info in sem_detail.items():
+            score_pct = int(info.get("score", 1.0) * 100)
+            lines.append(f"### {sub_check.replace('_', ' ').title()} ({score_pct}%)")
+            if "dirty_count" in info:
+                lines.append(f"- {info['dirty_count']} dirty values detected")
+            if "flagged_count" in info:
+                lines.append(f"- {info['flagged_count']} non-product records flagged")
+            if "invalid_count" in info:
+                lines.append(f"- {info['invalid_count']}/{info['checked']} products with invalid numeric fields")
+            if info.get("examples"):
+                lines.append(f"- Examples: {', '.join(str(e)[:80] for e in info['examples'][:3])}")
+            lines.append("")
+
+    lines.append("## Check Results")
+    lines.append("")
+    lines.append("| Check | Value | Threshold | Score | Status |")
+    lines.append("|---|---|---|---|---|")
+    for name, check in result["checks"].items():
+        if check.get("skipped"):
+            lines.append(f"| {name} | - | {check['threshold']} | - | SKIP |")
+        else:
+            val = check.get("value", 0)
+            status = "PASS" if check.get("score", 0) == 0 else "FAIL"
+            lines.append(f"| {name} | {val:.2%} | {check['threshold']:.0%} | {check['score']} | {status} |")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -485,6 +869,10 @@ def maybe_create_baseline(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate scraper output quality")
     parser.add_argument("config", type=Path, help="Path to eval_config.json")
+    parser.add_argument("--collect", action="store_true",
+                        help="Run scraper to collect sufficient sample before scoring")
+    parser.add_argument("--no-history", action="store_true",
+                        help="Write eval_result.json but skip eval_history.json and baseline updates (for remediation re-runs)")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -508,42 +896,65 @@ def main() -> None:
         history = []
     is_limited = summary.get("limited", False)
 
+    # --collect: run scraper if sample is insufficient
+    if args.collect:
+        sample = eval_sample_size(config)
+        needed = sample["total"]
+        if len(products) < needed:
+            scraper_path = project_root / "docs" / "scraper-generator" / slug / "scraper.py"
+            if scraper_path.exists():
+                print(f"Collecting {needed} products (have {len(products)})...", file=sys.stderr)
+                try:
+                    proc = subprocess.run(
+                        ["uv", "run", str(scraper_path), "--limit", str(needed)],
+                        cwd=project_root,
+                        timeout=min(max(300, needed * 10), 3600),
+                        check=False,
+                    )
+                    if proc.returncode != 0:
+                        print(f"Warning: scraper exited with code {proc.returncode}", file=sys.stderr)
+                except subprocess.TimeoutExpired:
+                    print(f"Warning: scraper timed out after {min(max(300, needed * 10), 3600)}s", file=sys.stderr)
+                # Reload data
+                products = load_jsonl(scraper_output)
+                summary = load_json(scraper_summary_path) or {}
+                is_limited = summary.get("limited", False)
+            else:
+                print(f"Warning: scraper not found at {scraper_path}", file=sys.stderr)
+
     if not products:
         print("Warning: No products found in scraper output.", file=sys.stderr)
 
     # Baseline
-    baseline = maybe_create_baseline(products, config, is_limited, baseline_path)
+    if args.no_history:
+        baseline = load_json(baseline_path) if baseline_path.exists() else None
+    else:
+        baseline = maybe_create_baseline(products, config, is_limited, baseline_path)
 
     # Run checks
     result = compute_results(products, config, summary, history, baseline)
 
-    # Write result
+    # Write JSON result to file
     eval_result_path.write_text(json.dumps(result, indent=2))
 
-    # Append to history
-    history_entry = {
-        "status": result["status"],
-        "degradation_score": result["degradation_score"],
-        "products_found": result["products_found"],
-        "limited": is_limited,
-        "timestamp": result["timestamp"],
-    }
-    history.append(history_entry)
-    eval_history_path.write_text(json.dumps(history, indent=2))
+    # Append to history (skip when --no-history is set, e.g. remediation re-runs)
+    if not args.no_history:
+        history_entry = {
+            "status": result["status"],
+            "degradation_score": result["degradation_score"],
+            "products_found": result["products_found"],
+            "limited": is_limited,
+            "timestamp": result["timestamp"],
+        }
+        history.append(history_entry)
+        eval_history_path.write_text(json.dumps(history, indent=2))
 
-    # Print summary to stderr
-    print(f"Status: {result['status']}", file=sys.stderr)
-    print(f"Degradation score: {result['degradation_score']}", file=sys.stderr)
-    print(f"Products found: {result['products_found']}", file=sys.stderr)
-    print(f"Recommend rediscovery: {result['recommend_rediscovery']}", file=sys.stderr)
-    for name, check in result["checks"].items():
-        if check.get("skipped"):
-            print(f"  {name}: SKIPPED", file=sys.stderr)
-        else:
-            print(f"  {name}: value={check['value']} threshold={check['threshold']} score={check['score']}", file=sys.stderr)
+    # Text summary to stdout
+    print(format_text_summary(result, config))
 
-    # Print full result to stdout
-    print(json.dumps(result, indent=2))
+    # Markdown report to file
+    report_path = eval_output_dir / "eval_report.md"
+    report_path.write_text(format_markdown_report(result, config, products))
 
 
 if __name__ == "__main__":
