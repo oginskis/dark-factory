@@ -109,28 +109,38 @@ def run_scraper(
         return -1, "", duration
 
 
-def step_probe(scraper_path: Path, urls: list[str], log_file: Path | None) -> None:
-    """Run --probe for each URL. Traces each result.
+def step_probe(scraper_path: Path, urls: list[str], log_file: Path, probe_file: Path) -> None:
+    """Run --probe for each URL. Writes results to probe_{n}_{hash}.json.
 
     --probe is exclusive with all other scraper flags (per coder.md),
     so no --output-file/--summary-file/--log-file is passed to the scraper.
     Stderr is captured by run_scraper and appended to log_file.
     """
+    results = []
     for url in urls:
         code, stdout, duration = run_scraper(scraper_path, ["--probe", url], log_file, timeout=30)
+        entry: dict = {"url": url, "exit_code": code, "duration_s": round(duration, 1)}
         if code == 0 and stdout.strip():
             try:
                 product = json.loads(stdout.strip())
-                trace("probe", url=url, status="ok", exit_code=code,
-                      duration_s=round(duration, 1), fields=list(product.keys()))
+                entry["status"] = "ok"
+                entry["fields"] = list(product.keys())
+                entry["product"] = product
             except json.JSONDecodeError:
-                trace("probe", url=url, status="parse_error", exit_code=code,
-                      stdout_snippet=stdout[:200])
+                entry["status"] = "parse_error"
+                entry["stdout_snippet"] = stdout[:200]
         elif code == -1:
-            trace("probe", url=url, status="timeout", exit_code=-1, duration_s=round(duration, 1))
+            entry["status"] = "timeout"
         else:
-            trace("probe", url=url, status="error", exit_code=code,
-                  duration_s=round(duration, 1))
+            entry["status"] = "error"
+        results.append(entry)
+        trace("probe", **{k: v for k, v in entry.items() if k != "product"})
+
+    # Write probe results to versioned file
+    output = {"probes": results, "total": len(results),
+              "ok": sum(1 for r in results if r.get("status") == "ok")}
+    probe_file.parent.mkdir(parents=True, exist_ok=True)
+    probe_file.write_text(json.dumps(output, indent=2))
 
 
 def step_categories(
@@ -248,8 +258,9 @@ def main() -> None:
             print("Error: --probe-urls required for probe step", file=sys.stderr)
             sys.exit(1)
         urls = [u.strip() for u in args.probe_urls.split(",") if u.strip()]
-        trace("files", debug_log=str(log_file))
-        step_probe(scraper_path, urls, log_file)
+        probe_file = output_dir / f"probe_{n}_{h}.json"
+        trace("files", probe=str(probe_file), debug_log=str(log_file))
+        step_probe(scraper_path, urls, log_file, probe_file)
 
     elif args.step == "categories":
         if not args.categories:

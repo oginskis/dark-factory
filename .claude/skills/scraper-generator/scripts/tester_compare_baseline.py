@@ -131,6 +131,8 @@ def main() -> None:
     parser.add_argument("--baseline", required=True, help="Path to baseline JSONL")
     parser.add_argument("--retest", required=True, help="Path to retest JSONL")
     parser.add_argument("--retest-categories", help="Comma-separated category prefixes that were retested (for dropout detection)")
+    parser.add_argument("--output-dir", help="Directory for versioned result file")
+    parser.add_argument("--iteration", type=int, help="Iteration number for result file naming")
     args = parser.parse_args()
 
     baseline = load_jsonl(Path(args.baseline))
@@ -138,7 +140,18 @@ def main() -> None:
     retest_cats = [c.strip() for c in args.retest_categories.split(",") if c.strip()] if args.retest_categories else None
     result = compare_products(baseline, retest, retest_categories=retest_cats)
 
-    print(json.dumps(result, indent=2))
+    output_json = json.dumps(result, indent=2)
+
+    # Write to versioned file if output-dir provided
+    if args.output_dir and args.iteration is not None:
+        import os
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        h = os.urandom(2).hex()
+        result_file = output_dir / f"regression_{args.iteration}_{h}.json"
+        result_file.write_text(output_json)
+
+    print(output_json)
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -201,13 +202,22 @@ def main() -> None:
         if i:
             issues.append(i)
 
-    print(json.dumps({
+    output = {
         "rule_results": results,
         "issues": issues,
         "products_count": len(products),
         "types_count": len(types),
         "units_count": len(units),
-    }, indent=2))
+    }
+    output_json = json.dumps(output, indent=2)
+
+    # Write to versioned file
+    h = os.urandom(2).hex()
+    result_file = output_dir / f"semantic_{args.iteration}_{h}.json"
+    result_file.write_text(output_json)
+
+    # Also print to stdout
+    print(output_json)
 
 
 if __name__ == "__main__":

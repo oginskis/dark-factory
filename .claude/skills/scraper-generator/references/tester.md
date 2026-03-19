@@ -55,7 +55,31 @@ All output files use `{name}_{n}_{hash}.{ext}` versioning. Never overwritten.
 | `summary_{n}_{hash}.json` | Scraper | Tester passes `--summary-file` path to scraper |
 | `debug_{n}_{hash}.log` | Scraper | Tester passes `--log-file` path to scraper |
 
-The helper scripts produce **no persisted files** — they emit JSON to stdout, which the tester reads and merges into `report_{n}_{hash}.json`.
+All helper scripts write versioned result files to the output directory and also print JSON to stdout:
+
+| Script | Writes |
+|--------|--------|
+| `tester_run_scraper.py` | `probe_{n}_{hash}.json`, `products_{n}_{hash}.jsonl`, `summary_{n}_{hash}.json`, `debug_{n}_{hash}.log`, `baseline_products.jsonl` |
+| `tester_evaluate_structural.py` | `structural_{n}_{hash}.json` |
+| `tester_evaluate_semantic.py` | `semantic_{n}_{hash}.json` |
+| `tester_compare_baseline.py` | `regression_{n}_{hash}.json` (when `--output-dir` + `--iteration` provided) |
+
+### How to find result files
+
+After running a script, find its output file by globbing in the output directory:
+
+| After running | Glob pattern | Expect |
+|---------------|-------------|--------|
+| `--step probe` | `probe_{n}_*.json` | 1 file |
+| `--step categories` | `products_{n}_*.jsonl` | 1 new file (plus any from prior steps) |
+| `--step depth` | `products_{n}_*.jsonl` | 1 new file added |
+| `evaluate_structural` | `structural_{n}_*.json` | 1 file |
+| `evaluate_semantic` | `semantic_{n}_*.json` | 1 file |
+| `compare_baseline` | `regression_{n}_*.json` | 1 file |
+
+**To find a specific step's file:** List files matching the glob, sort by modification time (newest first), take the first. Since each step creates exactly one file with a unique hash, the newest match is the one just created.
+
+Read each result file and merge into `report_{n}_{hash}.json`.
 
 ### report_{n}_{hash}.json format
 

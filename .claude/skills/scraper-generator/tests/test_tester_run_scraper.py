@@ -64,18 +64,24 @@ class TestRunScraper:
 
 class TestStepProbe:
     @patch("tester_run_scraper.run_scraper")
-    def test_ok(self, mock_run, capsys):
+    def test_ok_writes_file(self, mock_run, tmp_path):
         mock_run.return_value = (0, json.dumps({"sku": "A"}), 1.0)
-        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], None)
-        lines = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
-        assert lines[0]["status"] == "ok"
+        probe_file = tmp_path / "probe_1_aaaa.json"
+        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], None, probe_file)
+        assert probe_file.exists()
+        data = json.loads(probe_file.read_text())
+        assert data["ok"] == 1
+        assert data["probes"][0]["status"] == "ok"
+        assert "product" in data["probes"][0]
 
     @patch("tester_run_scraper.run_scraper")
-    def test_error(self, mock_run, capsys):
+    def test_error_writes_file(self, mock_run, tmp_path):
         mock_run.return_value = (1, "", 0.5)
-        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], None)
-        lines = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
-        assert lines[0]["status"] == "error"
+        probe_file = tmp_path / "probe_1_bbbb.json"
+        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], None, probe_file)
+        data = json.loads(probe_file.read_text())
+        assert data["ok"] == 0
+        assert data["probes"][0]["status"] == "error"
 
 
 class TestMergeSummaries:
