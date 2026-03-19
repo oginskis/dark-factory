@@ -30,7 +30,14 @@
     "Galvas diametrs": "head_diameter",
     "Sortiments": "product_type",
     "Sortimenta veids": "product_type",
-    "Norāde": "sku"
+    "Norāde": "sku",
+    "Sastāvs": "composition",
+    "Mitruma daudzums": "moisture_content",
+    "Pelnu saturs": "ash_content",
+    "Siltumvadītspēja": "heat_value",
+    "Blīvums": "density",
+    "Apakšsortiments": "product_subtype",
+    "Materiāls": "material"
   },
   "category_aliases": {
     "wood.softwood_hardwood_lumber": {
