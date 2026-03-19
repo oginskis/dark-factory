@@ -58,7 +58,7 @@ Read and follow `references/workflow.md`.
 - **Archive previous run:** Before starting, check if `docs/eval-generator/{slug}/` exists. If it does, archive it: `mv docs/eval-generator/{slug} docs/eval-generator/{slug}-archived-$(date -u +%Y%m%dT%H%M%S)`. Then create the fresh directory: `mkdir -p docs/eval-generator/{slug}/output`. Every invocation generates from scratch — never read from or make decisions based on archived directories (`{slug}-archived-*`).
 - Provide the file paths from the table above when the workflow references logical resources (e.g., "the scraper source", "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the scrape output file", "the scrape run summary", "the shared eval script", "the eval config file", "the eval result file", "the eval history file", "the eval baseline file").
 - The `no_sku_schema` decision has an autonomous resolution path: when the subcategory exists in the taxonomy but the SKU schema hasn't been created yet, invoke `/product-taxonomy` for that subcategory to generate the schema, then continue. Only escalate if the subcategory itself is missing from the taxonomy.
-- Run the shared eval script for verification: `uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json`
+- Run the shared eval script for verification — see the commands reference below for the correct invocation.
 - The `missing_product_count_estimate` decision is handled autonomously without escalation — the workflow uses the best available estimate (from scraper source, category structure, or current output count). This is a graceful degradation, not a stop. No user interaction needed.
 - No web search or browsing tools are needed — this stage generates a config file locally.
 
@@ -80,6 +80,16 @@ When the workflow reaches an escalation point, present it to the user using this
 User options per escalation:
 - `no_sku_schema` (taxonomy issue) — 1) Add the missing subcategory to `docs/product-taxonomy/categories.md` and retry, 2) Stop
 - `scraper_output_format_unclear` — 1) Fix the scraper and retry, 2) Describe the expected output format so the eval can be generated, 3) Stop
+
+## Eval commands
+
+The shared eval script (`eval/eval.py`) supports these invocations:
+
+| Command | When to use |
+|---------|-------------|
+| `uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json --collect` | **Primary verification.** Runs the scraper to collect a sufficient sample, then scores. Use this in Step 5 to validate the config end-to-end. |
+| `uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json` | Score existing scraper output only (no scraper invocation). Use when `products.jsonl` already exists and you just want to re-score. |
+| `uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json --no-history` | Score without updating `eval_history.json` or baseline. Use for remediation re-runs where you don't want to pollute the history timeline. |
 
 ## Notes
 

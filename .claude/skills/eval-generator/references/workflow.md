@@ -185,13 +185,18 @@ When checks are skipped (e.g., no baseline for `field_level_regression`, limited
 
 ## Step 5: Run Eval Script
 
-Run the shared eval script with the generated config file. The script reads the scraper output and produces an eval result file.
+Run the shared eval script with `--collect` to validate the config end-to-end:
 
-If the shared eval script fails to run or produces an error, review the config file for issues. Common problems:
+```
+uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json --collect
+```
 
-- Scraper output does not exist yet — the scraper must run before the eval. If no scraper output is found, note this and confirm the config is valid by inspecting its structure.
+`--collect` runs the scraper to gather a sufficient sample, then scores the output against the config. This is the only way to verify the config actually works — a dry run without products proves nothing.
+
+If the eval fails or produces unexpected results, review the config for these common problems:
+
 - Attribute names in `type_map` do not match what the scraper actually writes — cross-check against the scraper source.
-- `expected_top_level_categories` values do not match the category names the scraper uses in `category_path` — compare with actual scraper output if available.
+- `expected_top_level_categories` values do not match the category names the scraper uses in `category_path` — compare with actual scraper output.
 
 ---
 

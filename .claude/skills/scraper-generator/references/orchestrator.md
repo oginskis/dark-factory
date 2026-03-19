@@ -148,7 +148,7 @@ For **multi-subcategory companies**, the mapping depends on how the catalog is s
 
 ### URL-based navigation (`html_css`, `json_api` with category URLs)
 
-Map each URL prefix from the catalog assessment to a taxonomy ID. If a prefix cannot be matched to any subcategory in the company report, **skip it** — log the unmatched prefix and exclude those URLs from scraping. The scraper will only visit matched prefixes.
+Map each URL prefix from the catalog assessment to a taxonomy ID. If a prefix cannot be matched to any subcategory in the company report, escalate — see the `unmapped_url_prefix` decision.
 
 ```json
 {
@@ -184,7 +184,7 @@ Store the mapping in config (see Step 6).
 
 Check `generator_input.json` for each subcategory taxonomy ID from the company report. Each subcategory must have an entry in the `subcategory_schemas` dict. For single-subcategory companies, one entry. For multi-subcategory companies, one entry per subcategory — the scraper uses the Step 1b category mapping to determine which schema applies per product.
 
-If a subcategory key is missing from `subcategory_schemas`, **skip it** — remove it from the category mapping, log the skipped subcategory, and continue with what's available. The skipped subcategories are reported in the final output (see `validation_{n}_{hash}.json` field `skipped_subcategories`).
+If a subcategory key is missing from `subcategory_schemas`, **skip it** — remove it from the category mapping, log the skipped subcategory, and continue with what's available. The skipped subcategories are reported in the final output (see `validation_{n}_{hash}.json` field `skipped_subcategories`). The SKILL.md wrapper handles the `no_sku_schema` decision before the orchestrator starts.
 
 ---
 

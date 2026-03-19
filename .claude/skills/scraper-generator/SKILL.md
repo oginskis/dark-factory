@@ -61,7 +61,9 @@ All output files in `output/` use `{name}_{n}_{hash}.{ext}` naming. **Files are 
 
 ## Workflow
 
-Read and follow `references/orchestrator.md`. It defines all steps, decisions, constants, and the fix→retest loop. The coder contract is in `references/coder.md`, the tester contract in `references/tester.md`.
+Read and follow `references/orchestrator.md`.
+
+It defines all steps, decisions, constants, and the fix→retest loop. The coder contract is in `references/coder.md`, the tester contract in `references/tester.md`.
 
 ### Before starting the orchestrator
 
@@ -79,6 +81,7 @@ Read and follow `references/orchestrator.md`. It defines all steps, decisions, c
 
 ### Operational notes
 
+- Provide the file paths from the table above when the workflow references logical resources (e.g., "the company report", "the catalog assessment", "the product taxonomy categories file", "the SKU schema", "the platform knowledgebase", "the generator input file", "the language seed file"). If a "catalog assessment cannot be mapped to any subcategory in the company report", or if "the company report does not appear in the product taxonomy categories file" / "the company report exists in the product taxonomy categories file", the orchestrator escalates.
 - Run scrapers with `uv run` (not `uv run python`). PEP 723 metadata resolves dependencies automatically.
 - No web search or Playwright browser tools needed. Scrapers fetch pages internally.
 - The `no_sku_schema` decision has an autonomous resolution: invoke `/product-taxonomy` for the missing subcategory. Before concluding a schema is missing, **list `docs/product-taxonomy/sku-schemas/`** — never guess the filename.
@@ -100,6 +103,7 @@ When the workflow reaches an escalation point, present it to the user using this
 
 User options per escalation:
 - `missing_catalog_assessment` — 1) Run `/catalog-detector {slug}` first, then retry, 2) Stop
+- `unknown_scraping_strategy` — 1) Re-run `/catalog-detector {slug}` to produce a valid strategy, 2) Stop
 - `no_sku_schema` (taxonomy issue, only escalates when subcategory is missing from taxonomy) — 1) Add the missing subcategory to `docs/product-taxonomy/categories.md` and retry, 2) Stop
 - `label_coverage_insufficient` — 1) Provide additional label-to-schema mappings for the site, 2) Expand the relevant SKU schemas with missing attribute keys, 3) Stop
 - `probe_extraction_failed` — 1) Provide guidance on how to extract from this site, 2) Stop
