@@ -70,4 +70,4 @@ Values are URL-encoded with HTML entities (e.g., `%26%23x2122%3B` for ™). Requ
 ## Sites Using This Platform
 | Company | Slug | Date | Notes |
 |---------|------|------|-------|
-| SOLIDteknics | solidteknics | 2026-03-19 | Australian cookware manufacturer. Specs in li/p format, some products have empty spec tabs. |
+| SOLIDteknics | solidteknics | 2026-03-20 | Australian cookware manufacturer. Specs in li/p format, some products have empty spec tabs. Spec content inside accordion collapse `#accordionSpecifications`. |

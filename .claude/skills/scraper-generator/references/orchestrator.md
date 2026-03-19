@@ -74,6 +74,7 @@ flowchart TD
     LANG --->|yes| READY(["Ready for implementation"])
     LANG --->|no| S2b["Step 2b: Build a translation map<br/>Map site labels (from catalog assessment + language seed file)<br/>to attribute keys (from generator_input.json)"]
     S2b --> READY
+    classDef default fill:#1e3a5f,stroke:#4a90d9,color:#e0e0e0
 ```
 
 ### Implementation (Coder → Tester → Finalize)
@@ -94,6 +95,7 @@ flowchart TD
     ESC --> ESCR{"Failure type?"}
     ESCR --->|"selectors/extraction"| ESC_A(["probe_extraction_failed"])
     ESCR --->|"crash/timeout/runtime"| ESC_B(["scraper_test_failed"])
+    classDef default fill:#1e3a5f,stroke:#4a90d9,color:#e0e0e0
 ```
 
 ### Fix Loop Detail
@@ -110,6 +112,7 @@ flowchart TD
     RESTATUS --->|pass| DONE(["Return to Step 5"])
     RESTATUS --->|needs_fix| BUDGET
     RESTATUS --->|unfixable| ESC
+    classDef default fill:#1e3a5f,stroke:#4a90d9,color:#e0e0e0
 ```
 
 ---

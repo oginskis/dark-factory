@@ -130,7 +130,47 @@ For every product: `sku`, `name`, `url`, `price` (float or null), `currency` (IS
 
 Route into correct bucket per routing tables. Attribute keys must exactly match SKU schema Key values — no inventing or renaming. For units: extract from site when SKU schema `Unit` column is not `—`, include in `attribute_units`. No unit conversions.
 
-**Always separate values from units.** Parse `"18mm"` into `value=18` + `attribute_units={"attr": "mm"}`. This is the most common validation failure.
+**Always separate values from units.** This is the #1 cause of validation failures.
+
+**Mandatory pattern — tuple-returning parser:**
+
+```python
+import re
+
+_UNIT_RE = re.compile(
+    r"^([\d.,]+)\s*"
+    r"(mm|cm|m|kg|g|lb|oz|ml|l|V|W|A|Hz|kW|kWh|MPa|Nm|bpm|psi|in|ft|rpm|dB|dB\(A\)|%|°[CF]|Pa|VDC)$",
+    re.IGNORECASE,
+)
+
+def _parse_numeric(raw: str) -> tuple[int | float | None, str | None]:
+    """Split '18mm' into (18, 'mm'). Returns (None, None) on failure."""
+    cleaned = re.sub(r",(\d{3})", r"\1", raw.strip())  # strip thousands commas
+    m = _UNIT_RE.match(cleaned)
+    if m:
+        val = float(m.group(1))
+        return (int(val) if val == int(val) else val), m.group(2)
+    try:
+        val = float(cleaned.replace(",", "."))
+        return (int(val) if val == int(val) else val), None
+    except ValueError:
+        return None, None
+```
+
+**Rules for using this parser:**
+1. Call `_parse_numeric()` for EVERY attribute value in ALL THREE buckets (core, extended, extra) — not just attributes listed in a `UNITS` dict.
+2. When it returns `(number, unit)`: store `number` as the value, store `unit` in `attribute_units`.
+3. When it returns `(number, None)`: store `number`, look up unit from UNIT_MAP or routing tables.
+4. When it returns `(None, None)`: store the raw string value as-is (it's non-numeric).
+5. NEVER write a `_parse_number()` that returns only a number. The unit must travel with the value through parsing.
+
+**Anti-pattern (DO NOT generate):**
+```python
+# BAD — discards unit, then does separate lookup
+value = _parse_number(raw)          # returns 53, unit "mm" is lost
+if attr_key in UNITS:               # only works for pre-declared attrs
+    attribute_units[attr_key] = UNITS[attr_key]
+```
 
 ### FR3: Discover products (per strategy)
 
@@ -173,7 +213,9 @@ After writing `scraper.py`, run quick smoke checks before handing off to the tes
 - Output is valid JSON
 - All universal top-level fields are present (`sku`, `name`, `url`, `brand`, `product_category`, `scraped_at`)
 - `core_attributes` is non-empty (at least one key extracted)
-- No embedded units in numeric values (no `"18mm"` — should be `18` + `attribute_units`)
+- No embedded units in numeric values — run this check against EVERY attribute in all three buckets:
+  `re.search(r'\d+\s*(mm|cm|m|kg|g|lb|oz|V|W|kW|Hz|A|Nm|rpm|bpm|psi|in|ft|MPa|Pa|VDC|dB|kWh|%)$', str(v))`.
+  If it matches any value, the `_parse_numeric()` tuple parser was not applied to that attribute. Fix before handoff.
 - `product_category` is a valid taxonomy ID from the routing tables
 - For non-English sites: attribute keys are English, not source-language
 
@@ -323,4 +365,4 @@ The tester validates output against these rules. Code must pass all of them.
 | M01 | For attributes typed `number` in routing tables AND listed in `units`: value must be `int`/`float`, and `attribute_units` must contain the key. **Wrong:** `"nominal_width": "18mm"`. **Right:** `"nominal_width": 18` + `"attribute_units": {"nominal_width": "mm"}`. |
 | M02 | All attributes typed `number` in routing tables must be `int`/`float`, not strings. Warning only. |
 | M03 | When routing table `units` dict has an entry for an attribute and the product has it, `attribute_units` must contain the key. Warning only. |
-| M04 | Regex `\d+\s*(mm|cm|m|kg|g|lb|oz|ml|l|V|W|A|Hz|kW|MPa)$` must NOT match any value in attributes typed `number` or listed in `units`. Catches embedded units. |
+| M04 | Regex `\d+\s*(mm|cm|m|kg|g|lb|oz|ml|l|V|W|A|Hz|kW|MPa|Nm|bpm|psi|rpm|dB|Pa|VDC|kWh)$` must NOT match any value in **any attribute bucket** (core, extended, AND extra). Catches embedded units. Note: extra_attributes are NOT exempt — the `_parse_numeric()` tuple parser must be applied to all buckets uniformly. |

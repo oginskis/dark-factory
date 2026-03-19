@@ -26,6 +26,7 @@ flowchart TD
 
     S4["<b>4. Generate Eval</b><br/>Build eval config, verify end-to-end"]
     S4 --> DONE(["scraper.py + eval_config.json ready"])
+    classDef default fill:#1e3a5f,stroke:#4a90d9,color:#e0e0e0
 ```
 
 Each stage produces a file that the next stage consumes. Any stage can **stop** when it hits a blocker, or **escalate** ambiguous decisions to the user.
@@ -52,10 +53,7 @@ flowchart LR
     CHECK -->|"pass (0-30)"| OK(["No action"])
     CHECK -->|"degraded (31-60)"| REVIEW(["Review output"])
     CHECK -->|"fail (61-100)"| REGEN(["Re-run pipeline"])
-
-    style SCRAPER fill:#e8f5e9,stroke:#4CAF50
-    style EVAL fill:#e8f5e9,stroke:#4CAF50
-    style REGEN fill:#ffebee,stroke:#f44336
+    classDef default fill:#1e3a5f,stroke:#4a90d9,color:#e0e0e0
 ```
 
 The generated `scraper.py` and `eval_config.json` run on any scheduler with zero LLM involvement. The expensive tier only re-runs when the eval detects quality degradation.
@@ -78,13 +76,7 @@ flowchart TD
     BUDGET -->|no| STOP(["Escalate to user<br/>with partial output"])
     RESULT -->|unfixable| STOP
     DONE --> COMPLETE(["scraper.py + config.json ready"])
-
-    style CODER fill:#e3f2fd,stroke:#1976D2
-    style TESTER fill:#fff3e0,stroke:#F57C00
-    style FIX fill:#e3f2fd,stroke:#1976D2
-    style RETEST fill:#fff3e0,stroke:#F57C00
-    style COMPLETE fill:#e8f5e9,stroke:#4CAF50
-    style STOP fill:#ffebee,stroke:#f44336
+    classDef default fill:#1e3a5f,stroke:#4a90d9,color:#e0e0e0
 ```
 
 ## Prerequisites
