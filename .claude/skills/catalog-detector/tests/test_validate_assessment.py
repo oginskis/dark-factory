@@ -77,7 +77,7 @@ class TestDetectTemplate:
 
 class TestExtractField:
     def test_extract_existing_field(self):
-        content = "**Platform:** shopify\n**Strategy:** static_html\n"
+        content = "**Platform:** shopify\n**Strategy:** html_css\n"
         assert extract_field(content, "Platform") == "shopify"
 
     def test_extract_with_extra_content(self):
@@ -188,18 +188,18 @@ class TestCheckHeadingAndSlug:
 
 
 class TestCheckStrategyValid:
-    def test_static_html(self):
-        content = "**Scraping strategy:** static_html\n"
+    def test_html_css(self):
+        content = "**Scraping strategy:** html_css\n"
         result = check_strategy_valid(content)
         assert result["pass"] is True
 
-    def test_structured_data(self):
-        content = "**Scraping strategy:** structured_data\n"
+    def test_json_api(self):
+        content = "**Scraping strategy:** json_api\n"
         result = check_strategy_valid(content)
         assert result["pass"] is True
 
-    def test_pdf_pricelist(self):
-        content = "**Scraping strategy:** pdf_pricelist\n"
+    def test_pdf(self):
+        content = "**Scraping strategy:** pdf\n"
         result = check_strategy_valid(content)
         assert result["pass"] is True
 
@@ -220,7 +220,7 @@ class TestCheckStrategyValid:
 
     def test_strategy_with_extra_text(self):
         """Strategy with additional description after the value should still pass."""
-        content = "**Scraping strategy:** structured_data (JSON-LD primary)\n"
+        content = "**Scraping strategy:** json_api (JSON-LD primary)\n"
         result = check_strategy_valid(content)
         assert result["pass"] is True
 

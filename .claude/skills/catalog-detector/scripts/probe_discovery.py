@@ -31,7 +31,7 @@ INTERPRETATION:
         likely no_public_catalog stop
     sample_product_urls → pass directly to probe_recipe via --product-urls
     json_ld_on_homepage contains "Product" → structured data likely available on product pages;
-        prioritise structured_data strategy
+        prioritise json_api strategy
 """
 from __future__ import annotations
 

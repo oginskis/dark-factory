@@ -83,7 +83,7 @@ Find product listing pages via navigation links from Step 1, or try: `/products`
 For each candidate: confirm products with visible attributes, note URL patterns for products and categories.
 
 If no listing found:
-- PDF catalogs → `pdf_pricelist` strategy, continue
+- PDF catalogs → `pdf` strategy, continue
 - Login-gated → stop, see `auth_required` decision
 - Nothing → stop, see `no_public_catalog` decision
 
@@ -117,7 +117,7 @@ This step is shared — uses whatever was discovered in Step 2 or Step 3.
 
 ### Scraping strategy
 
-Select one: `static_html`, `structured_data`, `pdf_pricelist`. Prefer: `structured_data` > `static_html` > `pdf_pricelist`.
+Select one: `html_css`, `json_api`, `pdf`. Prefer: `json_api` > `html_css` > `pdf`.
 
 ### Product count estimate
 
@@ -191,7 +191,7 @@ Re-read the catalog assessment and check against these gates. Fix any failures b
 |---|-------|---------------|
 | 1 | **Correct template** | Success template for scrapable catalogs, stop template for stops |
 | 2 | **Heading and slug** | `# Catalog Assessment: {Company Name}` with correct slug |
-| 3 | **Strategy valid** | One of: `static_html`, `structured_data`, `pdf_pricelist` |
+| 3 | **Strategy valid** | One of: `html_css`, `json_api`, `pdf` |
 | 4 | **Platform valid** | One of the platform enumeration values |
 | 5 | **Data source concrete** | Actual endpoint/selector, not placeholders |
 | 6 | **Discovery actionable** | Discovery method, pagination pattern, products per page all specified |
@@ -222,7 +222,7 @@ Re-read the catalog assessment and check against these gates. Fix any failures b
 **Slug:** {slug}
 **Assessment date:** {date}
 **Catalog found:** yes
-**Scraping strategy:** static_html | structured_data | pdf_pricelist
+**Scraping strategy:** html_css | json_api | pdf
 **Platform:** {platform-slug}
 **Anti-bot:** none | light | moderate {one-line mitigation note if needed}
 **Estimated product count:** {number} ({estimation method})
@@ -231,7 +231,7 @@ Re-read the catalog assessment and check against these gates. Fix any failures b
 ## Extraction Blueprint
 
 ### Data Source
-- **Primary method:** {api_endpoint | static_html_css | json_ld | pdf}
+- **Primary method:** {api_endpoint | html_css_css | json_ld | pdf}
 - **Endpoint/URL pattern:** {concrete pattern with placeholders}
 - **Parameters:** {pagination, category filters, limits}
 - **Response shape:** {brief description of JSON structure or HTML layout}
@@ -253,7 +253,7 @@ Re-read the catalog assessment and check against these gates. Fix any failures b
 ### Product Data Extraction
 
 #### Price
-- **Method:** {static_html_css | json_ld | dataLayer | api_endpoint}
+- **Method:** {html_css_css | json_ld | dataLayer | api_endpoint}
 - **Selector/path:** {concrete CSS selector or JSON path}
 - **Verified on:** {2-3 product URLs with actual extracted prices}
 - **Price variants:** {description if applicable}
@@ -312,7 +312,7 @@ Re-read the catalog assessment and check against these gates. Fix any failures b
 |------|---------|-------|
 | **H1 heading** | `# Catalog Assessment: {Company Name}` | `## Catalog Assessment`, missing name |
 | **Slug** | `festool` | Company name, URL, different slug |
-| **Strategy** | `static_html`, `structured_data`, `pdf_pricelist`, `none` | `headless_browser`, free-text |
+| **Strategy** | `html_css`, `json_api`, `pdf`, `none` | `headless_browser`, free-text |
 | **Stop reports** | `**Stop reason:** auth_required` + `## Findings` | Success template with empty sections |
 | **Success reports** | `## Extraction Blueprint` with all subsections | Survey-style sections |
 | **Anti-bot** | `none`, `light`, `moderate` | `severe` (should be stop), free-text |

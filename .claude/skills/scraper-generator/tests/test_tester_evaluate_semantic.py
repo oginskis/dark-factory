@@ -138,15 +138,12 @@ class TestM01UnitsSeparated:
         assert "18mm" in i["sample_values"]["nominal_thickness"]
 
     def test_string_without_unit_still_fails(self):
-        # "18" is still a string for a number+unit attr
         r, i = es.m01([STRING_NUMBERS], TYPES, UNITS)
         assert r["status"] == "fail"
 
     def test_string_attr_not_flagged(self):
-        # species is str-typed — even if it contains "mm" it shouldn't fail
         p = make_product(core_attributes={"wood_type": "12mm Softwood"})
         r, _ = es.m01([p], TYPES, UNITS)
-        # wood_type is str-typed, not number, so M01 doesn't check it
         assert r["status"] == "pass"
 
 
@@ -160,11 +157,9 @@ class TestM02TypeConformance:
     def test_string_number_warns(self):
         r, i = es.m02([STRING_NUMBERS], TYPES)
         assert r["status"] == "warn"
-        # pack_quantity is also string "10" — should be caught
         assert "pack_quantity" in i["affected_attributes"]
 
     def test_string_typed_attrs_not_flagged(self):
-        # species is str-typed — having a string value is correct
         r, _ = es.m02([VALID_PRODUCT], TYPES)
         assert r["status"] == "pass"
 
@@ -177,15 +172,14 @@ class TestM03AttributeUnitsPopulated:
         assert r["status"] == "pass"
 
     def test_missing_units_warns(self):
-        p = make_product(attribute_units={})  # missing both unit entries
+        p = make_product(attribute_units={})
         r, i = es.m03([p], UNITS)
         assert r["status"] == "warn"
         assert "nominal_thickness" in i["affected_attributes"]
 
     def test_attr_not_in_product_not_flagged(self):
-        # If the product doesn't have the attr at all, no issue
         p = make_product(
-            extended_attributes={"species": "Redwood"},  # no nominal_* attrs
+            extended_attributes={"species": "Redwood"},
             attribute_units={},
         )
         r, _ = es.m03([p], UNITS)
@@ -205,7 +199,6 @@ class TestM04ConcatenationScan:
         assert "18mm" in i["sample_values"]["nominal_thickness"]
 
     def test_string_attr_with_mm_not_flagged(self):
-        # species is str-typed and not in units — "12mm" in it should NOT be caught
         p = make_product(extended_attributes={
             "species": "12mm Redwood",
             "nominal_thickness": 18,
@@ -216,7 +209,6 @@ class TestM04ConcatenationScan:
         assert r["status"] == "pass"
 
     def test_various_unit_patterns(self):
-        """Test different unit suffixes are caught."""
         for val, attr in [("5kg", "weight"), ("220V", "voltage"), ("3.5kW", "power")]:
             types = {attr: "number"}
             units = {attr: "x"}
@@ -225,27 +217,20 @@ class TestM04ConcatenationScan:
             assert r["status"] == "fail", f"Should catch '{val}'"
 
 
-class TestIterationFlag:
-    """--iteration flag selects products_iteration_{N}.jsonl instead of products.jsonl."""
+class TestVersionedFileSupport:
+    """Script accepts versioned products file path directly."""
 
-    def test_reads_iteration_file(self, tmp_path):
-        # products.jsonl has clean product (passes M01)
-        (tmp_path / "products.jsonl").write_text(json.dumps(make_product()) + "\n")
-        # products_iteration_3.jsonl has concatenated units (fails M01)
-        (tmp_path / "products_iteration_3.jsonl").write_text(json.dumps(BAD_CONCAT) + "\n")
-
-        # Default: reads products.jsonl → M01 passes
-        products_default = es.load_jsonl(tmp_path / "products.jsonl")
-        r, _ = es.m01(products_default, TYPES, UNITS)
+    def test_reads_versioned_products_file(self, tmp_path):
+        pf = tmp_path / "products_2_b4d1.jsonl"
+        pf.write_text(json.dumps(make_product()) + "\n")
+        products = es.load_jsonl(pf)
+        assert len(products) == 1
+        r, _ = es.m01(products, TYPES, UNITS)
         assert r["status"] == "pass"
 
-        # Iteration 3: reads products_iteration_3.jsonl → M01 fails
-        products_iter3 = es.load_jsonl(tmp_path / "products_iteration_3.jsonl")
-        r, _ = es.m01(products_iter3, TYPES, UNITS)
-        assert r["status"] == "fail"
-
-    def test_missing_iteration_file_returns_empty(self, tmp_path):
-        products = es.load_jsonl(tmp_path / "products_iteration_99.jsonl")
+    def test_missing_versioned_file_returns_empty(self, tmp_path):
+        pf = tmp_path / "products_99_xxxx.jsonl"
+        products = es.load_jsonl(pf)
         assert products == []
 
 

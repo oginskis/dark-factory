@@ -250,7 +250,7 @@ def success_assessment_content():
         **Slug:** test-company
         **URL:** https://www.test-company.com
         **Platform:** shopify
-        **Scraping strategy:** structured_data
+        **Scraping strategy:** json_api
         **Anti-bot:** none (no challenges detected)
         **Estimated product count:** ~500
 

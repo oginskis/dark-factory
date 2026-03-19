@@ -3,16 +3,21 @@
 # dependencies = []
 # ///
 """
-Print human-readable status from test_reports.json (array of all iterations).
+Print human-readable status from versioned test report files.
 
 Agent: none (human utility)
 
 Usage:
-    uv run util_show_test_status.py docs/scraper-generator/harlowbros/output/test_reports.json
+    # Single versioned report file
+    uv run util_show_test_status.py docs/scraper-generator/acme/output/report_1_a3f2.json
 
-Supports both:
-- Array format (new): [{report1}, {report2}, ...]
-- Single object format (old): {report}
+    # Directory — scans for all report_*_*.json files
+    uv run util_show_test_status.py docs/scraper-generator/acme/output/
+
+Supports:
+- Single report file (object format)
+- Directory scan (finds report_{n}_{hash}.json files, sorted by iteration)
+- Legacy array format (for backward compatibility)
 """
 from __future__ import annotations
 
@@ -106,25 +111,53 @@ def format_report(report: dict, index: int | None = None) -> str:
     return "\n".join(lines)
 
 
+def _load_reports_from_dir(directory: Path) -> list[tuple[int, dict]]:
+    """Find versioned report files in a directory, return sorted by iteration."""
+    import re
+    pattern = re.compile(r"^report_(\d+)_[a-f0-9]+\.json$")
+    reports = []
+    for f in directory.glob("report_*_*.json"):
+        m = pattern.match(f.name)
+        if m:
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                reports.append((int(m.group(1)), data))
+            except (json.JSONDecodeError, OSError):
+                pass
+    reports.sort(key=lambda x: x[0])
+    return reports
+
+
 def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: util_show_test_status.py <test_reports.json>", file=sys.stderr)
+        print("Usage: util_show_test_status.py <report_file_or_directory>", file=sys.stderr)
         sys.exit(1)
 
     path = Path(sys.argv[1])
     if not path.exists():
-        print(f"No test report at {path}", file=sys.stderr)
+        print(f"No report at {path}", file=sys.stderr)
         sys.exit(1)
 
-    data = json.loads(path.read_text(encoding="utf-8"))
-
-    if isinstance(data, list):
-        print(f"=== {len(data)} iterations ===\n")
-        for i, report in enumerate(data, 1):
-            print(format_report(report, index=i))
+    if path.is_dir():
+        # Scan directory for versioned report files
+        reports = _load_reports_from_dir(path)
+        if not reports:
+            print(f"No report_*_*.json files found in {path}", file=sys.stderr)
+            sys.exit(1)
+        print(f"=== {len(reports)} iterations ===\n")
+        for iteration, report in reports:
+            print(format_report(report, index=iteration))
             print("---")
     else:
-        print(format_report(data))
+        # Single file — could be a single report or legacy array format
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            print(f"=== {len(data)} iterations ===\n")
+            for i, report in enumerate(data, 1):
+                print(format_report(report, index=i))
+                print("---")
+        else:
+            print(format_report(data))
 
 
 if __name__ == "__main__":

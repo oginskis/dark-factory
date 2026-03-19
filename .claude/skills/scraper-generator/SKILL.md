@@ -32,19 +32,26 @@ Generate a production-ready Python scraper for a company's product catalog, vali
 | Archived previous runs | `docs/scraper-generator/{slug}-archived-{YYYYMMDDTHHMMSS}/` — never read these |
 | Scraper script (output) | `docs/scraper-generator/{slug}/scraper.py` |
 | Config metadata (output) | `docs/scraper-generator/{slug}/config.json` |
-| Product data (output) | `docs/scraper-generator/{slug}/output/products.jsonl` |
-| Baseline products (output) | `docs/scraper-generator/{slug}/output/baseline_products.jsonl` |
-| Run summary (output) | `docs/scraper-generator/{slug}/output/summary.json` |
 | Generator input (pre-processed) | `docs/scraper-generator/{slug}/generator_input.json` |
 | Language seed (non-English) | `docs/platform-knowledgebase/labels-{lang}.json` |
-| Test report, current iteration (output) | `docs/scraper-generator/{slug}/output/test_report.json` |
-| Test reports history (output) | `docs/scraper-generator/{slug}/output/test_reports.json` |
-| Test summary, human-readable (output) | `docs/scraper-generator/{slug}/output/test_summary.txt` |
-| Per-iteration products (output) | `docs/scraper-generator/{slug}/output/products_iteration_{N}.jsonl` |
-| Per-iteration debug log (output) | `docs/scraper-generator/{slug}/output/debug_iteration_{N}.log` |
-| Validation diagnostics (output) | `docs/scraper-generator/{slug}/output/validation.json` |
-| Debug log (output) | `docs/scraper-generator/{slug}/output/debug.log` |
-| Test status viewer (utility) | `.claude/skills/scraper-generator/scripts/util_show_test_status.py` |
+| Test report (output) | `docs/scraper-generator/{slug}/output/report_{n}_{hash}.json` — never overwritten |
+| Validation diagnostics (output) | `docs/scraper-generator/{slug}/output/validation_{n}_{hash}.json` — never overwritten |
+| Products (output) | `docs/scraper-generator/{slug}/output/products_{n}_{hash}.jsonl` — never overwritten |
+| Run summary (output) | `docs/scraper-generator/{slug}/output/summary_{n}_{hash}.json` — never overwritten |
+| Debug log (output) | `docs/scraper-generator/{slug}/output/debug_{n}_{hash}.log` — never overwritten |
+| Baseline products (output) | `docs/scraper-generator/{slug}/output/baseline_products.jsonl` — overwritten per test cycle |
+| Test status viewer (utility) | `.claude/skills/scraper-generator/scripts/util_show_test_status.py` — accepts file or directory |
+
+### Output file versioning
+
+All output files in `output/` use `{name}_{n}_{hash}.{ext}` naming. Files are never overwritten — each iteration produces new files.
+
+- **`{n}`** — iteration number. Starts at 1 for the first test run, increments for each retest cycle.
+- **`{hash}`** — short content hash (first 4 hex chars of SHA-256 of the file content, or of a timestamp if computing before content exists). Prevents collisions if the same iteration is re-run.
+
+**Who computes these paths:** The orchestrator computes all versioned paths and passes them to the tester. The tester passes them to the scraper via `--output-file`, `--summary-file`, `--log-file`. The tester computes its own `report_{n}_{hash}.json` path. Nobody invents filenames downstream — paths always flow from the orchestrator.
+
+**Finding the latest file:** Sort by `{n}` (highest iteration number wins). Within the same `{n}`, there should be exactly one file per name.
 
 ### Slug derivation
 
@@ -54,40 +61,27 @@ Generate a production-ready Python scraper for a company's product catalog, vali
 
 ## Workflow
 
-Read and follow `references/orchestrator.md`.
+Read and follow `references/orchestrator.md`. It defines all steps, decisions, constants, and the fix→retest loop. The coder contract is in `references/coder.md`, the tester contract in `references/tester.md`.
 
-- **Archive previous run:** Before starting, check if `docs/scraper-generator/{slug}/` exists. If it does, archive it: `mv docs/scraper-generator/{slug} docs/scraper-generator/{slug}-archived-$(date -u +%Y%m%dT%H%M%S)`. Then create the fresh directory: `mkdir -p docs/scraper-generator/{slug}/output`. Every invocation generates from scratch — never read from or make decisions based on archived directories (`{slug}-archived-*`).
-- Provide the file paths from the table above when the workflow references logical resources (e.g., "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the pre-processed generator input file", "the language seed file").
-- Dispatch the coder sub-agent using the Agent tool as directed by the orchestrator. Sub-agent file: `.claude/skills/scraper-generator/references/coder.md` — writes and patches `scraper.py`. The orchestrator specifies what data to pass and when to dispatch.
-- Dispatch the tester sub-agent using the Agent tool as directed by the orchestrator. Sub-agent file: `.claude/skills/scraper-generator/references/tester.md` — runs scraper, evaluates output, writes `test_report.json`. The orchestrator specifies what data to pass and when to dispatch.
-- **Sub-agent rules** — include these in every sub-agent dispatch prompt:
+### Before starting the orchestrator
+
+1. **Archive previous run:** If `docs/scraper-generator/{slug}/` exists, archive it: `mv docs/scraper-generator/{slug} docs/scraper-generator/{slug}-archived-$(date -u +%Y%m%dT%H%M%S)`. Then `mkdir -p docs/scraper-generator/{slug}/output`. Never read archived directories.
+2. **Build routing tables:** `uv run .claude/skills/scraper-generator/scripts/orchestrator_prepare_generator_input.py --schemas {taxonomy_ids} --output docs/scraper-generator/{slug}/generator_input.json` — `{taxonomy_ids}` are space-separated subcategory IDs from the company report. Exit 1 = some schemas missing (orchestrator resolves in Step 2). Exit 2 = crash, stop.
+3. **Language seed (non-English only):** Check for `docs/platform-knowledgebase/labels-{lang}.json`. If it exists, provide it to the orchestrator. Save the updated label map back after successful generation.
+
+### Dispatching sub-agents
+
+- **Coder:** `.claude/skills/scraper-generator/references/coder.md` — writes and patches `scraper.py`.
+- **Tester:** `.claude/skills/scraper-generator/references/tester.md` — runs scraper, evaluates output, writes `report_{n}_{hash}.json`.
+- Include these rules in every sub-agent dispatch prompt:
   1. Only read files listed in your input contract. No other scrapers, no archived runs, no files outside the company's directory.
   2. Run external commands in the foreground. Never use background tasks.
-- The orchestrator handles label mapping inline. It dispatches the coder for code generation and the tester for validation — it never writes code or runs the scraper itself.
-- Before starting the orchestrator, run the pre-processing script to build routing tables: `uv run .claude/skills/scraper-generator/scripts/orchestrator_prepare_generator_input.py --schemas {taxonomy_ids} --output docs/scraper-generator/{slug}/generator_input.json` where `{taxonomy_ids}` are the space-separated subcategory taxonomy IDs from the company report. If exit code is 1, some schemas are missing — read the `errors` array from stdout to identify them. The orchestrator resolves these in Step 2 via the `no_sku_schema` decision. If exit code is 2, the script crashed — report the error and stop.
-- For non-English sites, check for a language seed file at `docs/platform-knowledgebase/labels-{lang}.json` where `{lang}` is the ISO 639-1 language code from the catalog assessment. If it exists, provide it to the orchestrator. After successful scraper generation, save the updated label map back to the seed file.
-- For non-English sites, when `test_report.json` reveals low label coverage or issues referencing unknown attribute labels, the orchestrator enters a label extension retry: it reads the unmapped labels from the test report, extends the LABEL_MAP, and re-dispatches the coder and tester. Max 3 label extension attempts before escalating `label_coverage_insufficient`.
-- The `no_sku_schema` decision has an autonomous resolution path: when the subcategory exists in the taxonomy but the SKU schema file hasn't been created yet, automatically invoke `/product-taxonomy` for that subcategory to generate the schema, then continue without user interaction. Before concluding a schema is missing, **list the `docs/product-taxonomy/sku-schemas/` directory** and search for the subcategory name — never guess the filename from a partial slug.
-- Run the scraper using `uv run` (not `uv run python`). The PEP 723 inline metadata in the script declares its own dependencies, so `uv` resolves them automatically.
-- Probe: `uv run docs/scraper-generator/{slug}/scraper.py --probe <URL>` — the scraper fetches the page internally, prints JSON to stdout. No web fetch tools needed for probing.
-- Category-scoped run: `uv run docs/scraper-generator/{slug}/scraper.py --categories "/shop/timber-joinery" --limit 10` — only traverse matching categories.
-- Append mode: `uv run docs/scraper-generator/{slug}/scraper.py --categories "/shop/fencing" --limit 10 --append` — append to existing products.jsonl without truncating.
-- No web search or Playwright browser tools are needed.
-- The knowledgebase write (Step 3) uses file write/edit tools to create or append to the platform knowledgebase file.
-- Data persistence: the coder sub-agent writes scraper.py with persist hooks (`setup`/`persist`/`teardown`). The scraper code is final once the tester returns `pass`. After config metadata is prepared (Step 4), persist it as JSON to the config metadata path.
-- Diagnostic persistence: the tester writes `test_report.json` after each dispatch. After successful validation, the orchestrator derives `validation.json` from `test_report.json` for eval-generator compatibility.
-- The canonical product record format definition lives in `references/coder.md`.
 
-## Fix Mode
+### Operational notes
 
-When invoked by `/scraper-remediation` with a fix request (`mode: "fix"`), the scraper-generator operates differently:
-
-- **Skip the archive step** — do not archive or regenerate from scratch. Patch the existing scraper in place.
-- The remediation skill creates `scraper.py.pre-remediation` backup before invoking fix mode — rollback is the remediation skill's responsibility.
-- Read the fix request JSON to understand which eval checks failed and what needs fixing.
-- Read and follow the "## Fix Mode" section in `references/orchestrator.md` for the step flow. The orchestrator maps eval check names to internal rule IDs and dispatches the coder sub-agent in fix mode.
-- Validation (tester dispatch with retest + final modes) runs the same as normal mode.
-- Write a `fix_summary` field to `validation.json` describing what was changed and the `fix_outcome` (`"fixed"`, `"partial"`, or `"unfixable"`).
+- Run scrapers with `uv run` (not `uv run python`). PEP 723 metadata resolves dependencies automatically.
+- No web search or Playwright browser tools needed. Scrapers fetch pages internally.
+- The `no_sku_schema` decision has an autonomous resolution: invoke `/product-taxonomy` for the missing subcategory. Before concluding a schema is missing, **list `docs/product-taxonomy/sku-schemas/`** — never guess the filename.
 
 ## Escalation handling
 

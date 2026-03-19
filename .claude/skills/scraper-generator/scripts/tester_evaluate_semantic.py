@@ -10,11 +10,12 @@ Agent: tester sub-agent (references/tester.md)
 Checks attribute values against routing tables (types + units from generator_input.json).
 Catches the most common scraper bug: "18mm" instead of value=18 + attribute_units={"attr": "mm"}.
 
-Reads: products.jsonl, generator_input.json
+Reads: versioned products file, generator_input.json
 Outputs: JSON to stdout with rule_results and issues arrays.
 
 Usage:
-    uv run tester_evaluate_semantic.py --output-dir docs/scraper-generator/acme/output \
+    uv run tester_evaluate_semantic.py \
+        --products-file docs/scraper-generator/acme/output/products_1_a3f2.jsonl \
         --routing-tables docs/scraper-generator/acme/generator_input.json
 """
 from __future__ import annotations
@@ -201,14 +202,13 @@ def m04(products: list[dict], types: dict, units: dict) -> tuple[dict, dict | No
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Semantic validation rules M01-M04")
-    parser.add_argument("--output-dir", required=True, help="Scraper output directory")
-    parser.add_argument("--routing-tables", required=True, help="Path to generator_input.json")
-    parser.add_argument("--iteration", type=int, help="Evaluate products_iteration_{N}.jsonl instead of products.jsonl")
+    parser.add_argument("--products-file", required=True,
+                        help="Path to versioned products JSONL file")
+    parser.add_argument("--routing-tables", required=True,
+                        help="Path to generator_input.json")
     args = parser.parse_args()
 
-    output_dir = Path(args.output_dir)
-    # Read iteration-specific file if --iteration provided, otherwise latest products.jsonl
-    products_file = output_dir / f"products_iteration_{args.iteration}.jsonl" if args.iteration else output_dir / "products.jsonl"
+    products_file = Path(args.products_file)
     products = load_jsonl(products_file)
     types, units = load_routing_tables(Path(args.routing_tables))
 
@@ -224,7 +224,6 @@ def main() -> None:
         if i:
             issues.append(i)
 
-    # Output JSON to stdout for the tester sub-agent to consume
     print(json.dumps({
         "rule_results": results,
         "issues": issues,

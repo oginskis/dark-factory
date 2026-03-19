@@ -3,28 +3,41 @@
 # dependencies = []
 # ///
 """
-Scraper execution harness. Runs a scraper, captures output, manages iteration files.
+Scraper execution harness. Runs a scraper, captures output, manages versioned files.
 
 Agent: tester sub-agent (references/tester.md)
 No validation logic — just execution + file management + traces.
-Accumulates summary.json across multiple scraper invocations within a step
+Accumulates summary across multiple scraper invocations within a step
 so that errors_count reflects the total across all category runs.
+
+The orchestrator computes all versioned output paths (products_{n}_{hash}.jsonl,
+summary_{n}_{hash}.json, debug_{n}_{hash}.log) and passes them through the tester
+to this script. The scraper receives them as --output-file, --summary-file, --log-file.
 
 Usage:
     uv run tester_run_scraper.py --scraper docs/scraper-generator/acme/scraper.py \
         --step probe --probe-urls "https://acme.com/p1,https://acme.com/p2" --iteration 1
 
     uv run tester_run_scraper.py --scraper docs/scraper-generator/acme/scraper.py \
-        --step categories --categories "/shop/tools,/shop/wood" --limit-per-cat 10 --iteration 1
+        --step categories --categories "/shop/tools,/shop/wood" --limit-per-cat 10 \
+        --output-file output/products_1_a3f2.jsonl \
+        --summary-file output/summary_1_a3f2.json \
+        --log-file output/debug_1_a3f2.log \
+        --iteration 1
 
     uv run tester_run_scraper.py --scraper docs/scraper-generator/acme/scraper.py \
-        --step depth --iteration 1
+        --step depth \
+        --output-file output/products_1_a3f2.jsonl \
+        --summary-file output/summary_1_a3f2.json \
+        --log-file output/debug_1_a3f2.log \
+        --iteration 1
 
     uv run tester_run_scraper.py --scraper docs/scraper-generator/acme/scraper.py \
-        --step save-baseline --iteration 1
+        --step save-baseline \
+        --output-file output/products_1_a3f2.jsonl \
+        --iteration 1
 
-    uv run tester_run_scraper.py --scraper docs/scraper-generator/acme/scraper.py \
-        --step save-iteration --iteration 1
+Exit codes: 0 = success, 1 = missing required args, 2 = scraper not found
 """
 from __future__ import annotations
 
@@ -44,12 +57,11 @@ def trace(phase: str, **kwargs) -> None:
     print(json.dumps(entry), flush=True)
 
 
-def _read_summary(output_dir: Path) -> dict:
-    """Read summary.json from output dir. Returns empty dict if missing or malformed."""
-    sp = output_dir / "summary.json"
-    if sp.exists():
+def _read_summary(summary_file: Path) -> dict:
+    """Read summary JSON file. Returns empty dict if missing or malformed."""
+    if summary_file and summary_file.exists():
         try:
-            return json.loads(sp.read_text(encoding="utf-8"))
+            return json.loads(summary_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             pass
     return {}
@@ -58,7 +70,7 @@ def _read_summary(output_dir: Path) -> dict:
 def _merge_summaries(accumulated: dict, run_summary: dict) -> dict:
     """Merge a single-run summary into an accumulated summary.
 
-    Each scraper invocation writes its own summary.json via teardown().
+    Each scraper invocation writes its own summary via teardown().
     This function accumulates totals across multiple invocations so that
     tester_evaluate_structural.py sees the combined result (especially errors_count).
     """
@@ -78,46 +90,55 @@ def _merge_summaries(accumulated: dict, run_summary: dict) -> dict:
     }
 
 
-def _clear_summary(output_dir: Path) -> None:
-    """Remove summary.json so we can detect whether the scraper wrote a new one."""
-    sp = output_dir / "summary.json"
-    if sp.exists():
-        sp.unlink()
+def _clear_summary(summary_file: Path) -> None:
+    """Remove summary file so we can detect whether the scraper wrote a new one."""
+    if summary_file and summary_file.exists():
+        summary_file.unlink()
 
 
-def _write_summary(output_dir: Path, summary: dict) -> None:
-    """Write accumulated summary to output dir."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    sp = output_dir / "summary.json"
-    sp.write_text(json.dumps(summary, indent=2))
+def _write_summary(summary_file: Path, summary: dict) -> None:
+    """Write accumulated summary to the versioned summary file."""
+    summary_file.parent.mkdir(parents=True, exist_ok=True)
+    summary_file.write_text(json.dumps(summary, indent=2))
 
 
 def run_scraper(
     scraper_path: Path,
     args: list[str],
-    debug_log: Path,
+    log_file: Path | None,
     timeout: int,
 ) -> tuple[int, str, float]:
-    """Run scraper, append stderr to debug_log. Returns (exit_code, stdout, duration_s)."""
+    """Run scraper subprocess. Captures stderr and appends to log_file if non-empty.
+
+    Returns (exit_code, stdout, duration_s). Exit code -1 means timeout.
+    """
     cmd = ["uv", "run", str(scraper_path)] + args
     start = time.monotonic()
     try:
-        with open(debug_log, "a") as f:
-            result = subprocess.run(
-                cmd, stdout=subprocess.PIPE, stderr=f,
-                timeout=timeout, text=True,
-            )
+        result = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=timeout, text=True,
+        )
         duration = time.monotonic() - start
+        if result.stderr and log_file:
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(log_file, "a") as f:
+                f.write(result.stderr)
         return result.returncode, result.stdout, duration
     except subprocess.TimeoutExpired:
         duration = time.monotonic() - start
         return -1, "", duration
 
 
-def step_probe(scraper_path: Path, urls: list[str], debug_log: Path) -> None:
-    """Run --probe for each URL. Traces each result."""
+def step_probe(scraper_path: Path, urls: list[str], log_file: Path | None) -> None:
+    """Run --probe for each URL. Traces each result.
+
+    --probe is exclusive with all other scraper flags (per coder.md),
+    so no --output-file/--summary-file/--log-file is passed to the scraper.
+    Stderr is captured by run_scraper and appended to log_file.
+    """
     for url in urls:
-        code, stdout, duration = run_scraper(scraper_path, ["--probe", url], debug_log, timeout=30)
+        code, stdout, duration = run_scraper(scraper_path, ["--probe", url], log_file, timeout=30)
         if code == 0 and stdout.strip():
             try:
                 product = json.loads(stdout.strip())
@@ -137,120 +158,145 @@ def step_categories(
     scraper_path: Path,
     categories: list[str],
     limit_per: int,
-    debug_log: Path,
+    output_file: Path,
+    summary_file: Path,
+    log_file: Path | None,
     *,
     append: bool = False,
 ) -> None:
-    """Run scraper per category. First category uses --append only if append=True.
+    """Run scraper per category with versioned output paths.
+
+    First category uses --append only if append=True.
     Subsequent categories always use --append so outputs accumulate.
 
-    Accumulates summary.json across all category runs so that errors_count
-    reflects the total across all categories, not just the last one."""
-    output_dir = scraper_path.parent / "output"
-    accumulated = _read_summary(output_dir) if append else {}
+    Accumulates summary across all category runs so that errors_count
+    reflects the total across all categories, not just the last one.
+    """
+    accumulated = _read_summary(summary_file) if append else {}
     timeout_per = max(60, limit_per * 6)
     for i, cat in enumerate(categories):
-        args = ["--categories", cat, "--limit", str(limit_per)]
+        scraper_args = [
+            "--categories", cat,
+            "--limit", str(limit_per),
+            "--output-file", str(output_file),
+            "--summary-file", str(summary_file),
+        ]
+        if log_file:
+            scraper_args += ["--log-file", str(log_file)]
         if i > 0 or append:
-            args.append("--append")
-        _clear_summary(output_dir)
-        code, _, duration = run_scraper(scraper_path, args, debug_log, timeout_per)
-        run_summary = _read_summary(output_dir)
+            scraper_args.append("--append")
+        _clear_summary(summary_file)
+        code, _, duration = run_scraper(scraper_path, scraper_args, log_file, timeout_per)
+        run_summary = _read_summary(summary_file)
         if run_summary:
             accumulated = _merge_summaries(accumulated, run_summary)
         status = "ok" if code == 0 else ("timeout" if code == -1 else "error")
         trace("category", category=cat, status=status, exit_code=code,
               duration_s=round(duration, 1))
     if accumulated:
-        _write_summary(output_dir, accumulated)
+        _write_summary(summary_file, accumulated)
 
 
-def step_depth(scraper_path: Path, debug_log: Path) -> None:
-    """Run scraper with --limit 100 --append, no categories. Appends to preserve Step 2 output.
+def step_depth(
+    scraper_path: Path,
+    output_file: Path,
+    summary_file: Path,
+    log_file: Path | None,
+) -> None:
+    """Run scraper with --limit 100 --append using versioned output paths.
 
-    Merges this run's summary with the existing accumulated summary from prior steps."""
-    output_dir = scraper_path.parent / "output"
-    accumulated = _read_summary(output_dir)
-    _clear_summary(output_dir)
-    code, _, duration = run_scraper(scraper_path, ["--limit", "100", "--append"], debug_log, timeout=600)
-    run_summary = _read_summary(output_dir)
+    Merges this run's summary with the existing accumulated summary from prior steps.
+    """
+    accumulated = _read_summary(summary_file)
+    _clear_summary(summary_file)
+    scraper_args = [
+        "--limit", "100", "--append",
+        "--output-file", str(output_file),
+        "--summary-file", str(summary_file),
+    ]
+    if log_file:
+        scraper_args += ["--log-file", str(log_file)]
+    code, _, duration = run_scraper(scraper_path, scraper_args, log_file, timeout=600)
+    run_summary = _read_summary(summary_file)
     if run_summary:
         accumulated = _merge_summaries(accumulated, run_summary)
     if accumulated:
-        _write_summary(output_dir, accumulated)
+        _write_summary(summary_file, accumulated)
     status = "ok" if code == 0 else ("timeout" if code == -1 else "error")
     trace("depth_check", status=status, exit_code=code, duration_s=round(duration, 1))
 
 
-def step_save_baseline(output_dir: Path) -> None:
-    """Copy products.jsonl to baseline_products.jsonl."""
-    src = output_dir / "products.jsonl"
-    dst = output_dir / "baseline_products.jsonl"
-    if src.exists():
-        shutil.copy2(src, dst)
-        trace("save_baseline", status="ok", size_bytes=src.stat().st_size)
+def step_save_baseline(output_file: Path) -> None:
+    """Copy versioned products file to baseline_products.jsonl in the same directory."""
+    baseline = output_file.parent / "baseline_products.jsonl"
+    if output_file.exists():
+        shutil.copy2(output_file, baseline)
+        trace("save_baseline", status="ok", source=str(output_file.name),
+              size_bytes=output_file.stat().st_size)
     else:
-        trace("save_baseline", status="error", detail="products.jsonl does not exist")
-
-
-def step_save_iteration(output_dir: Path, iteration: int) -> None:
-    """Copy products.jsonl and debug log to iteration-specific files."""
-    products = output_dir / "products.jsonl"
-    debug = output_dir / f"debug_iteration_{iteration}.log"
-
-    if products.exists():
-        shutil.copy2(products, output_dir / f"products_iteration_{iteration}.jsonl")
-        trace("save_iteration", file="products", iteration=iteration,
-              size_bytes=products.stat().st_size)
-
-    if debug.exists():
-        shutil.copy2(debug, output_dir / "debug.log")
-        trace("save_iteration", file="debug", iteration=iteration,
-              size_bytes=debug.stat().st_size)
+        trace("save_baseline", status="error",
+              detail=f"{output_file.name} does not exist")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Scraper execution harness")
     parser.add_argument("--scraper", required=True, help="Path to scraper.py")
     parser.add_argument("--step", required=True,
-                        choices=["probe", "categories", "depth", "save-baseline", "save-iteration"])
+                        choices=["probe", "categories", "depth", "save-baseline"])
     parser.add_argument("--iteration", required=True, type=int)
     parser.add_argument("--probe-urls", help="Comma-separated product URLs (probe step)")
     parser.add_argument("--categories", help="Comma-separated category URL prefixes (categories step)")
     parser.add_argument("--limit-per-cat", type=int, default=10, help="Product limit per category")
-    parser.add_argument("--append", action="store_true", help="Append to existing products.jsonl (categories step)")
+    parser.add_argument("--append", action="store_true",
+                        help="Append to existing products file (categories step)")
+    parser.add_argument("--output-file",
+                        help="Versioned products JSONL path (categories, depth, save-baseline steps)")
+    parser.add_argument("--summary-file",
+                        help="Versioned summary JSON path (categories, depth steps)")
+    parser.add_argument("--log-file",
+                        help="Versioned debug log path (probe, categories, depth steps)")
     args = parser.parse_args()
 
     scraper_path = Path(args.scraper)
     if not scraper_path.exists():
         print(f"Error: scraper not found at {scraper_path}", file=sys.stderr)
         sys.exit(2)
-    output_dir = scraper_path.parent / "output"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    debug_log = output_dir / f"debug_iteration_{args.iteration}.log"
+
+    output_file = Path(args.output_file) if args.output_file else None
+    summary_file = Path(args.summary_file) if args.summary_file else None
+    log_file = Path(args.log_file) if args.log_file else None
 
     if args.step == "probe":
         if not args.probe_urls:
             print("Error: --probe-urls required for probe step", file=sys.stderr)
             sys.exit(1)
         urls = [u.strip() for u in args.probe_urls.split(",") if u.strip()]
-        step_probe(scraper_path, urls, debug_log)
+        step_probe(scraper_path, urls, log_file)
 
     elif args.step == "categories":
         if not args.categories:
             print("Error: --categories required for categories step", file=sys.stderr)
             sys.exit(1)
+        if not output_file or not summary_file:
+            print("Error: --output-file and --summary-file required for categories step",
+                  file=sys.stderr)
+            sys.exit(1)
         cats = [c.strip() for c in args.categories.split(",") if c.strip()]
-        step_categories(scraper_path, cats, args.limit_per_cat, debug_log, append=args.append)
+        step_categories(scraper_path, cats, args.limit_per_cat,
+                        output_file, summary_file, log_file, append=args.append)
 
     elif args.step == "depth":
-        step_depth(scraper_path, debug_log)
+        if not output_file or not summary_file:
+            print("Error: --output-file and --summary-file required for depth step",
+                  file=sys.stderr)
+            sys.exit(1)
+        step_depth(scraper_path, output_file, summary_file, log_file)
 
     elif args.step == "save-baseline":
-        step_save_baseline(output_dir)
-
-    elif args.step == "save-iteration":
-        step_save_iteration(output_dir, args.iteration)
+        if not output_file:
+            print("Error: --output-file required for save-baseline step", file=sys.stderr)
+            sys.exit(1)
+        step_save_baseline(output_file)
 
 
 if __name__ == "__main__":

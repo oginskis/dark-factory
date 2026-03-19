@@ -10,13 +10,18 @@ Agent: tester sub-agent (references/tester.md)
 Checks product record structure: required fields, fill rates, taxonomy IDs,
 brand placement, category diversity, error counts, crash status, persist hooks.
 
-Reads: products.jsonl, summary.json, categories.md
+Reads: versioned products file, versioned summary file, categories.md
 Outputs: JSON to stdout with rule_results and issues arrays.
 
 Usage:
-    uv run tester_evaluate_structural.py --output-dir docs/scraper-generator/acme/output \
+    uv run tester_evaluate_structural.py \
+        --products-file docs/scraper-generator/acme/output/products_1_a3f2.jsonl \
+        --summary-file docs/scraper-generator/acme/output/summary_1_a3f2.json \
         --exit-code 0
-    uv run tester_evaluate_structural.py --output-dir docs/scraper-generator/acme/output \
+
+    uv run tester_evaluate_structural.py \
+        --products-file docs/scraper-generator/acme/output/products_1_a3f2.jsonl \
+        --summary-file docs/scraper-generator/acme/output/summary_1_a3f2.json \
         --exit-code 0 --skip-s06
 """
 from __future__ import annotations
@@ -146,7 +151,6 @@ def s03(products: list[dict]) -> tuple[dict, dict | None]:
     st = "pass" if not failing else "fail"
     iss = None
     if failing:
-        # Find which fields are most commonly missing
         counts: dict[str, int] = {}
         for p in failing:
             for f in required:
@@ -197,12 +201,11 @@ def s06(products: list[dict], skip: bool = False) -> tuple[dict, dict | None]:
     return {"id": "S06", "status": st, "value": n, "threshold": 2}, iss
 
 
-def s07(output_dir: Path) -> tuple[dict, dict | None]:
-    """S07: errors_count in summary.json must be 0 (error)."""
-    sp = output_dir / "summary.json"
-    if not sp.exists():
+def s07(summary_file: Path) -> tuple[dict, dict | None]:
+    """S07: errors_count in summary file must be 0 (error)."""
+    if not summary_file.exists():
         return {"id": "S07", "status": "fail", "value": -1, "threshold": 0}, None
-    errors = json.loads(sp.read_text()).get("errors_count", 0)
+    errors = json.loads(summary_file.read_text()).get("errors_count", 0)
     st = "pass" if errors == 0 else "fail"
     iss = {"rule_id": "S07", "detail": f"{errors} errors", "affected_categories": [], "sample_urls": []} if errors else None
     return {"id": "S07", "status": st, "value": errors, "threshold": 0}, iss
@@ -218,15 +221,14 @@ def s08(exit_code: int) -> tuple[dict, dict | None]:
     return {"id": "S08", "status": st, "value": exit_code}, iss
 
 
-def s09(output_dir: Path) -> tuple[dict, dict | None]:
-    """S09: products.jsonl must exist and be non-empty (error). Empty = scraper extracted nothing."""
-    pp = output_dir / "products.jsonl"
-    if not pp.exists():
+def s09(products_file: Path) -> tuple[dict, dict | None]:
+    """S09: products file must exist and be non-empty (error)."""
+    if not products_file.exists():
         return {"id": "S09", "status": "fail", "value": 0}, \
-            {"rule_id": "S09", "detail": "products.jsonl missing", "affected_categories": [], "sample_urls": []}
-    lines = len([l for l in pp.read_text().splitlines() if l.strip()])
+            {"rule_id": "S09", "detail": f"{products_file.name} missing", "affected_categories": [], "sample_urls": []}
+    lines = len([l for l in products_file.read_text().splitlines() if l.strip()])
     st = "pass" if lines > 0 else "fail"
-    iss = {"rule_id": "S09", "detail": "products.jsonl empty", "affected_categories": [], "sample_urls": []} if not lines else None
+    iss = {"rule_id": "S09", "detail": f"{products_file.name} empty", "affected_categories": [], "sample_urls": []} if not lines else None
     return {"id": "S09", "status": st, "value": lines}, iss
 
 
@@ -236,15 +238,17 @@ def s09(output_dir: Path) -> tuple[dict, dict | None]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Structural validation rules S01-S09")
-    parser.add_argument("--output-dir", required=True, help="Scraper output directory")
+    parser.add_argument("--products-file", required=True,
+                        help="Path to versioned products JSONL file")
+    parser.add_argument("--summary-file", required=True,
+                        help="Path to versioned summary JSON file")
     parser.add_argument("--exit-code", type=int, default=0, help="Scraper exit code")
-    parser.add_argument("--skip-s06", action="store_true", help="Skip category diversity (retest mode)")
-    parser.add_argument("--iteration", type=int, help="Evaluate products_iteration_{N}.jsonl instead of products.jsonl")
+    parser.add_argument("--skip-s06", action="store_true",
+                        help="Skip category diversity (retest mode)")
     args = parser.parse_args()
 
-    output_dir = Path(args.output_dir)
-    # Read iteration-specific file if --iteration provided, otherwise latest products.jsonl
-    products_file = output_dir / f"products_iteration_{args.iteration}.jsonl" if args.iteration else output_dir / "products.jsonl"
+    products_file = Path(args.products_file)
+    summary_file = Path(args.summary_file)
     products = load_jsonl(products_file)
 
     results, issues = [], []
@@ -257,7 +261,7 @@ def main() -> None:
     results.append(r)
     if i:
         issues.append(i)
-    r, i = s07(output_dir)
+    r, i = s07(summary_file)
     results.append(r)
     if i:
         issues.append(i)
@@ -265,12 +269,11 @@ def main() -> None:
     results.append(r)
     if i:
         issues.append(i)
-    r, i = s09(output_dir)
+    r, i = s09(products_file)
     results.append(r)
     if i:
         issues.append(i)
 
-    # Output JSON to stdout for the tester sub-agent or tester_evaluate_semantic.py to consume
     print(json.dumps({"rule_results": results, "issues": issues, "products_count": len(products)}, indent=2))
 
 

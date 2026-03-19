@@ -27,8 +27,8 @@ Generate an eval config that validates scraper quality using thirteen weighted c
 | Scraper source | `docs/scraper-generator/{slug}/scraper.py` |
 | Product taxonomy categories | `docs/product-taxonomy/categories.md` |
 | SKU schema | `docs/product-taxonomy/sku-schemas/{category-slug}.md` |
-| Scrape output (products) | `docs/scraper-generator/{slug}/output/products.jsonl` |
-| Scrape run summary | `docs/scraper-generator/{slug}/output/summary.json` |
+| Scrape output (products) | `docs/scraper-generator/{slug}/output/products.jsonl` — eval.py writes here via `--output-file` when running the scraper |
+| Scrape run summary | `docs/scraper-generator/{slug}/output/summary.json` — eval.py writes here via `--summary-file` when running the scraper |
 | Shared eval script | `eval/eval.py` |
 | Eval config (output) | `docs/eval-generator/{slug}/eval_config.json` |
 | Eval result (output) | `docs/eval-generator/{slug}/output/eval_result.json` |

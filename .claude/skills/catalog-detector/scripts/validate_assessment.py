@@ -26,7 +26,7 @@ def log(level: str, message: str, **extra: object) -> None:
     print(json.dumps(entry), file=sys.stderr)
 
 
-VALID_STRATEGIES = {"static_html", "structured_data", "pdf_pricelist", "none"}
+VALID_STRATEGIES = {"html_css", "json_api", "pdf", "none"}
 VALID_PLATFORMS = {
     "woocommerce", "shopify", "magento", "prestashop", "opencart",
     "bigcommerce", "squarespace", "wix", "drupal", "custom", "unknown",
@@ -105,7 +105,7 @@ def check_heading_and_slug(content: str) -> dict:
 
 def check_strategy_valid(content: str) -> dict:
     """
-    WHAT IT CHECKS: **Scraping strategy:** is one of {static_html, structured_data, pdf_pricelist, none}.
+    WHAT IT CHECKS: **Scraping strategy:** is one of {html_css, json_api, pdf, none}.
     FAILURE MEANS: The strategy field is missing or uses a non-standard value.
     HOW TO FIX: Set **Scraping strategy:** to one of the valid values.
     """

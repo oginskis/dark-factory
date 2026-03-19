@@ -880,13 +880,17 @@ def main() -> None:
     slug = config["company_slug"]
 
     # Resolve paths
-    scraper_output = project_root / "docs" / "scraper-generator" / slug / "output" / "products.jsonl"
-    scraper_summary_path = project_root / "docs" / "scraper-generator" / slug / "output" / "summary.json"
+    scraper_dir = project_root / "docs" / "scraper-generator" / slug
+    output_dir = scraper_dir / "output"
+    scraper_output = output_dir / "products.jsonl"
+    scraper_summary_path = output_dir / "summary.json"
+    scraper_log_path = output_dir / "debug.log"
     eval_output_dir = args.config.resolve().parent / "output"
     eval_result_path = eval_output_dir / "eval_result.json"
     eval_history_path = eval_output_dir / "eval_history.json"
     baseline_path = eval_output_dir / "baseline.json"
     eval_output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load data
     products = load_jsonl(scraper_output)
@@ -901,12 +905,18 @@ def main() -> None:
         sample = eval_sample_size(config)
         needed = sample["total"]
         if len(products) < needed:
-            scraper_path = project_root / "docs" / "scraper-generator" / slug / "scraper.py"
+            scraper_path = scraper_dir / "scraper.py"
             if scraper_path.exists():
                 print(f"Collecting {needed} products (have {len(products)})...", file=sys.stderr)
                 try:
                     proc = subprocess.run(
-                        ["uv", "run", str(scraper_path), "--limit", str(needed)],
+                        [
+                            "uv", "run", str(scraper_path),
+                            "--limit", str(needed),
+                            "--output-file", str(scraper_output),
+                            "--summary-file", str(scraper_summary_path),
+                            "--log-file", str(scraper_log_path),
+                        ],
                         cwd=project_root,
                         timeout=min(max(300, needed * 10), 3600),
                         check=False,

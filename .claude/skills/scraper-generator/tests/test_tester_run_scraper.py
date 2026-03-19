@@ -4,7 +4,7 @@
 #     "pytest",
 # ]
 # ///
-"""Tests for tester_run_scraper.py — execution harness."""
+"""Tests for tester_run_scraper.py — execution harness with versioned output paths."""
 from __future__ import annotations
 
 import json
@@ -39,55 +39,67 @@ class TestTrace:
 
 
 class TestRunScraper:
-    """run_scraper() subprocess wrapper."""
+    """run_scraper() subprocess wrapper with stderr capture."""
 
-    def test_success_returns_zero(self, tmp_path):
-        # Use a simple python command instead of an actual scraper
-        script = tmp_path / "ok.py"
-        script.write_text("print('hello')")
-        debug_log = tmp_path / "debug.log"
-
+    @patch("tester_run_scraper.subprocess.run")
+    def test_success_returns_zero(self, mock_run, tmp_path):
+        mock_run.return_value = MagicMock(returncode=0, stdout="hello", stderr="")
         code, stdout, duration = run_scraper.run_scraper(
-            script, [], debug_log, timeout=10
+            Path("scraper.py"), ["--probe", "url"], None, timeout=10
         )
-        # uv run won't work on a bare .py without PEP 723, so test the interface
-        # by mocking subprocess
+        assert code == 0
+        assert stdout == "hello"
         assert isinstance(duration, float)
 
     @patch("tester_run_scraper.subprocess.run")
     def test_timeout_returns_minus_one(self, mock_run, tmp_path):
         import subprocess
         mock_run.side_effect = subprocess.TimeoutExpired(cmd=["uv"], timeout=5)
-        debug_log = tmp_path / "debug.log"
-        debug_log.touch()
 
         code, stdout, duration = run_scraper.run_scraper(
-            Path("scraper.py"), ["--probe", "url"], debug_log, timeout=5
+            Path("scraper.py"), ["--probe", "url"], None, timeout=5
         )
         assert code == -1
         assert stdout == ""
 
     @patch("tester_run_scraper.subprocess.run")
     def test_crash_returns_exit_code(self, mock_run, tmp_path):
-        mock_run.return_value = MagicMock(returncode=1, stdout="")
-        debug_log = tmp_path / "debug.log"
-        debug_log.touch()
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="")
 
         code, stdout, duration = run_scraper.run_scraper(
-            Path("scraper.py"), [], debug_log, timeout=10
+            Path("scraper.py"), [], None, timeout=10
         )
         assert code == 1
+
+    @patch("tester_run_scraper.subprocess.run")
+    def test_stderr_appended_to_log_file(self, mock_run, tmp_path):
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="crash trace\n")
+        log_file = tmp_path / "debug.log"
+
+        run_scraper.run_scraper(Path("scraper.py"), [], log_file, timeout=10)
+
+        assert log_file.exists()
+        assert "crash trace" in log_file.read_text()
+
+    @patch("tester_run_scraper.subprocess.run")
+    def test_empty_stderr_no_log_file_created(self, mock_run, tmp_path):
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        log_file = tmp_path / "debug.log"
+
+        run_scraper.run_scraper(Path("scraper.py"), [], log_file, timeout=10)
+
+        assert not log_file.exists()
 
 
 class TestStepProbe:
     """step_probe() runs --probe per URL and traces results."""
 
     @patch("tester_run_scraper.run_scraper")
-    def test_successful_probe_traces_ok(self, mock_run, capsys, tmp_path):
+    def test_successful_probe_traces_ok(self, mock_run, capsys):
         product = {"sku": "ABC", "name": "Widget", "url": "https://x.com/p1"}
         mock_run.return_value = (0, json.dumps(product), 1.5)
 
-        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], tmp_path / "d.log")
+        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], None)
 
         lines = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
         assert len(lines) == 1
@@ -96,28 +108,28 @@ class TestStepProbe:
         assert "sku" in lines[0]["fields"]
 
     @patch("tester_run_scraper.run_scraper")
-    def test_failed_probe_traces_error(self, mock_run, capsys, tmp_path):
+    def test_failed_probe_traces_error(self, mock_run, capsys):
         mock_run.return_value = (1, "", 0.5)
 
-        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], tmp_path / "d.log")
+        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], None)
 
         lines = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
         assert lines[0]["status"] == "error"
 
     @patch("tester_run_scraper.run_scraper")
-    def test_timeout_probe_traces_timeout(self, mock_run, capsys, tmp_path):
+    def test_timeout_probe_traces_timeout(self, mock_run, capsys):
         mock_run.return_value = (-1, "", 30.0)
 
-        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], tmp_path / "d.log")
+        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], None)
 
         lines = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
         assert lines[0]["status"] == "timeout"
 
     @patch("tester_run_scraper.run_scraper")
-    def test_invalid_json_traces_parse_error(self, mock_run, capsys, tmp_path):
+    def test_invalid_json_traces_parse_error(self, mock_run, capsys):
         mock_run.return_value = (0, "not json {{{", 1.0)
 
-        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], tmp_path / "d.log")
+        run_scraper.step_probe(Path("s.py"), ["https://x.com/p1"], None)
 
         lines = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
         assert lines[0]["status"] == "parse_error"
@@ -155,34 +167,59 @@ class TestMergeSummaries:
 
 
 class TestStepCategories:
-    """step_categories() runs scraper per category with --append."""
+    """step_categories() runs scraper per category with versioned output paths."""
+
+    @patch("tester_run_scraper.run_scraper")
+    def test_passes_output_file_and_summary_file(self, mock_run, capsys, tmp_path):
+        mock_run.return_value = (0, "", 2.0)
+        output_file = tmp_path / "products_1_a3f2.jsonl"
+        summary_file = tmp_path / "summary_1_a3f2.json"
+
+        run_scraper.step_categories(
+            Path("scraper.py"), ["/shop/tools"], 10,
+            output_file, summary_file, None
+        )
+
+        call_args = mock_run.call_args_list[0][0][1]
+        assert "--output-file" in call_args
+        assert str(output_file) in call_args
+        assert "--summary-file" in call_args
+        assert str(summary_file) in call_args
+
+    @patch("tester_run_scraper.run_scraper")
+    def test_passes_log_file_when_provided(self, mock_run, capsys, tmp_path):
+        mock_run.return_value = (0, "", 2.0)
+        log_file = tmp_path / "debug_1_a3f2.log"
+
+        run_scraper.step_categories(
+            Path("scraper.py"), ["/shop/tools"], 10,
+            tmp_path / "p.jsonl", tmp_path / "s.json", log_file
+        )
+
+        call_args = mock_run.call_args_list[0][0][1]
+        assert "--log-file" in call_args
+        assert str(log_file) in call_args
 
     @patch("tester_run_scraper.run_scraper")
     def test_first_category_no_append(self, mock_run, capsys, tmp_path):
         mock_run.return_value = (0, "", 2.0)
-        scraper = tmp_path / "co" / "scraper.py"
-        scraper.parent.mkdir(parents=True)
-        scraper.touch()
 
         run_scraper.step_categories(
-            scraper, ["/shop/tools", "/shop/wood"], 10, tmp_path / "d.log"
+            Path("scraper.py"), ["/shop/tools", "/shop/wood"], 10,
+            tmp_path / "p.jsonl", tmp_path / "s.json", None
         )
 
         calls = mock_run.call_args_list
-        # First call should NOT have --append
         assert "--append" not in calls[0][0][1]
-        # Second call SHOULD have --append
         assert "--append" in calls[1][0][1]
 
     @patch("tester_run_scraper.run_scraper")
     def test_traces_per_category(self, mock_run, capsys, tmp_path):
         mock_run.return_value = (0, "", 1.0)
-        scraper = tmp_path / "co" / "scraper.py"
-        scraper.parent.mkdir(parents=True)
-        scraper.touch()
 
         run_scraper.step_categories(
-            scraper, ["/a", "/b", "/c"], 5, tmp_path / "d.log"
+            Path("scraper.py"), ["/a", "/b", "/c"], 5,
+            tmp_path / "p.jsonl", tmp_path / "s.json", None
         )
 
         lines = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
@@ -192,59 +229,54 @@ class TestStepCategories:
 
     @patch("tester_run_scraper.run_scraper")
     def test_summary_accumulates_across_categories(self, mock_run, capsys, tmp_path):
-        scraper = tmp_path / "co" / "scraper.py"
-        scraper.parent.mkdir(parents=True)
-        scraper.touch()
-        output_dir = scraper.parent / "output"
-        output_dir.mkdir()
-
+        summary_file = tmp_path / "summary_1_a3f2.json"
         call_count = 0
-        def side_effect(scraper_path, args, debug_log, timeout):
+
+        def side_effect(scraper_path, args, log_file, timeout):
             nonlocal call_count
             call_count += 1
             errors = 3 if call_count == 1 else 0
             summary = {"total_products": 5, "batches_written": 1,
                        "duration_seconds": 2.0, "errors_count": errors,
                        "limited": False, "timestamp": f"2026-01-01T00:0{call_count}:00Z"}
-            (output_dir / "summary.json").write_text(json.dumps(summary))
+            summary_file.write_text(json.dumps(summary))
             return (0, "", 2.0)
 
         mock_run.side_effect = side_effect
 
         run_scraper.step_categories(
-            scraper, ["/shop/tools", "/shop/wood"], 10, tmp_path / "d.log"
+            Path("scraper.py"), ["/shop/tools", "/shop/wood"], 10,
+            tmp_path / "products_1_a3f2.jsonl", summary_file, None
         )
 
-        merged = json.loads((output_dir / "summary.json").read_text())
+        merged = json.loads(summary_file.read_text())
         assert merged["total_products"] == 10
-        assert merged["errors_count"] == 3  # 3 from first + 0 from second
+        assert merged["errors_count"] == 3
         assert merged["duration_seconds"] == 4.0
 
     @patch("tester_run_scraper.run_scraper")
     def test_append_preserves_existing_summary(self, mock_run, capsys, tmp_path):
-        scraper = tmp_path / "co" / "scraper.py"
-        scraper.parent.mkdir(parents=True)
-        scraper.touch()
-        output_dir = scraper.parent / "output"
-        output_dir.mkdir()
+        summary_file = tmp_path / "summary_1_a3f2.json"
         existing = {"total_products": 20, "batches_written": 4, "duration_seconds": 10.0,
                      "errors_count": 1, "limited": False, "timestamp": "2026-01-01T00:00:00Z"}
-        (output_dir / "summary.json").write_text(json.dumps(existing))
+        summary_file.write_text(json.dumps(existing))
 
-        def side_effect(scraper_path, args, debug_log, timeout):
+        def side_effect(scraper_path, args, log_file, timeout):
             summary = {"total_products": 5, "batches_written": 1,
                        "duration_seconds": 2.0, "errors_count": 0,
                        "limited": False, "timestamp": "2026-01-01T00:05:00Z"}
-            (output_dir / "summary.json").write_text(json.dumps(summary))
+            summary_file.write_text(json.dumps(summary))
             return (0, "", 2.0)
 
         mock_run.side_effect = side_effect
 
         run_scraper.step_categories(
-            scraper, ["/shop/wood"], 10, tmp_path / "d.log", append=True
+            Path("scraper.py"), ["/shop/wood"], 10,
+            tmp_path / "products_1_a3f2.jsonl", summary_file, None,
+            append=True
         )
 
-        merged = json.loads((output_dir / "summary.json").read_text())
+        merged = json.loads(summary_file.read_text())
         assert merged["total_products"] == 25
         assert merged["errors_count"] == 1
 
@@ -254,64 +286,94 @@ class TestStepDepth:
 
     @patch("tester_run_scraper.run_scraper")
     def test_merges_with_existing_summary(self, mock_run, capsys, tmp_path):
-        scraper = tmp_path / "co" / "scraper.py"
-        scraper.parent.mkdir(parents=True)
-        scraper.touch()
-        output_dir = scraper.parent / "output"
-        output_dir.mkdir()
+        summary_file = tmp_path / "summary_1_a3f2.json"
         existing = {"total_products": 30, "batches_written": 6, "duration_seconds": 15.0,
                      "errors_count": 2, "limited": False, "timestamp": "2026-01-01T00:00:00Z"}
-        (output_dir / "summary.json").write_text(json.dumps(existing))
+        summary_file.write_text(json.dumps(existing))
 
-        def side_effect(scraper_path, args, debug_log, timeout):
+        def side_effect(scraper_path, args, log_file, timeout):
             summary = {"total_products": 100, "batches_written": 10,
                        "duration_seconds": 60.0, "errors_count": 0,
                        "limited": True, "timestamp": "2026-01-01T00:10:00Z"}
-            (output_dir / "summary.json").write_text(json.dumps(summary))
+            summary_file.write_text(json.dumps(summary))
             return (0, "", 60.0)
 
         mock_run.side_effect = side_effect
+        output_file = tmp_path / "products_1_a3f2.jsonl"
 
-        run_scraper.step_depth(scraper, tmp_path / "d.log")
+        run_scraper.step_depth(Path("scraper.py"), output_file, summary_file, None)
 
-        merged = json.loads((output_dir / "summary.json").read_text())
+        merged = json.loads(summary_file.read_text())
         assert merged["total_products"] == 130
         assert merged["errors_count"] == 2
         assert merged["limited"] is True
 
+    @patch("tester_run_scraper.run_scraper")
+    def test_passes_versioned_paths_to_scraper(self, mock_run, capsys, tmp_path):
+        mock_run.return_value = (0, "", 5.0)
+        output_file = tmp_path / "products_1_a3f2.jsonl"
+        summary_file = tmp_path / "summary_1_a3f2.json"
+        log_file = tmp_path / "debug_1_a3f2.log"
+
+        run_scraper.step_depth(Path("scraper.py"), output_file, summary_file, log_file)
+
+        call_args = mock_run.call_args_list[0][0][1]
+        assert "--output-file" in call_args
+        assert "--summary-file" in call_args
+        assert "--log-file" in call_args
+        assert "--append" in call_args
+
 
 class TestStepSaveBaseline:
-    """step_save_baseline() copies products.jsonl to baseline."""
+    """step_save_baseline() copies versioned products file to baseline."""
 
     def test_copies_file(self, tmp_path, capsys):
-        products = tmp_path / "products.jsonl"
+        products = tmp_path / "products_1_a3f2.jsonl"
         products.write_text('{"sku":"1"}\n')
 
-        run_scraper.step_save_baseline(tmp_path)
+        run_scraper.step_save_baseline(products)
 
         baseline = tmp_path / "baseline_products.jsonl"
         assert baseline.exists()
         assert baseline.read_text() == '{"sku":"1"}\n'
 
     def test_missing_products_traces_error(self, tmp_path, capsys):
-        run_scraper.step_save_baseline(tmp_path)
+        missing = tmp_path / "products_1_a3f2.jsonl"
+        run_scraper.step_save_baseline(missing)
 
         data = json.loads(capsys.readouterr().out.strip())
         assert data["status"] == "error"
 
 
-class TestStepSaveIteration:
-    """step_save_iteration() copies products and debug to iteration files."""
+class TestSummaryHelpers:
+    """_read_summary, _write_summary, _clear_summary work with file paths."""
 
-    def test_copies_both_files(self, tmp_path, capsys):
-        (tmp_path / "products.jsonl").write_text('{"sku":"1"}\n')
-        (tmp_path / "debug_iteration_1.log").write_text("log line\n")
+    def test_read_existing_summary(self, tmp_path):
+        sf = tmp_path / "summary_1_a3f2.json"
+        sf.write_text(json.dumps({"errors_count": 3}))
+        assert run_scraper._read_summary(sf) == {"errors_count": 3}
 
-        run_scraper.step_save_iteration(tmp_path, 1)
+    def test_read_missing_summary(self, tmp_path):
+        sf = tmp_path / "nonexistent.json"
+        assert run_scraper._read_summary(sf) == {}
 
-        assert (tmp_path / "products_iteration_1.jsonl").exists()
-        assert (tmp_path / "debug.log").exists()
-        assert (tmp_path / "debug.log").read_text() == "log line\n"
+    def test_read_none_summary(self):
+        assert run_scraper._read_summary(None) == {}
+
+    def test_write_summary(self, tmp_path):
+        sf = tmp_path / "summary_1_a3f2.json"
+        run_scraper._write_summary(sf, {"errors_count": 0})
+        assert json.loads(sf.read_text()) == {"errors_count": 0}
+
+    def test_clear_summary(self, tmp_path):
+        sf = tmp_path / "summary_1_a3f2.json"
+        sf.write_text("{}")
+        run_scraper._clear_summary(sf)
+        assert not sf.exists()
+
+    def test_clear_missing_summary_no_error(self, tmp_path):
+        sf = tmp_path / "nonexistent.json"
+        run_scraper._clear_summary(sf)  # should not raise
 
 
 if __name__ == "__main__":

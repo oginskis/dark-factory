@@ -9,8 +9,8 @@ Site-specific knowledgebase for iwood.co.uk. Custom ASP.NET e-commerce platform 
 - Some offers include `priceSpecification` with `unitCode` (MTK for per-m2 pricing, MTR for per-metre) and `valueAddedTaxIncluded: false`
 - Beams page uses `@graph` format with multiple schemas: `ItemList` (grades), `FAQPage`, `Product`, `BreadcrumbList`
 - BreadcrumbList present on ALL pages (including those without Product schema)
-- **JSON-LD coverage:** Cladding (all profiles/species), beams, cedar slats, timber packs have full Product schema with offers
-- **No JSON-LD Product schema:** Skirting, architrave, decking, oak sleepers, PAR, cut-to-size — prices are JavaScript-calculator-only or example-pricing HTML tables
+- **JSON-LD coverage:** Cladding (all profiles/species), beams, cedar slats, timber packs, PAR (planed all round) have Product schema. Cladding, PAR, cedar slats, timber packs have full offers arrays. Beams have Product schema but NO offers (prices in HTML tables only).
+- **No JSON-LD Product schema:** Skirting, architrave, decking, oak sleepers, cut-to-size — prices are JavaScript-calculator-only or example-pricing HTML tables
 
 ## CSS Selectors
 
@@ -58,4 +58,4 @@ Species IDs: European Oak=32, British Larch=18, Cedar British WR=44, Douglas Fir
 
 | Company | Slug | Date | Notes |
 |---------|------|------|-------|
-| iWood Timber Ltd | iwood | 2026-03-18 | UK wholesale timber merchant. Custom ASP.NET. JSON-LD on beams, PAR, cut-to-size, cladding. No JSON-LD on skirting/architrave/decking/sleepers (JS calculator). HTML sitemap at /sitemap/ (~150 product URLs). Prices ex-VAT. No pagination. |
+| iWood Timber Ltd | iwood | 2026-03-19 | UK wholesale timber merchant. Custom ASP.NET. JSON-LD with offers on cladding, PAR, cedar slats, timber packs. Beams have Product schema but no offers (prices in HTML). No JSON-LD on skirting/architrave/decking/sleepers (JS calculator). XML sitemap at /sitemap.xml (482 URLs, ~120-150 product pages). Prices ex-VAT (GBP). No pagination — all variants in single page offers array. |
