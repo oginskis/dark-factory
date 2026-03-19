@@ -7,42 +7,40 @@ Scraper execution harness. Runs a scraper, captures output, manages versioned fi
 
 Agent: tester sub-agent (references/tester.md)
 No validation logic — just execution + file management + traces.
-Accumulates summary across multiple scraper invocations within a step
-so that errors_count reflects the total across all category runs.
 
-The orchestrator computes all versioned output paths (products_{n}_{hash}.jsonl,
-summary_{n}_{hash}.json, debug_{n}_{hash}.log) and passes them through the tester
-to this script. The scraper receives them as --output-file, --summary-file, --log-file.
+Every invocation generates a unique hash and creates its own output files.
+Files are NEVER overwritten. The hash is 4 hex chars from os.urandom.
+
+Within step_categories, multiple scraper runs (one per category) share the
+invocation's hash and accumulate into a single products file via --append.
 
 Usage:
     uv run tester_run_scraper.py --scraper docs/scraper-generator/acme/scraper.py \
-        --step probe --probe-urls "https://acme.com/p1,https://acme.com/p2" --iteration 1
+        --step probe --probe-urls "https://acme.com/p1,https://acme.com/p2" \
+        --output-dir docs/scraper-generator/acme/output --iteration 1
 
     uv run tester_run_scraper.py --scraper docs/scraper-generator/acme/scraper.py \
         --step categories --categories "/shop/tools,/shop/wood" --limit-per-cat 10 \
-        --output-file output/products_1_a3f2.jsonl \
-        --summary-file output/summary_1_a3f2.json \
-        --log-file output/debug_1_a3f2.log \
-        --iteration 1
+        --output-dir docs/scraper-generator/acme/output --iteration 1
 
     uv run tester_run_scraper.py --scraper docs/scraper-generator/acme/scraper.py \
         --step depth \
-        --output-file output/products_1_a3f2.jsonl \
-        --summary-file output/summary_1_a3f2.json \
-        --log-file output/debug_1_a3f2.log \
-        --iteration 1
+        --output-dir docs/scraper-generator/acme/output --iteration 1
 
     uv run tester_run_scraper.py --scraper docs/scraper-generator/acme/scraper.py \
         --step save-baseline \
-        --output-file output/products_1_a3f2.jsonl \
-        --iteration 1
+        --output-dir docs/scraper-generator/acme/output --iteration 1
 
 Exit codes: 0 = success, 1 = missing required args, 2 = scraper not found
+
+The script emits a {"phase": "files", ...} trace with the generated paths
+so the tester agent knows where files ended up.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -51,28 +49,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+def _make_hash() -> str:
+    """Generate a unique 4-char hex hash for this invocation."""
+    return os.urandom(2).hex()
+
+
 def trace(phase: str, **kwargs) -> None:
     """Emit a structured JSON trace line to stdout."""
     entry = {"phase": phase, "timestamp": datetime.now(timezone.utc).isoformat(), **kwargs}
     print(json.dumps(entry), flush=True)
 
 
-def _read_summary(summary_file: Path) -> dict:
-    """Read summary JSON file. Returns empty dict if missing or malformed."""
-    if summary_file and summary_file.exists():
-        try:
-            return json.loads(summary_file.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            pass
-    return {}
-
-
 def _merge_summaries(accumulated: dict, run_summary: dict) -> dict:
     """Merge a single-run summary into an accumulated summary.
 
-    Each scraper invocation writes its own summary via teardown().
-    This function accumulates totals across multiple invocations so that
-    tester_evaluate_structural.py sees the combined result (especially errors_count).
+    Used within step_categories to accumulate across per-category scraper runs.
     """
     if not accumulated:
         return run_summary
@@ -88,18 +79,6 @@ def _merge_summaries(accumulated: dict, run_summary: dict) -> dict:
         "limited": accumulated.get("limited", False) or run_summary.get("limited", False),
         "timestamp": max(accumulated.get("timestamp", ""), run_summary.get("timestamp", "")),
     }
-
-
-def _clear_summary(summary_file: Path) -> None:
-    """Remove summary file so we can detect whether the scraper wrote a new one."""
-    if summary_file and summary_file.exists():
-        summary_file.unlink()
-
-
-def _write_summary(summary_file: Path, summary: dict) -> None:
-    """Write accumulated summary to the versioned summary file."""
-    summary_file.parent.mkdir(parents=True, exist_ok=True)
-    summary_file.write_text(json.dumps(summary, indent=2))
 
 
 def run_scraper(
@@ -160,82 +139,80 @@ def step_categories(
     limit_per: int,
     output_file: Path,
     summary_file: Path,
-    log_file: Path | None,
-    *,
-    append: bool = False,
+    log_file: Path,
 ) -> None:
-    """Run scraper per category with versioned output paths.
+    """Run scraper per category. All categories accumulate into this invocation's files.
 
-    First category uses --append only if append=True.
-    Subsequent categories always use --append so outputs accumulate.
-
-    Accumulates summary across all category runs so that errors_count
-    reflects the total across all categories, not just the last one.
+    First category creates the files, subsequent categories use --append.
+    Summary is accumulated across all category runs within this invocation.
     """
-    accumulated = _read_summary(summary_file) if append else {}
+    accumulated: dict = {}
     timeout_per = max(60, limit_per * 6)
+    # Temp summary path — scraper overwrites this on each teardown, we read and merge
+    temp_summary = summary_file.parent / f"_tmp_summary_{os.urandom(2).hex()}.json"
     for i, cat in enumerate(categories):
         scraper_args = [
             "--categories", cat,
             "--limit", str(limit_per),
             "--output-file", str(output_file),
-            "--summary-file", str(summary_file),
+            "--summary-file", str(temp_summary),
+            "--log-file", str(log_file),
         ]
-        if log_file:
-            scraper_args += ["--log-file", str(log_file)]
-        if i > 0 or append:
+        if i > 0:
             scraper_args.append("--append")
-        _clear_summary(summary_file)
+        if temp_summary.exists():
+            temp_summary.unlink()
         code, _, duration = run_scraper(scraper_path, scraper_args, log_file, timeout_per)
-        run_summary = _read_summary(summary_file)
-        if run_summary:
-            accumulated = _merge_summaries(accumulated, run_summary)
+        if temp_summary.exists():
+            try:
+                run_summary = json.loads(temp_summary.read_text(encoding="utf-8"))
+                accumulated = _merge_summaries(accumulated, run_summary)
+            except (json.JSONDecodeError, OSError):
+                pass
         status = "ok" if code == 0 else ("timeout" if code == -1 else "error")
         trace("category", category=cat, status=status, exit_code=code,
               duration_s=round(duration, 1))
+    # Write final accumulated summary to the versioned summary file (never overwrites — unique hash)
     if accumulated:
-        _write_summary(summary_file, accumulated)
+        summary_file.parent.mkdir(parents=True, exist_ok=True)
+        summary_file.write_text(json.dumps(accumulated, indent=2))
+    # Clean up temp
+    if temp_summary.exists():
+        temp_summary.unlink()
 
 
 def step_depth(
     scraper_path: Path,
     output_file: Path,
     summary_file: Path,
-    log_file: Path | None,
+    log_file: Path,
 ) -> None:
-    """Run scraper with --limit 100 --append using versioned output paths.
-
-    Merges this run's summary with the existing accumulated summary from prior steps.
-    """
-    accumulated = _read_summary(summary_file)
-    _clear_summary(summary_file)
+    """Run scraper with --limit 100. Creates its own versioned files (unique hash)."""
     scraper_args = [
-        "--limit", "100", "--append",
+        "--limit", "100",
         "--output-file", str(output_file),
         "--summary-file", str(summary_file),
+        "--log-file", str(log_file),
     ]
-    if log_file:
-        scraper_args += ["--log-file", str(log_file)]
     code, _, duration = run_scraper(scraper_path, scraper_args, log_file, timeout=600)
-    run_summary = _read_summary(summary_file)
-    if run_summary:
-        accumulated = _merge_summaries(accumulated, run_summary)
-    if accumulated:
-        _write_summary(summary_file, accumulated)
     status = "ok" if code == 0 else ("timeout" if code == -1 else "error")
     trace("depth_check", status=status, exit_code=code, duration_s=round(duration, 1))
 
 
-def step_save_baseline(output_file: Path) -> None:
-    """Copy versioned products file to baseline_products.jsonl in the same directory."""
-    baseline = output_file.parent / "baseline_products.jsonl"
-    if output_file.exists():
-        shutil.copy2(output_file, baseline)
-        trace("save_baseline", status="ok", source=str(output_file.name),
-              size_bytes=output_file.stat().st_size)
-    else:
-        trace("save_baseline", status="error",
-              detail=f"{output_file.name} does not exist")
+def step_save_baseline(output_dir: Path, iteration: int) -> None:
+    """Find all products files for this iteration and concatenate into baseline."""
+    baseline = output_dir / "baseline_products.jsonl"
+    pattern = f"products_{iteration}_*.jsonl"
+    files = sorted(output_dir.glob(pattern))
+    if not files:
+        trace("save_baseline", status="error", detail=f"No {pattern} files found")
+        return
+    with open(baseline, "w") as out:
+        for f in files:
+            out.write(f.read_text())
+    total = sum(1 for line in baseline.read_text().splitlines() if line.strip())
+    trace("save_baseline", status="ok", files=[f.name for f in files],
+          total_products=total, size_bytes=baseline.stat().st_size)
 
 
 def main() -> None:
@@ -244,17 +221,11 @@ def main() -> None:
     parser.add_argument("--step", required=True,
                         choices=["probe", "categories", "depth", "save-baseline"])
     parser.add_argument("--iteration", required=True, type=int)
+    parser.add_argument("--output-dir", required=True,
+                        help="Directory for versioned output files")
     parser.add_argument("--probe-urls", help="Comma-separated product URLs (probe step)")
-    parser.add_argument("--categories", help="Comma-separated category URL prefixes (categories step)")
+    parser.add_argument("--categories", help="Comma-separated category URL prefixes")
     parser.add_argument("--limit-per-cat", type=int, default=10, help="Product limit per category")
-    parser.add_argument("--append", action="store_true",
-                        help="Append to existing products file (categories step)")
-    parser.add_argument("--output-file",
-                        help="Versioned products JSONL path (categories, depth, save-baseline steps)")
-    parser.add_argument("--summary-file",
-                        help="Versioned summary JSON path (categories, depth steps)")
-    parser.add_argument("--log-file",
-                        help="Versioned debug log path (probe, categories, depth steps)")
     args = parser.parse_args()
 
     scraper_path = Path(args.scraper)
@@ -262,41 +233,41 @@ def main() -> None:
         print(f"Error: scraper not found at {scraper_path}", file=sys.stderr)
         sys.exit(2)
 
-    output_file = Path(args.output_file) if args.output_file else None
-    summary_file = Path(args.summary_file) if args.summary_file else None
-    log_file = Path(args.log_file) if args.log_file else None
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    n = args.iteration
+    h = _make_hash()
+
+    # Compute versioned paths for this invocation
+    products_file = output_dir / f"products_{n}_{h}.jsonl"
+    summary_file = output_dir / f"summary_{n}_{h}.json"
+    log_file = output_dir / f"debug_{n}_{h}.log"
 
     if args.step == "probe":
         if not args.probe_urls:
             print("Error: --probe-urls required for probe step", file=sys.stderr)
             sys.exit(1)
         urls = [u.strip() for u in args.probe_urls.split(",") if u.strip()]
+        trace("files", debug_log=str(log_file))
         step_probe(scraper_path, urls, log_file)
 
     elif args.step == "categories":
         if not args.categories:
             print("Error: --categories required for categories step", file=sys.stderr)
             sys.exit(1)
-        if not output_file or not summary_file:
-            print("Error: --output-file and --summary-file required for categories step",
-                  file=sys.stderr)
-            sys.exit(1)
         cats = [c.strip() for c in args.categories.split(",") if c.strip()]
+        trace("files", products=str(products_file), summary=str(summary_file),
+              debug_log=str(log_file))
         step_categories(scraper_path, cats, args.limit_per_cat,
-                        output_file, summary_file, log_file, append=args.append)
+                        products_file, summary_file, log_file)
 
     elif args.step == "depth":
-        if not output_file or not summary_file:
-            print("Error: --output-file and --summary-file required for depth step",
-                  file=sys.stderr)
-            sys.exit(1)
-        step_depth(scraper_path, output_file, summary_file, log_file)
+        trace("files", products=str(products_file), summary=str(summary_file),
+              debug_log=str(log_file))
+        step_depth(scraper_path, products_file, summary_file, log_file)
 
     elif args.step == "save-baseline":
-        if not output_file:
-            print("Error: --output-file required for save-baseline step", file=sys.stderr)
-            sys.exit(1)
-        step_save_baseline(output_file)
+        step_save_baseline(output_dir, n)
 
 
 if __name__ == "__main__":

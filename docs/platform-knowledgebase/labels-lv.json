@@ -1,7 +1,7 @@
 {
   "_language": "lv",
   "_description": "Latvian attribute label translations for building materials sites",
-  "_updated": "2026-03-16",
+  "_updated": "2026-03-19",
   "labels": {
     "Platums": "width",
     "Biezums": "thickness",
@@ -27,7 +27,10 @@
     "Apstiprinājumi": "certification",
     "Bitu tips": "drive_type",
     "Savienotāja tips": "connector_type",
-    "Galvas diametrs": "head_diameter"
+    "Galvas diametrs": "head_diameter",
+    "Sortiments": "product_type",
+    "Sortimenta veids": "product_type",
+    "Norāde": "sku"
   },
   "category_aliases": {
     "wood.softwood_hardwood_lumber": {

@@ -44,14 +44,14 @@ Generate a production-ready Python scraper for a company's product catalog, vali
 
 ### Output file versioning
 
-All output files in `output/` use `{name}_{n}_{hash}.{ext}` naming. Files are never overwritten — each iteration produces new files.
+All output files in `output/` use `{name}_{n}_{hash}.{ext}` naming. **Files are never overwritten.**
 
 - **`{n}`** — iteration number. Starts at 1 for the first test run, increments for each retest cycle.
-- **`{hash}`** — short content hash (first 4 hex chars of SHA-256 of the file content, or of a timestamp if computing before content exists). Prevents collisions if the same iteration is re-run.
+- **`{hash}`** — 4 random hex chars (`os.urandom(2).hex()`), generated fresh per `tester_run_scraper.py` invocation. Each invocation creates its own uniquely-named files.
 
-**Who computes these paths:** The orchestrator computes all versioned paths and passes them to the tester. The tester passes them to the scraper via `--output-file`, `--summary-file`, `--log-file`. The tester computes its own `report_{n}_{hash}.json` path. Nobody invents filenames downstream — paths always flow from the orchestrator.
+**How it works:** Each call to `tester_run_scraper.py` generates a unique hash and creates files like `products_1_a3f2.jsonl`. A second call in the same iteration gets a different hash — `products_1_b7c1.jsonl`. No file is ever overwritten. The evaluators glob `products_{n}_*.jsonl` and `summary_{n}_*.json` to find all files for an iteration.
 
-**Finding the latest file:** Sort by `{n}` (highest iteration number wins). Within the same `{n}`, there should be exactly one file per name.
+**Finding files for an iteration:** Glob `{name}_{n}_*.{ext}` in the output directory. Multiple files per name per iteration is normal (one from categories, one from depth).
 
 ### Slug derivation
 

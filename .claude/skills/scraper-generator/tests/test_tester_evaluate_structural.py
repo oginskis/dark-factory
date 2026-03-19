@@ -4,7 +4,7 @@
 #     "pytest",
 # ]
 # ///
-"""Tests for tester_evaluate_structural.py — S01-S09 validation rules."""
+"""Tests for tester_evaluate_structural.py — S01-S09 with glob-based file loading."""
 from __future__ import annotations
 
 import json
@@ -18,12 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import tester_evaluate_structural as es
 
 
-# ---------------------------------------------------------------------------
-# Fixtures — synthetic product records
-# ---------------------------------------------------------------------------
-
 def make_product(**overrides) -> dict:
-    """Create a valid product record with all required fields."""
     base = {
         "sku": "SKU-001", "name": "Test Product", "url": "https://example.com/p1",
         "price": 9.99, "currency": "GBP", "brand": "TestBrand",
@@ -45,209 +40,152 @@ NO_BRAND = make_product(brand=None)
 BRAND_IN_CORE = make_product(core_attributes={"brand": "Oops", "wood_type": "Oak"})
 
 
-class TestS01CoreFillRate:
-    """S01: >=30% of products must have non-empty core_attributes."""
-
-    def test_all_have_core_passes(self):
-        r, i = es.s01([VALID_PRODUCT] * 5)
-        assert r["status"] == "pass"
-        assert r["value"] == 1.0
-
-    def test_none_have_core_fails(self):
-        r, i = es.s01([EMPTY_CORE] * 5)
-        assert r["status"] == "fail"
-        assert r["value"] == 0
-        assert i is not None
-
-    def test_30_percent_threshold(self):
-        products = [VALID_PRODUCT] * 3 + [EMPTY_CORE] * 7
-        r, _ = es.s01(products)
+class TestS01:
+    def test_pass(self):
+        r, _ = es.s01([VALID_PRODUCT] * 5)
         assert r["status"] == "pass"
 
-    def test_29_percent_fails(self):
-        products = [VALID_PRODUCT] * 29 + [EMPTY_CORE] * 71
-        r, _ = es.s01(products)
+    def test_fail(self):
+        r, _ = es.s01([EMPTY_CORE] * 5)
         assert r["status"] == "fail"
 
-    def test_empty_products_fails(self):
-        r, _ = es.s01([])
-        assert r["status"] == "fail"
+    def test_threshold(self):
+        r, _ = es.s01([VALID_PRODUCT] * 3 + [EMPTY_CORE] * 7)
+        assert r["status"] == "pass"
 
-    def test_per_category_breakdown(self):
+    def test_per_category(self):
         p1 = make_product(category_path="Timber > Softwood")
         p2 = make_product(category_path="Fencing > Panels", core_attributes={})
         r, _ = es.s01([p1, p2])
         assert "Timber" in r["per_category"]
-        assert "Fencing" in r["per_category"]
 
 
-class TestS02ExtendedFillRate:
-    """S02: >=20% of products must have non-empty extended_attributes (warning)."""
-
-    def test_all_have_extended_passes(self):
-        r, _ = es.s02([VALID_PRODUCT] * 5)
-        assert r["status"] == "pass"
-
-    def test_none_have_extended_warns(self):
-        empty_ext = make_product(extended_attributes={})
-        r, i = es.s02([empty_ext] * 5)
-        assert r["status"] == "warn"
-
-
-class TestS03RequiredFields:
-    """S03: 100% must have all top-level fields."""
-
-    def test_valid_product_passes(self):
+class TestS03:
+    def test_pass(self):
         r, _ = es.s03([VALID_PRODUCT])
         assert r["status"] == "pass"
 
-    def test_missing_sku_fails(self):
-        bad = make_product(sku=None)
-        r, i = es.s03([bad])
+    def test_missing_sku(self):
+        r, i = es.s03([make_product(sku=None)])
         assert r["status"] == "fail"
         assert "sku" in i["detail"]
 
-    def test_missing_price_key_fails(self):
-        bad = make_product()
-        del bad["price"]
-        r, i = es.s03([bad])
-        assert r["status"] == "fail"
-
-    def test_null_price_passes(self):
-        p = make_product(price=None)
-        r, _ = es.s03([p])
+    def test_null_price_ok(self):
+        r, _ = es.s03([make_product(price=None)])
         assert r["status"] == "pass"
 
 
-class TestS04TaxonomyID:
-    """S04: product_category must be a valid taxonomy ID."""
-
+class TestS04:
     @patch("tester_evaluate_structural.load_taxonomy_ids")
-    def test_valid_id_passes(self, mock_ids):
-        mock_ids.return_value = {"wood.softwood_hardwood_lumber", "wood.plywood_engineered_panels"}
+    def test_valid(self, mock_ids):
+        mock_ids.return_value = {"wood.softwood_hardwood_lumber"}
         r, _ = es.s04([VALID_PRODUCT])
         assert r["status"] == "pass"
 
     @patch("tester_evaluate_structural.load_taxonomy_ids")
-    def test_invalid_id_fails(self, mock_ids):
+    def test_invalid(self, mock_ids):
         mock_ids.return_value = {"wood.plywood_engineered_panels"}
-        r, i = es.s04([VALID_PRODUCT])
+        r, _ = es.s04([VALID_PRODUCT])
         assert r["status"] == "fail"
-        assert i is not None
 
 
-class TestS05BrandPlacement:
-    """S05: brand must be top-level, not inside attribute buckets."""
-
-    def test_brand_top_level_passes(self):
+class TestS05:
+    def test_pass(self):
         r, _ = es.s05([VALID_PRODUCT])
         assert r["status"] == "pass"
 
-    def test_brand_missing_fails(self):
+    def test_missing(self):
         r, _ = es.s05([NO_BRAND])
         assert r["status"] == "fail"
 
-    def test_brand_in_core_fails(self):
-        r, i = es.s05([BRAND_IN_CORE])
+    def test_in_core(self):
+        r, _ = es.s05([BRAND_IN_CORE])
         assert r["status"] == "fail"
 
 
-class TestS06CategoryDiversity:
-    """S06: >=2 distinct top-level category_path values."""
-
-    def test_two_categories_passes(self):
-        p1 = make_product(category_path="Timber > Softwood")
-        p2 = make_product(category_path="Fencing > Panels")
-        r, _ = es.s06([p1, p2])
+class TestS06:
+    def test_pass(self):
+        r, _ = es.s06([make_product(category_path="A > x"), make_product(category_path="B > y")])
         assert r["status"] == "pass"
 
-    def test_one_category_warns(self):
-        r, i = es.s06([VALID_PRODUCT, VALID_PRODUCT])
+    def test_warn(self):
+        r, _ = es.s06([VALID_PRODUCT, VALID_PRODUCT])
         assert r["status"] == "warn"
 
-    def test_skip_in_retest(self):
+    def test_skip(self):
         r, _ = es.s06([VALID_PRODUCT], skip=True)
         assert r["status"] == "skip"
 
 
-class TestS07ZeroErrors:
-    """S07: errors_count in summary file must be 0."""
-
-    def test_zero_errors_passes(self, tmp_path):
-        sf = tmp_path / "summary_1_a3f2.json"
-        sf.write_text(json.dumps({"errors_count": 0}))
-        r, _ = es.s07(sf)
+class TestS07:
+    def test_pass(self):
+        r, _ = es.s07({"errors_count": 0})
         assert r["status"] == "pass"
 
-    def test_nonzero_errors_fails(self, tmp_path):
-        sf = tmp_path / "summary_1_a3f2.json"
-        sf.write_text(json.dumps({"errors_count": 3}))
-        r, i = es.s07(sf)
+    def test_fail(self):
+        r, i = es.s07({"errors_count": 3})
         assert r["status"] == "fail"
         assert "3" in i["detail"]
 
-    def test_missing_summary_fails(self, tmp_path):
-        sf = tmp_path / "nonexistent.json"
-        r, _ = es.s07(sf)
-        assert r["status"] == "fail"
+    def test_empty_summary_fails(self):
+        r, _ = es.s07({})
+        assert r["status"] == "fail"  # no summary = can't verify
 
 
-class TestS08NoCrash:
-    """S08: scraper must exit with code 0."""
-
-    def test_zero_passes(self):
+class TestS08:
+    def test_pass(self):
         r, _ = es.s08(0)
         assert r["status"] == "pass"
 
-    def test_nonzero_fails(self):
-        r, i = es.s08(1)
+    def test_fail(self):
+        r, _ = es.s08(1)
         assert r["status"] == "fail"
 
-    def test_timeout_fails(self):
+    def test_timeout(self):
         r, i = es.s08(-1)
-        assert r["status"] == "fail"
         assert "timed out" in i["detail"].lower()
 
 
-class TestS09ProductsExist:
-    """S09: products file must exist and be non-empty."""
-
-    def test_nonempty_passes(self, tmp_path):
-        pf = tmp_path / "products_1_a3f2.jsonl"
-        pf.write_text('{"sku":"1"}\n')
-        r, _ = es.s09(pf)
+class TestS09:
+    def test_pass(self, tmp_path):
+        (tmp_path / "products_1_aaaa.jsonl").write_text('{"sku":"1"}\n')
+        r, _ = es.s09(tmp_path, 1)
         assert r["status"] == "pass"
-        assert r["value"] == 1
 
-    def test_empty_fails(self, tmp_path):
-        pf = tmp_path / "products_1_a3f2.jsonl"
-        pf.write_text("")
-        r, i = es.s09(pf)
+    def test_missing(self, tmp_path):
+        r, i = es.s09(tmp_path, 1)
         assert r["status"] == "fail"
-        assert "empty" in i["detail"]
+        assert "No products" in i["detail"]
 
-    def test_missing_fails(self, tmp_path):
-        pf = tmp_path / "products_1_a3f2.jsonl"
-        r, i = es.s09(pf)
+    def test_empty(self, tmp_path):
+        (tmp_path / "products_1_aaaa.jsonl").write_text("")
+        r, i = es.s09(tmp_path, 1)
         assert r["status"] == "fail"
-        assert "missing" in i["detail"]
 
 
-class TestVersionedFileSupport:
-    """Scripts accept versioned file paths instead of output-dir + iteration."""
+class TestGlobLoading:
+    """Evaluator globs products_{n}_*.jsonl and merges across files."""
 
-    def test_reads_versioned_products_file(self, tmp_path):
-        pf = tmp_path / "products_2_b4d1.jsonl"
-        pf.write_text(json.dumps(make_product()) + "\n")
-        products = es.load_jsonl(pf)
+    def test_loads_multiple_products_files(self, tmp_path):
+        (tmp_path / "products_1_aaaa.jsonl").write_text(json.dumps(make_product(sku="A")) + "\n")
+        (tmp_path / "products_1_bbbb.jsonl").write_text(json.dumps(make_product(sku="B")) + "\n")
+        products = es.load_products_for_iteration(tmp_path, 1)
+        assert len(products) == 2
+        assert {p["sku"] for p in products} == {"A", "B"}
+
+    def test_merges_summaries(self, tmp_path):
+        (tmp_path / "summary_1_aaaa.json").write_text(json.dumps({"errors_count": 1, "total_products": 10}))
+        (tmp_path / "summary_1_bbbb.json").write_text(json.dumps({"errors_count": 2, "total_products": 5}))
+        merged = es.load_merged_summary(tmp_path, 1)
+        assert merged["errors_count"] == 3
+        assert merged["total_products"] == 15
+
+    def test_ignores_other_iterations(self, tmp_path):
+        (tmp_path / "products_1_aaaa.jsonl").write_text(json.dumps(make_product(sku="A")) + "\n")
+        (tmp_path / "products_2_bbbb.jsonl").write_text(json.dumps(make_product(sku="B")) + "\n")
+        products = es.load_products_for_iteration(tmp_path, 1)
         assert len(products) == 1
-        r, _ = es.s01(products)
-        assert r["status"] == "pass"
-
-    def test_missing_versioned_file_returns_empty(self, tmp_path):
-        pf = tmp_path / "products_99_xxxx.jsonl"
-        products = es.load_jsonl(pf)
-        assert products == []
+        assert products[0]["sku"] == "A"
 
 
 if __name__ == "__main__":

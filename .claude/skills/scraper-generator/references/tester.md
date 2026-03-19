@@ -35,9 +35,9 @@ Run `scraper.py` against a sample of the catalog, evaluate the output against va
 
 | Script | Purpose | Key flags |
 |--------|---------|-----------|
-| `tester_run_scraper.py` | Run scraper with versioned output paths | `--output-file`, `--summary-file`, `--log-file` |
-| `tester_evaluate_structural.py` | S01–S09 structural validation | `--products-file`, `--summary-file` |
-| `tester_evaluate_semantic.py` | M01–M04 semantic validation | `--products-file`, `--routing-tables` |
+| `tester_run_scraper.py` | Run scraper, generate unique hash per invocation | `--output-dir`, `--iteration` |
+| `tester_evaluate_structural.py` | S01–S09 structural validation | `--output-dir`, `--iteration` |
+| `tester_evaluate_semantic.py` | M01–M04 semantic validation | `--output-dir`, `--iteration`, `--routing-tables` |
 | `tester_compare_baseline.py` | Regression detection (retest mode) | `--baseline`, `--retest` |
 
 All at `.claude/skills/scraper-generator/scripts/`. Use them for all mechanical work — the tester's job is to call them, read their output, aggregate results, and handle failures.
@@ -124,11 +124,11 @@ uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
   --scraper {scraper_path} \
   --step probe \
   --probe-urls "url1,url2,url3" \
-  --log-file {debug_{n}_{hash}.log} \
+  --output-dir {output_dir} \
   --iteration {n}
 ```
 
-Read JSON traces from stdout. Each has `"phase": "probe"` with `status` ("ok", "error", "timeout", "parse_error"). If all probes fail — skip to evaluation (S09 catches it). Note: `--probe` is exclusive with other scraper flags (per coder.md), so `--log-file` is only used by the harness to capture stderr — it is not passed to the scraper.
+The script generates a unique hash and creates `debug_{n}_{hash}.log`. Read JSON traces from stdout — the first trace has `"phase": "files"` with the generated paths. Each probe has `"phase": "probe"` with `status` ("ok", "error", "timeout", "parse_error"). If all probes fail — skip to evaluation (S09 catches it).
 
 **Step 2 — Per-category sampling.** Use `sample_per_category` as the limit per category. Run the scraper with the output paths from `output_paths`:
 
@@ -138,42 +138,38 @@ uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
   --step categories \
   --categories "cat1,cat2,cat3" \
   --limit-per-cat {sample_per_category} \
-  --output-file {products_{n}_{hash}.jsonl} \
-  --summary-file {summary_{n}_{hash}.json} \
-  --log-file {debug_{n}_{hash}.log} \
+  --output-dir {output_dir} \
   --iteration {n}
 ```
 
-**Step 3 — Depth check.** Appends to the same versioned output files from Step 2:
+Each invocation generates a unique hash. Read the `"phase": "files"` trace from stdout to learn the generated paths.
+
+**Step 3 — Depth check.** Creates its own versioned files (separate hash from Step 2):
 
 ```bash
 uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
   --scraper {scraper_path} \
   --step depth \
-  --output-file {products_{n}_{hash}.jsonl} \
-  --summary-file {summary_{n}_{hash}.json} \
-  --log-file {debug_{n}_{hash}.log} \
+  --output-dir {output_dir} \
   --iteration {n}
 ```
 
-**Step 4 — Save baseline.** Copy the versioned products file to `baseline_products.jsonl` for regression comparison in retest mode:
+**Step 4 — Save baseline.** Concatenates all `products_{n}_*.jsonl` files into `baseline_products.jsonl`:
 
 ```bash
 uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
   --scraper {scraper_path} \
   --step save-baseline \
-  --output-file {products_{n}_{hash}.jsonl} \
+  --output-dir {output_dir} \
   --iteration {n}
 ```
 
-No `save-iteration` step — files are already versioned as `products_{n}_{hash}.jsonl`.
-
-**Step 5 — Evaluate structural rules.** Determine worst exit code from Steps 1–3. Pass versioned file paths:
+**Step 5 — Evaluate structural rules.** Evaluators glob all `products_{n}_*.jsonl` and `summary_{n}_*.json` for the iteration:
 
 ```bash
 uv run .claude/skills/scraper-generator/scripts/tester_evaluate_structural.py \
-  --products-file {products_{n}_{hash}.jsonl} \
-  --summary-file {summary_{n}_{hash}.json} \
+  --output-dir {output_dir} \
+  --iteration {n} \
   --exit-code {worst_exit}
 ```
 
@@ -181,7 +177,8 @@ uv run .claude/skills/scraper-generator/scripts/tester_evaluate_structural.py \
 
 ```bash
 uv run .claude/skills/scraper-generator/scripts/tester_evaluate_semantic.py \
-  --products-file {products_{n}_{hash}.jsonl} \
+  --output-dir {output_dir} \
+  --iteration {n} \
   --routing-tables {routing_tables_path}
 ```
 
@@ -204,13 +201,11 @@ uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
   --step categories \
   --categories "{failing_categories}" \
   --limit-per-cat {sample_per_category} \
-  --output-file {products_{n}_{hash}.jsonl} \
-  --summary-file {summary_{n}_{hash}.json} \
-  --log-file {debug_{n}_{hash}.log} \
+  --output-dir {output_dir} \
   --iteration {n}
 ```
 
-**Step 2 — Regression check.** Run passing categories, appending to the same products file:
+**Step 2 — Regression check.** Run passing categories (separate invocation, gets its own hash):
 
 ```bash
 uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
@@ -218,10 +213,7 @@ uv run .claude/skills/scraper-generator/scripts/tester_run_scraper.py \
   --step categories \
   --categories "{passing_categories}" \
   --limit-per-cat {sample_per_category} \
-  --output-file {products_{n}_{hash}.jsonl} \
-  --summary-file {summary_{n}_{hash}.json} \
-  --log-file {debug_{n}_{hash}.log} \
-  --append \
+  --output-dir {output_dir} \
   --iteration {n}
 ```
 
@@ -238,13 +230,14 @@ uv run .claude/skills/scraper-generator/scripts/tester_compare_baseline.py \
 
 ```bash
 uv run .claude/skills/scraper-generator/scripts/tester_evaluate_structural.py \
-  --products-file {products_{n}_{hash}.jsonl} \
-  --summary-file {summary_{n}_{hash}.json} \
+  --output-dir {output_dir} \
+  --iteration {n} \
   --exit-code {worst_exit} \
   --skip-s06
 
 uv run .claude/skills/scraper-generator/scripts/tester_evaluate_semantic.py \
-  --products-file {products_{n}_{hash}.jsonl} \
+  --output-dir {output_dir} \
+  --iteration {n} \
   --routing-tables {routing_tables_path}
 ```
 

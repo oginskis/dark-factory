@@ -7,15 +7,13 @@ Semantic validation rules M01-M04 for scraper output.
 
 Agent: tester sub-agent (references/tester.md)
 
-Checks attribute values against routing tables (types + units from generator_input.json).
-Catches the most common scraper bug: "18mm" instead of value=18 + attribute_units={"attr": "mm"}.
-
-Reads: versioned products file, generator_input.json
-Outputs: JSON to stdout with rule_results and issues arrays.
+Reads all products_{n}_*.jsonl files for the iteration, then evaluates
+semantic rules against routing tables.
 
 Usage:
     uv run tester_evaluate_semantic.py \
-        --products-file docs/scraper-generator/acme/output/products_1_a3f2.jsonl \
+        --output-dir docs/scraper-generator/acme/output \
+        --iteration 1 \
         --routing-tables docs/scraper-generator/acme/generator_input.json
 """
 from __future__ import annotations
@@ -26,7 +24,6 @@ import re
 import sys
 from pathlib import Path
 
-# Matches values like "18mm", "3.5kg", "220V" — embedded unit in a string
 UNIT_PATTERN = re.compile(r"\d+\s*(mm|cm|m|kg|g|lb|oz|ml|l|V|W|A|Hz|kW|MPa)$")
 
 
@@ -35,7 +32,6 @@ UNIT_PATTERN = re.compile(r"\d+\s*(mm|cm|m|kg|g|lb|oz|ml|l|V|W|A|Hz|kW|MPa)$")
 # ---------------------------------------------------------------------------
 
 def load_jsonl(path: Path) -> list[dict]:
-    """Load NDJSON file, skip malformed lines."""
     products = []
     if path.exists():
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -48,12 +44,15 @@ def load_jsonl(path: Path) -> list[dict]:
     return products
 
 
-def load_routing_tables(path: Path) -> tuple[dict[str, str], dict[str, str]]:
-    """Load generator_input.json, return (types, units) flattened across subcategories.
+def load_products_for_iteration(output_dir: Path, iteration: int) -> list[dict]:
+    """Glob all products_{n}_*.jsonl files for the iteration and concatenate."""
+    products = []
+    for f in sorted(output_dir.glob(f"products_{iteration}_*.jsonl")):
+        products.extend(load_jsonl(f))
+    return products
 
-    Input structure: {"subcategory_schemas": {"wood.lumber": {"attribute_types": {...}, "units": {...}}, ...}}
-    Output: merged {attr: type} and {attr: unit} dicts across all subcategories.
-    """
+
+def load_routing_tables(path: Path) -> tuple[dict[str, str], dict[str, str]]:
     data = json.loads(path.read_text(encoding="utf-8"))
     routing = data.get("subcategory_schemas", data)
     types: dict[str, str] = {}
@@ -73,13 +72,11 @@ def load_routing_tables(path: Path) -> tuple[dict[str, str], dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 def top_category(p: dict) -> str:
-    """First segment of category_path."""
     cp = p.get("category_path") or ""
     return cp.split(" > ")[0] if cp else "unknown"
 
 
 def all_attrs(p: dict) -> dict:
-    """Merge all three attribute buckets into one dict for checking."""
     return {
         **(p.get("core_attributes") or {}),
         **(p.get("extended_attributes") or {}),
@@ -89,7 +86,6 @@ def all_attrs(p: dict) -> dict:
 
 def issue(rule_id: str, detail: str, failing: list[dict], *,
           attrs: list[str] | None = None, samples: dict | None = None) -> dict:
-    """Build an issue dict with sample URLs and values for the coder to diagnose."""
     d: dict = {
         "rule_id": rule_id,
         "detail": detail,
@@ -108,12 +104,6 @@ def issue(rule_id: str, detail: str, failing: list[dict], *,
 # ---------------------------------------------------------------------------
 
 def m01(products: list[dict], types: dict, units: dict) -> tuple[dict, dict | None]:
-    """M01: number-typed attrs WITH units must be numeric, not strings (error).
-
-    Checks: for each attribute where types[attr]=="number" AND attr in units,
-    the value must be int/float. Catches "18mm" where value should be 18
-    and attribute_units should have {"nominal_width": "mm"}.
-    """
     failing, attrs, svals = [], set(), {}
     for p in products:
         for a, v in all_attrs(p).items():
@@ -130,10 +120,6 @@ def m01(products: list[dict], types: dict, units: dict) -> tuple[dict, dict | No
 
 
 def m02(products: list[dict], types: dict) -> tuple[dict, dict | None]:
-    """M02: ALL number-typed attrs must be int/float, not strings (warning).
-
-    Broader than M01 — catches "3" (should be 3) even for attrs without units.
-    """
     failing, attrs, svals = [], set(), {}
     for p in products:
         for a, v in all_attrs(p).items():
@@ -150,11 +136,6 @@ def m02(products: list[dict], types: dict) -> tuple[dict, dict | None]:
 
 
 def m03(products: list[dict], units: dict) -> tuple[dict, dict | None]:
-    """M03: attribute_units must contain keys for attrs that have units in routing table (warning).
-
-    If the routing table says nominal_width has unit "mm" and the product has nominal_width
-    in any bucket, then attribute_units must contain "nominal_width".
-    """
     missing, attrs, failing = 0, set(), []
     for p in products:
         pu = p.get("attribute_units") or {}
@@ -171,17 +152,11 @@ def m03(products: list[dict], units: dict) -> tuple[dict, dict | None]:
 
 
 def m04(products: list[dict], types: dict, units: dict) -> tuple[dict, dict | None]:
-    """M04: regex scan for embedded units like '18mm' in number-typed or unit-bearing attrs (error).
-
-    Only checks attrs where routing table type is 'number' OR units dict has an entry.
-    Does NOT flag string-typed attrs that happen to contain unit-like suffixes.
-    """
     failing, attrs, svals = [], set(), {}
     for p in products:
         for a, v in all_attrs(p).items():
             if not isinstance(v, str):
                 continue
-            # Only check attrs that should be numeric or have units
             if types.get(a) != "number" and a not in units:
                 continue
             if UNIT_PATTERN.search(v):
@@ -202,14 +177,16 @@ def m04(products: list[dict], types: dict, units: dict) -> tuple[dict, dict | No
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Semantic validation rules M01-M04")
-    parser.add_argument("--products-file", required=True,
-                        help="Path to versioned products JSONL file")
+    parser.add_argument("--output-dir", required=True,
+                        help="Directory containing versioned output files")
+    parser.add_argument("--iteration", required=True, type=int,
+                        help="Iteration number to evaluate")
     parser.add_argument("--routing-tables", required=True,
                         help="Path to generator_input.json")
     args = parser.parse_args()
 
-    products_file = Path(args.products_file)
-    products = load_jsonl(products_file)
+    output_dir = Path(args.output_dir)
+    products = load_products_for_iteration(output_dir, args.iteration)
     types, units = load_routing_tables(Path(args.routing_tables))
 
     results, issues = [], []
