@@ -204,7 +204,7 @@ class TestCoreAttributeCoveragePerSubcategory:
             },
         ]
         score, detail = check_core_attribute_coverage(products, config)
-        # 7 universals + 1 core (wood_type) = 8 fields
+        # 7 mandatory core fields + 1 core (wood_type) = 8 fields
         # All 8 populated -> 100% > 80% threshold -> passes
         assert score == 1.0
         assert detail["wood.lumber"]["coverage"] == 1.0
@@ -277,7 +277,7 @@ class TestCoreAttributeCoverageUnclassified:
             },
         ]
         score, detail = check_core_attribute_coverage(products, config)
-        # 7 universals + 2 union core (wood_type, material) = 9 fields
+        # 7 mandatory core fields + 2 union core (wood_type, material) = 9 fields
         # 8 populated (missing material) -> 8/9 = 88.9% > 80% -> passes
         assert score == 1.0
         assert "unknown.thing" in detail

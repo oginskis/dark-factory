@@ -41,9 +41,10 @@ REPO_ROOT = find_repo_root()
 TAXONOMY_FILE = REPO_ROOT / "docs" / "product-taxonomy" / "categories.md"
 SCHEMAS_DIR = REPO_ROOT / "docs" / "product-taxonomy" / "sku-schemas"
 
-# Universal fields handled by the eval script — exclude from routing tables
-UNIVERSAL_KEYS = {
+# Top-level fields on the product record — exclude from routing tables
+TOP_LEVEL_KEYS = {
     "sku", "product_name", "name", "url", "price", "currency",
+    "price_includes_vat",
     "brand", "product_category", "scraped_at", "category_path",
 }
 
@@ -114,7 +115,7 @@ def parse_schema_table(content: str, section_name: str) -> list[dict]:
 
 
 def extract_routing_table(schema_path: Path) -> dict:
-    """Extract core/extended attribute keys, types, and units from a schema file."""
+    """Extract core/extended attribute keys, types, units, and mandatory flags from a schema file."""
     content = schema_path.read_text(encoding="utf-8")
 
     core_rows = parse_schema_table(content, "Core Attributes")
@@ -122,6 +123,7 @@ def extract_routing_table(schema_path: Path) -> dict:
 
     core_keys = []
     extended_keys = []
+    mandatory_keys = []
     types = {}
     units = {}
 
@@ -129,17 +131,20 @@ def extract_routing_table(schema_path: Path) -> dict:
         key = row.get("Key", "").strip()
         data_type = row.get("Data Type", "").strip()
         unit = row.get("Unit", "").strip()
-        if key and key not in UNIVERSAL_KEYS:
+        mandatory = row.get("Mandatory", "").strip()
+        if key and key not in TOP_LEVEL_KEYS:
             core_keys.append(key)
             types[key] = TYPE_MAP.get(data_type, "str")
             if unit and unit not in ("—", "-"):
                 units[key] = unit
+            if mandatory == "yes":
+                mandatory_keys.append(key)
 
     for row in extended_rows:
         key = row.get("Key", "").strip()
         data_type = row.get("Data Type", "").strip()
         unit = row.get("Unit", "").strip()
-        if key and key not in UNIVERSAL_KEYS:
+        if key and key not in TOP_LEVEL_KEYS:
             extended_keys.append(key)
             types[key] = TYPE_MAP.get(data_type, "str")
             if unit and unit not in ("—", "-"):
@@ -148,6 +153,7 @@ def extract_routing_table(schema_path: Path) -> dict:
     return {
         "core_attribute_keys": core_keys,
         "extended_attribute_keys": extended_keys,
+        "mandatory_keys": mandatory_keys,
         "attribute_types": types,
         "units": units,
     }

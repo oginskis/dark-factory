@@ -4,7 +4,7 @@
 #     "pytest",
 # ]
 # ///
-"""Tests for tester_evaluate_structural.py — S01-S09 with glob-based file loading."""
+"""Tests for tester_evaluate_structural.py — structural validation with schema-aware key coverage."""
 from __future__ import annotations
 
 import json
@@ -34,6 +34,22 @@ def make_product(**overrides) -> dict:
     return base
 
 
+ROUTING_TABLES = {
+    "subcategory_schemas": {
+        "wood.softwood_hardwood_lumber": {
+            "core_attribute_keys": ["wood_type", "treatment_type", "structural_grade", "appearance_grade"],
+            "extended_attribute_keys": ["species", "nominal_thickness", "nominal_width", "length"],
+            "attribute_types": {
+                "wood_type": "str", "treatment_type": "str",
+                "structural_grade": "str", "appearance_grade": "str",
+                "species": "str", "nominal_thickness": "number",
+                "nominal_width": "number", "length": "number",
+            },
+            "units": {"nominal_thickness": "mm", "nominal_width": "mm", "length": "m"},
+        }
+    }
+}
+
 VALID_PRODUCT = make_product()
 EMPTY_CORE = make_product(core_attributes={})
 NO_BRAND = make_product(brand=None)
@@ -41,23 +57,136 @@ BRAND_IN_CORE = make_product(core_attributes={"brand": "Oops", "wood_type": "Oak
 
 
 class TestS01:
-    def test_pass(self):
-        r, _ = es.s01([VALID_PRODUCT] * 5)
-        assert r["status"] == "pass"
+    """S01: ≥75% of core_attribute_keys from routing table appear in at least one product."""
 
-    def test_fail(self):
-        r, _ = es.s01([EMPTY_CORE] * 5)
+    def test_pass_all_keys_present(self):
+        """All 4 core keys present → 100% coverage → pass."""
+        p = make_product(core_attributes={
+            "wood_type": "Softwood", "treatment_type": "Untreated",
+            "structural_grade": "C24", "appearance_grade": "A",
+        })
+        r, _ = es.s01([p], ROUTING_TABLES)
+        assert r["status"] == "pass"
+        assert r["value"] == 1.0
+
+    def test_pass_at_75_percent(self):
+        """3 of 4 core keys present → 75% → pass."""
+        p = make_product(core_attributes={
+            "wood_type": "Softwood", "treatment_type": "Untreated",
+            "structural_grade": "C24",
+        })
+        r, _ = es.s01([p], ROUTING_TABLES)
+        assert r["status"] == "pass"
+        assert r["value"] == 0.75
+
+    def test_fail_below_75_percent(self):
+        """2 of 4 core keys → 50% < 75% → fail."""
+        p = make_product(core_attributes={
+            "wood_type": "Softwood", "treatment_type": "Untreated",
+        })
+        r, iss = es.s01([p], ROUTING_TABLES)
+        assert r["status"] == "fail"
+        assert r["value"] == 0.5
+        assert iss is not None
+        assert "structural_grade" in str(iss["detail"])
+
+    def test_fail_empty_core(self):
+        """No core keys → 0% → fail."""
+        r, iss = es.s01([EMPTY_CORE], ROUTING_TABLES)
+        assert r["status"] == "fail"
+        assert r["value"] == 0
+
+    def test_fail_no_products(self):
+        r, iss = es.s01([], ROUTING_TABLES)
         assert r["status"] == "fail"
 
-    def test_threshold(self):
-        r, _ = es.s01([VALID_PRODUCT] * 3 + [EMPTY_CORE] * 7)
+    def test_fail_no_routing_tables(self):
+        r, _ = es.s01([VALID_PRODUCT], {})
+        assert r["status"] == "fail"
+
+    def test_keys_found_across_multiple_products(self):
+        """Key found in ANY product counts — doesn't need to be in every product."""
+        p1 = make_product(core_attributes={"wood_type": "Softwood", "treatment_type": "Untreated"})
+        p2 = make_product(core_attributes={"structural_grade": "C24", "appearance_grade": "A"})
+        r, _ = es.s01([p1, p2], ROUTING_TABLES)
+        assert r["status"] == "pass"
+        assert r["value"] == 1.0
+
+    def test_null_values_not_counted(self):
+        """Keys with None values don't count as found."""
+        p = make_product(core_attributes={
+            "wood_type": "Softwood", "treatment_type": None,
+            "structural_grade": None, "appearance_grade": None,
+        })
+        r, _ = es.s01([p], ROUTING_TABLES)
+        assert r["status"] == "fail"
+        assert r["value"] == 0.25
+
+    def test_per_category_breakdown(self):
+        """Per-subcategory coverage is reported."""
+        p = make_product(core_attributes={"wood_type": "Softwood", "treatment_type": "Untreated"})
+        r, _ = es.s01([p], ROUTING_TABLES)
+        assert "wood.softwood_hardwood_lumber" in r["per_category"]
+        subcat = r["per_category"]["wood.softwood_hardwood_lumber"]
+        assert subcat["value"] == 0.5
+        assert subcat["status"] == "fail"
+
+    def test_no_products_for_subcategory(self):
+        """Subcategory in routing tables but no products with that product_category."""
+        p = make_product(product_category="other.category",
+                         core_attributes={"wood_type": "X"})
+        r, _ = es.s01([p], ROUTING_TABLES)
+        assert r["status"] == "fail"
+        subcat = r["per_category"]["wood.softwood_hardwood_lumber"]
+        assert subcat["value"] == 0
+
+    def test_empty_core_keys_passes(self):
+        """Subcategory with no expected core keys → auto-pass."""
+        rt = {"subcategory_schemas": {"cat.empty": {
+            "core_attribute_keys": [],
+            "extended_attribute_keys": ["x"],
+        }}}
+        p = make_product(product_category="cat.empty")
+        r, _ = es.s01([p], rt)
         assert r["status"] == "pass"
 
-    def test_per_category(self):
-        p1 = make_product(category_path="Timber > Softwood")
-        p2 = make_product(category_path="Fencing > Panels", core_attributes={})
-        r, _ = es.s01([p1, p2])
-        assert "Timber" in r["per_category"]
+
+class TestS02:
+    """S02: ≥50% of extended_attribute_keys from routing table appear in at least one product."""
+
+    def test_pass_all_keys(self):
+        p = make_product(extended_attributes={
+            "species": "Redwood", "nominal_thickness": 47,
+            "nominal_width": 100, "length": 3.6,
+        })
+        r, _ = es.s02([p], ROUTING_TABLES)
+        assert r["status"] == "pass"
+        assert r["value"] == 1.0
+
+    def test_pass_at_50_percent(self):
+        """2 of 4 extended keys → 50% → pass."""
+        p = make_product(extended_attributes={"species": "Redwood", "nominal_thickness": 47})
+        r, _ = es.s02([p], ROUTING_TABLES)
+        assert r["status"] == "pass"
+        assert r["value"] == 0.5
+
+    def test_fail_below_50_percent(self):
+        """1 of 4 extended keys → 25% < 50% → fail."""
+        p = make_product(extended_attributes={"species": "Redwood"})
+        r, iss = es.s02([p], ROUTING_TABLES)
+        assert r["status"] == "fail"
+        assert r["value"] == 0.25
+        assert iss is not None
+
+    def test_fail_no_products(self):
+        r, _ = es.s02([], ROUTING_TABLES)
+        assert r["status"] == "fail"
+
+    def test_now_error_severity(self):
+        """S02 is error severity — fail status is 'fail' not 'warn'."""
+        p = make_product(extended_attributes={})
+        r, _ = es.s02([p], ROUTING_TABLES)
+        assert r["status"] == "fail"
 
 
 class TestS03:
@@ -163,6 +292,40 @@ class TestS09:
         assert r["status"] == "fail"
 
 
+class TestKeyCoverage:
+    """Test the _key_coverage helper directly."""
+
+    def test_full_coverage(self):
+        products = [{"core_attributes": {"a": 1, "b": 2, "c": 3}}]
+        cov, missing = es._key_coverage(products, ["a", "b", "c"], "core_attributes")
+        assert cov == 1.0
+        assert missing == []
+
+    def test_partial_coverage(self):
+        products = [{"core_attributes": {"a": 1}}]
+        cov, missing = es._key_coverage(products, ["a", "b", "c"], "core_attributes")
+        assert abs(cov - 1 / 3) < 0.01
+        assert set(missing) == {"b", "c"}
+
+    def test_none_values_excluded(self):
+        products = [{"core_attributes": {"a": 1, "b": None}}]
+        cov, missing = es._key_coverage(products, ["a", "b"], "core_attributes")
+        assert cov == 0.5
+        assert missing == ["b"]
+
+    def test_empty_expected(self):
+        cov, missing = es._key_coverage([], [], "core_attributes")
+        assert cov == 1.0
+
+    def test_across_products(self):
+        products = [
+            {"core_attributes": {"a": 1}},
+            {"core_attributes": {"b": 2}},
+        ]
+        cov, missing = es._key_coverage(products, ["a", "b"], "core_attributes")
+        assert cov == 1.0
+
+
 class TestGlobLoading:
     """Evaluator globs products_{n}_*.jsonl and merges across files."""
 
@@ -186,6 +349,31 @@ class TestGlobLoading:
         products = es.load_products_for_iteration(tmp_path, 1)
         assert len(products) == 1
         assert products[0]["sku"] == "A"
+
+
+class TestMultiSubcategory:
+    """S01/S02 with multiple subcategories in routing tables."""
+
+    def test_worst_subcategory_determines_status(self):
+        """If one subcategory passes and another fails, overall status is fail."""
+        rt = {"subcategory_schemas": {
+            "cat.good": {
+                "core_attribute_keys": ["a", "b"],
+                "extended_attribute_keys": [],
+            },
+            "cat.bad": {
+                "core_attribute_keys": ["x", "y", "z", "w"],
+                "extended_attribute_keys": [],
+            },
+        }}
+        products = [
+            make_product(product_category="cat.good", core_attributes={"a": 1, "b": 2}),
+            make_product(product_category="cat.bad", core_attributes={"x": 1}),  # 1/4 = 25%
+        ]
+        r, iss = es.s01(products, rt)
+        assert r["status"] == "fail"
+        assert r["per_category"]["cat.good"]["status"] == "pass"
+        assert r["per_category"]["cat.bad"]["status"] == "fail"
 
 
 if __name__ == "__main__":

@@ -1,10 +1,5 @@
 # Scraper Generator Workflow
 
-**Input:** Company report, catalog assessment, generator_input.json, product taxonomy
-**Output:** scraper.py, config.json, validation_{n}_{hash}.json
-
----
-
 ## Context
 
 This workflow takes what we know about a company's catalog and turns it into a working Python scraper that extracts product data.
@@ -15,7 +10,7 @@ Three agents collaborate, each with a single job:
 |-------|-------------|-------------------|
 | **Orchestrator** (this document) | Loads context, makes decisions, manages retries, escalates problems | Write code, run the scraper |
 | **Coder** (`references/coder.md`) | Writes `scraper.py` from scratch or patches it when tests fail | Run the scraper, decide what to fix |
-| **Tester** (`references/tester.md`) | Runs the scraper, checks the output against quality rules, writes `report_{n}_{hash}.json` | Write or modify code |
+| **Tester** (`references/tester.md`) | Runs the scraper, checks the output against acceptance criteria, writes `report_{n}_{hash}.json` | Write or modify code |
 
 The final scraper is a single standalone `.py` file with no imports from this codebase — it runs independently in production.
 
@@ -82,7 +77,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     S3["Step 3: Dispatch Coder — write scraper.py<br/>Reads: catalog assessment, generator_input.json,<br/>category mapping, platform knowledgebase,<br/>LABEL_MAP + CATEGORY_ALIASES (non-English only)"]
-    S3 --> S4["Step 4: Dispatch Tester — run scraper, check output<br/>Probe PROBE_URLS product URLs, SAMPLE_PER_CATEGORY per category,<br/>check structural rules (S01–S09) + semantic rules (M01–M04)<br/>Writes: report_{n}_{hash}.json, products_{n}_{hash}.jsonl, summary_{n}_{hash}.json, debug_{n}_{hash}.log"]
+    S3 --> S4["Step 4: Dispatch Tester — run scraper, check output<br/>Probe PROBE_URLS product URLs, SAMPLE_PER_CATEGORY per category,<br/>check acceptance criteria (see acceptance-criteria.md)<br/>Writes: report_{n}_{hash}.json, products_{n}_{hash}.jsonl, summary_{n}_{hash}.json, debug_{n}_{hash}.log"]
     S4 --> S4R{"Test result?"}
     S4R --->|pass| S5["Step 5: Save platform knowledge<br/>(skip if platform is custom/unknown)"]
     S4R --->|needs_fix| FIX[["Fix loop — max MAX_FIX_CYCLES rounds<br/>see Fix Loop Detail below"]]
@@ -90,7 +85,7 @@ flowchart TD
     FIX --->|pass| S5
     FIX --->|fail| ESC
     S5 --> S6["Step 6: Write config.json"]
-    S6 --> S7["Step 7: Final check — 13 quality gates"]
+    S6 --> S7["Step 7: Final check — 6 quality gates"]
     S7 --> DONE(["Done — scraper.py + config.json + validation_{n}_{hash}.json ready"])
     ESC --> ESCR{"Failure type?"}
     ESCR --->|"selectors/extraction"| ESC_A(["probe_extraction_failed"])
@@ -105,8 +100,8 @@ flowchart TD
     START(["Enter from Step 4: status = needs_fix"])
     START --> BUDGET{"Fix budget remaining?<br/>Max MAX_FIX_CYCLES"}
     BUDGET --->|no| ESC(["STOP — can't fix this automatically<br/>Partial output: scraper.py, report_{n}_{hash}.json, debug_{n}_{hash}.log"])
-    BUDGET --->|yes| CFIX["Dispatch Coder (fix mode)<br/>Reads: catalog assessment, generator_input.json,<br/>category mapping, platform knowledgebase,<br/>LABEL_MAP + CATEGORY_ALIASES (non-English only)<br/>+ report_{n}_{hash}.json (failing rules, sample URLs, sample values)<br/>Patches scraper.py — targeted fixes only, not a rewrite"]
-    CFIX --> RETEST["Dispatch Tester (retest mode)<br/>Same as Step 4 but skip probe<br/>SAMPLE_PER_CATEGORY per category, check S01–S09 + M01–M04<br/>Writes: report_{n}_{hash}.json, products_{n}_{hash}.jsonl, debug_{n}_{hash}.log"]
+    BUDGET --->|yes| CFIX["Dispatch Coder (fix mode)<br/>Reads: catalog assessment, generator_input.json,<br/>category mapping, platform knowledgebase,<br/>LABEL_MAP + CATEGORY_ALIASES (non-English only)<br/>+ report_{n}_{hash}.json (failing acceptance criteria, sample URLs, sample values)<br/>Patches scraper.py — targeted fixes only, not a rewrite"]
+    CFIX --> RETEST["Dispatch Tester (retest mode)<br/>Same as Step 4 but skip probe<br/>SAMPLE_PER_CATEGORY per category, check acceptance criteria<br/>Writes: report_{n}_{hash}.json, products_{n}_{hash}.jsonl, debug_{n}_{hash}.log"]
     RETEST --> REREAD["Read updated report_{n}_{hash}.json"]
     REREAD --> RESTATUS{"Test result?"}
     RESTATUS --->|pass| DONE(["Return to Step 5"])
@@ -204,7 +199,7 @@ Build the `LABEL_MAP` and `CATEGORY_ALIASES` dicts that the scraper will use to 
 
 **Build CATEGORY_ALIASES** for labels that map to different schema keys per subcategory (e.g., "thickness" → `nominal_thickness` for lumber, `thickness` for flooring). The language seed may already contain aliases — use those, add new ones from blueprint labels.
 
-**No coverage gate** — build the best translation map possible and continue. If attributes end up empty because of poor translations, the Tester will catch it via S01 (core attribute fill rate).
+**No coverage gate** — build the best translation map possible and continue. If attributes end up empty because of poor translations, the Tester will catch it via the acceptance criteria.
 
 **After successful scraper generation:** Save the merged LABEL_MAP back to the language seed file to enrich it for future sites.
 
@@ -227,7 +222,7 @@ Full contract in `references/coder.md` Input Contract.
 | `platform_knowledgebase` | Platform-specific patterns (if platform is an enumerated value) |
 | `scraper_output_path` | Path where the coder writes `scraper.py` |
 | `LABEL_MAP` + `CATEGORY_ALIASES` | (non-English only) Translation maps from Step 2b |
-| `report_path` | (fix mode only) Path to the latest `report_{n}_{hash}.json` — failing rules, sample URLs, sample values |
+| `report_path` | (fix mode only) Path to the previous tester's `report_{n}_{hash}.json` — failing acceptance criteria, sample URLs, sample values |
 | `existing_scraper_path` | (fix mode only) Path to the current `scraper.py` to patch |
 
 ### Output from coder
@@ -240,9 +235,9 @@ Full contract in `references/coder.md` Input Contract.
 
 ## Step 4: Dispatch Tester
 
-Dispatch the tester sub-agent to run the scraper and evaluate its output. The tester reads `references/tester.md` for validation rules, run strategies, and report format.
+Dispatch the tester sub-agent to run the scraper and evaluate its output. The tester reads `references/tester.md` for acceptance criteria, run strategies, and report format.
 
-The tester probes `PROBE_URLS` product URLs, samples `SAMPLE_PER_CATEGORY` products per category, and checks structural rules (S01–S09) plus semantic rules (M01–M04).
+The tester probes `PROBE_URLS` product URLs, samples `SAMPLE_PER_CATEGORY` products per category, and checks the acceptance criteria.
 
 ### Input to tester
 
@@ -252,13 +247,13 @@ The tester probes `PROBE_URLS` product URLs, samples `SAMPLE_PER_CATEGORY` produ
 | `scraper_path` | Path to `scraper.py` |
 | `catalog_structure` | Categories, navigation paths, top-level category list from catalog assessment |
 | `expected_product_count` | From the catalog assessment |
-| `routing_tables_path` | Path to `generator_input.json` (for schema-aware validation rules) |
+| `routing_tables_path` | Path to `generator_input.json` (for schema-aware acceptance criteria checks) |
 | `iteration` | Iteration number (1 for first test run, increments for each retest) |
 | `output_paths` | Versioned paths computed by the orchestrator: `products_{n}_{hash}.jsonl`, `summary_{n}_{hash}.json`, `debug_{n}_{hash}.log`. The tester passes these to the scraper as `--output-file`, `--summary-file`, `--log-file` CLI arguments. |
 | `report_path` | Path for `report_{n}_{hash}.json` (computed by the tester) |
 | `probe_urls` | List of product URLs for probing — 1 per category, min 3 (from `PROBE_URLS` constant) |
 | `sample_per_category` | Max products per category — 20% of category size, min 5, max 25 (from `SAMPLE_PER_CATEGORY` constant) |
-| `fix_targets` | (retest only) Rule IDs that the coder fixed — tester focuses verification on these |
+| `fix_targets` | (retest only) Acceptance criteria IDs that the coder fixed — tester focuses verification on these |
 | `regression_sample_from` | (retest only) Categories that were passing before the fix — tester checks for regressions |
 
 ### Output from tester
@@ -273,8 +268,8 @@ The tester probes `PROBE_URLS` product URLs, samples `SAMPLE_PER_CATEGORY` produ
 Full format is defined in `references/tester.md`. The orchestrator reads these fields from the latest `report_{n}_{hash}.json`:
 
 - **`status`** — `"pass"`, `"needs_fix"`, `"unfixable"`, or `"script_error"` — drives the fix→retest state machine. `"script_error"` means a tester helper script crashed (not the scraper's fault) — escalate to the user immediately, do not enter fix loop.
-- **`rule_results`** — per-rule pass/fail with values — used for per-rule fix attempt tracking
-- **`issues`** — rule IDs, affected categories, sample URLs/values — passed to coder as fix targets
+- **`rule_results`** — per acceptance criterion pass/fail with values — used for fix attempt tracking
+- **`issues`** — acceptance criteria IDs, affected categories, sample URLs/values — passed to coder as fix targets
 - **`passing_categories`** — passed to tester as `regression_sample_from` in retest mode
 
 Retest mode adds: `fix_results`, `regression_results`, `new_issues` (schemas in `references/tester.md`).
@@ -287,7 +282,7 @@ The orchestrator manages a state machine that iterates between the coder and tes
 
 ### "unfixable" status — context-dependent behavior
 
-The tester returns `"unfixable"` when S08 (crash) or S09 (no output) fails. The orchestrator's response depends on the context:
+The tester returns `"unfixable"` when the crash or no-output acceptance criteria fail (see `references/acceptance-criteria.md` for actual rule IDs). The orchestrator's response depends on the context:
 
 | Context | Tester returns "unfixable" | Orchestrator action |
 |---------|---------------------------|---------------------|
@@ -295,6 +290,10 @@ The tester returns `"unfixable"` when S08 (crash) or S09 (no output) fails. The 
 | **Retest mode** (after a fix) | Fix introduced a crash or broke output | ESCALATE immediately. A coder patch that causes a crash is not recoverable by another patch — escalate with the debug log showing what broke. |
 
 In both cases, the orchestrator does NOT retry. "Unfixable" always means immediate escalation. The distinction is which escalation decision to use: if the crash is related to extraction (selectors, parsing) → `probe_extraction_failed`; if it's a runtime issue (timeout, memory, HTTP) → `scraper_test_failed`.
+
+### "needs_fix" exhaustion — attribute coverage
+
+When the fix→retest loop exhausts `MAX_FIX_CYCLES` and the remaining failures are the attribute coverage acceptance criteria, the orchestrator escalates as `not_enough_attributes_to_extract`. This is distinct from extraction failures (selectors, parsing) — it means the catalog genuinely doesn't expose enough attributes for the schema. The coder should report any important catalog attributes that couldn't be mapped to schema keys (schema gap report).
 
 ### Coder fix dispatch input
 
@@ -305,12 +304,12 @@ Same fields as the Step 3 input table with `mode` set to `"fix"` — including `
 | Breaker | Limit |
 |---|---|
 | Fix → retest cycles | `MAX_FIX_CYCLES` |
-| Same rule failing after fix | `MAX_FIX_ATTEMPTS_PER_RULE` |
+| Same acceptance criterion failing after fix | `MAX_FIX_ATTEMPTS_PER_RULE` |
 | Retest timeout | `RETEST_TIMEOUT` |
 
-**Per-rule tracking:** The orchestrator maintains a dict `rule_fix_attempts: {rule_id: int}` counting how many times each rule has been explicitly listed in `fix_targets` for a coder dispatch. Only explicit targets increment the counter — a rule that fails as collateral damage from a fix aimed at a different rule does NOT count.
+**Per-criterion tracking:** The orchestrator maintains a dict `rule_fix_attempts: {rule_id: int}` counting how many times each acceptance criterion has been explicitly listed in `fix_targets` for a coder dispatch. Only explicit targets increment the counter — a criterion that fails as collateral damage from a fix aimed at a different one does NOT count.
 
-**Worked example:**
+**Worked example** (uses real acceptance criteria IDs — see `references/acceptance-criteria.md` for the full list and thresholds):
 
 | Cycle | fix_targets sent | Tester result | rule_fix_attempts after |
 |-------|-----------------|---------------|------------------------|
@@ -324,7 +323,7 @@ At this point M01 is exhausted (`MAX_FIX_ATTEMPTS_PER_RULE` attempts) but still 
 
 ## Label Handling (non-English sites)
 
-For non-English sites, the orchestrator builds the best LABEL_MAP it can in Step 2b (one pass) and moves on. There is no separate label extension retry loop — if missing translations cause low attribute coverage, the fix loop (`MAX_FIX_CYCLES`) handles it. The Coder can improve the LABEL_MAP as part of a targeted fix when S01 (core attribute fill rate) fails due to unmapped labels.
+For non-English sites, the orchestrator builds the best LABEL_MAP it can in Step 2b (one pass) and moves on. There is no separate label extension retry loop — if missing translations cause low attribute coverage, the fix loop (`MAX_FIX_CYCLES`) handles it. The Coder can improve the LABEL_MAP as part of a targeted fix when the core attribute coverage criterion fails due to unmapped labels.
 
 ---
 
@@ -352,7 +351,7 @@ Write to: **JSON-LD Patterns**, **CSS Selectors**, **Pagination**, **Common Pitf
 
 ## Step 6: Prepare Config Metadata
 
-Produce config metadata for the scraper:
+Produce config metadata for the scraper. Example structure (values are illustrative):
 
 ```json
 {
@@ -393,20 +392,13 @@ Before presenting results, verify the scraper and config against these quality g
 | # | Check | Pass criteria |
 |---|-------|---------------|
 | 1 | **Scraper is standalone** | Single .py file, no imports from the codebase, only allowed libraries |
-| 2 | **Validation passed** | Tester returned `pass` (latest `report_{n}_{hash}.json` status is "pass") |
-| 3 | **Product data contract correct** | Flat list of product records with universal top-level fields plus three attribute buckets |
-| 4 | **`brand` is top-level** | `brand` appears as a top-level field in every product record, not inside any attribute bucket |
-| 5 | **`product_category` is valid** | `product_category` is a valid taxonomy ID from the product taxonomy categories file |
-| 6 | **`core_attributes` keys match schema** | Every key in `core_attributes` appears in the Key column of the SKU schema's Core Attributes table |
-| 7 | **`extended_attributes` keys match schema** | Every key in `extended_attributes` appears in the Key column of the SKU schema's Extended Attributes table |
-| 8 | **`extra_attributes` keys are governed** | Keys are `snake_case`, values are primitives (string, number, boolean) or arrays of primitives, no nested objects |
-| 9 | **Config metadata complete** | All required fields present with correct values, including `subcategories`, `category_mapping`, and `default_category`. For multi-subcategory companies, every URL prefix from the catalog assessment appears in `category_mapping`. |
-| 10 | **Platform knowledgebase updated** | Knowledgebase was written or updated after successful validation (when platform is an enumerated value — not `unknown` or `custom`) |
-| 11 | **Multi-subcategory mapping correct** | For multi-subcategory companies: category mapping covers all URL prefixes, scraper uses per-subcategory SKU schemas for attribute routing, and `product_category` varies correctly across products from different sections. |
-| 12 | **`attribute_units` correct** | `attribute_units` is a top-level dict. Every key appears in exactly one of `core_attributes`, `extended_attributes`, or `extra_attributes`. Values are strings. Attributes with schema Unit `—` do not appear. |
-| 13 | **Label coverage sufficient (non-English sites)** | LABEL_MAP covers ≥70% of discovered attribute labels that map to schema keys. Context-dependent aliases (CATEGORY_ALIASES) exist when the same label maps to different schema keys per subcategory. Skip for English sites. |
+| 2 | **Tester passed** | Latest `report_{n}_{hash}.json` status is "pass" |
+| 3 | **Config metadata complete** | All required fields present with correct values, including `subcategories`, `category_mapping`, and `default_category`. For multi-subcategory companies, every URL prefix from the catalog assessment appears in `category_mapping`. |
+| 4 | **Platform knowledgebase updated** | Knowledgebase was written or updated after successful validation (when platform is an enumerated value — not `unknown` or `custom`) |
+| 5 | **Multi-subcategory mapping correct** | For multi-subcategory companies: category mapping covers all URL prefixes, scraper uses per-subcategory SKU schemas for attribute routing, and `product_category` varies correctly across products from different sections. |
+| 6 | **Label coverage sufficient (non-English sites)** | LABEL_MAP covers ≥70% of discovered attribute labels that map to schema keys. Context-dependent aliases (CATEGORY_ALIASES) exist when the same label maps to different schema keys per subcategory. Skip for English sites. |
 
-If all 13 pass, the scraper is complete.
+If all checks pass, the scraper is complete.
 
 ### Output on success
 
@@ -475,9 +467,9 @@ No `config.json` or `validation_{n}_{hash}.json` on escalation.
 
 ### Decision: probe_extraction_failed
 
-**Context:** The tester found that the scraper's extraction logic does not work against the actual product pages — selectors don't match, JSON-LD structure is unexpected, or universal attributes cannot be extracted.
+**Context:** The tester found that the scraper's extraction logic does not work against the actual product pages — selectors don't match, JSON-LD structure is unexpected, or mandatory core attributes cannot be extracted.
 **Autonomous resolution:** The orchestrator dispatches the coder in fix mode with the tester's diagnostics. The fix→retest loop handles up to `MAX_FIX_CYCLES`.
-**Escalate when:** The fix→retest loop budget is exhausted (`MAX_FIX_CYCLES` with no resolution, or a rule fails after `MAX_FIX_ATTEMPTS_PER_RULE` targeted fix attempts).
+**Escalate when:** The fix→retest loop budget is exhausted (`MAX_FIX_CYCLES` with no resolution, or an acceptance criterion fails after `MAX_FIX_ATTEMPTS_PER_RULE` targeted fix attempts).
 **Escalation payload:** Company slug, the specific extraction failure, what was tried across fix cycles, sample data from the problematic pages.
 
 ### Decision: scraper_test_failed
@@ -486,3 +478,10 @@ No `config.json` or `validation_{n}_{hash}.json` on escalation.
 **Autonomous resolution:** The orchestrator enters the fix→retest loop (max `MAX_FIX_CYCLES`).
 **Escalate when:** The fix→retest loop budget is exhausted, or the tester returns "unfixable".
 **Escalation payload:** Company slug, error details or partial results, what was tried across fix cycles, the scraping strategy that was used.
+
+### Decision: not_enough_attributes_to_extract
+
+**Context:** The scraper cannot extract enough schema attributes for one or more subcategories. After exhausting the fix budget, the attribute coverage acceptance criteria still fail for at least one subcategory. The catalog may not expose enough product attributes for a viable scraper. See `references/acceptance-criteria.md` for actual rule IDs and thresholds.
+**Autonomous resolution:** The fix→retest loop attempts to improve attribute extraction up to `MAX_FIX_CYCLES`. The coder is guided to minimize `extra_attributes` and maximize mapping to schema keys.
+**Escalate when:** Any attribute coverage acceptance criteria still fail for any subcategory after the fix budget is exhausted.
+**Escalation payload:** Company slug, per-subcategory coverage report (which core/extended keys were found vs missing), sample product URLs showing the gap, and a note on any important attributes the coder found that are absent from the SKU schema (schema gap report).

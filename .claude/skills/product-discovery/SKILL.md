@@ -124,7 +124,7 @@ When all four stages complete successfully, present a structured summary to the 
   - {URL 2}
 
 ### Scraper
-- **Output format:** four-level with attribute_units (universal top-level fields + `core_attributes`, `extended_attributes`, `extra_attributes` + `attribute_units`)
+- **Output format:** four-level with attribute_units (mandatory core attributes + `core_attributes`, `extended_attributes`, `extra_attributes` + `attribute_units`)
 - **Test result:** {passed / failed} ({N} products extracted, {errors} errors, {duration}s)
 - **SKU schema:** {subcategory-slug}
 - **Category-specific attributes extracted:** {comma-separated list of attribute names found in test products}
@@ -135,7 +135,7 @@ When all four stages complete successfully, present a structured summary to the 
 
 ### Notes
 {Bulleted list of operational caveats and important observations that affect how the scraper output should be interpreted. Include any of the following that apply:}
-- {Missing data: universal attributes that are unavailable — e.g., "Prices not available — the international catalog does not display prices. Use a country-specific site (e.g., /de/, /fr/) if pricing is required."}
+- {Missing data: mandatory core attributes that are unavailable — e.g., "Prices not available — the international catalog does not display prices. Use a country-specific site (e.g., /de/, /fr/) if pricing is required."}
 - {Eval checks skipped and why — e.g., "Price sanity check skipped (no prices in output). Pagination completeness check skipped (limited test run)."}
 - {Catalog scope surprises — e.g., "Sitemap contains 7,887 URLs vs. ~1,000 estimate — includes spare parts and accessories beyond the main product catalog."}
 - {Regional or access limitations — e.g., "Geo-restricted content detected. Some categories may vary by region."}

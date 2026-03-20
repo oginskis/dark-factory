@@ -14,9 +14,9 @@ from pathlib import Path
 from statistics import median
 from typing import Any
 
-# Universal fields hardcoded — these live at product top level, not in attributes
-UNIVERSAL_FIELDS = ["sku", "name", "url", "price", "currency", "brand", "scraped_at"]
-UNIVERSAL_FIELDS_NO_PRICE = ["sku", "name", "url", "brand", "scraped_at"]
+# Mandatory core attributes — these live at product top level, not in attributes
+MANDATORY_CORE_FIELDS = ["sku", "name", "url", "price", "currency", "brand", "scraped_at"]
+MANDATORY_CORE_FIELDS_NO_PRICE = ["sku", "name", "url", "brand", "scraped_at"]
 
 # 13 checks with weights summing to 100
 CHECKS = {
@@ -148,7 +148,7 @@ def check_core_attribute_coverage(products: list[dict], config: dict) -> tuple[f
     if not products:
         return 0.0, {}
     sub_configs = config.get("_sub_configs", {})
-    universals = UNIVERSAL_FIELDS_NO_PRICE if not config["has_prices"] else UNIVERSAL_FIELDS
+    mandatory_fields = MANDATORY_CORE_FIELDS_NO_PRICE if not config["has_prices"] else MANDATORY_CORE_FIELDS
     default_core = config.get("core_attributes", [])
 
     sub_stats: dict[str, dict] = {}
@@ -158,14 +158,14 @@ def check_core_attribute_coverage(products: list[dict], config: dict) -> tuple[f
         cat = product.get("product_category", "_unclassified")
         sub = sub_configs.get(cat)
         core_nested = sub.get("core_attributes", default_core) if sub else default_core
-        total_core = len(universals) + len(core_nested)
+        total_core = len(mandatory_fields) + len(core_nested)
         if total_core == 0:
             passing += 1
             continue
 
         populated = 0
         missing = []
-        for field in universals:
+        for field in mandatory_fields:
             val = product.get(field)
             if val is not None and val != "" and val != []:
                 populated += 1
@@ -444,8 +444,8 @@ def check_field_level_regression(
     if not baseline_rates:
         return None
     core_nested = config["core_attributes"]
-    universals = UNIVERSAL_FIELDS_NO_PRICE if not config["has_prices"] else UNIVERSAL_FIELDS
-    all_core = list(universals) + list(core_nested)
+    mandatory_fields = MANDATORY_CORE_FIELDS_NO_PRICE if not config["has_prices"] else MANDATORY_CORE_FIELDS
+    all_core = list(mandatory_fields) + list(core_nested)
     if not all_core:
         return 1.0
     current_rates: dict[str, float] = {}
@@ -455,7 +455,7 @@ def check_field_level_regression(
             continue
         filled = 0
         for product in products:
-            if attr in UNIVERSAL_FIELDS:
+            if attr in MANDATORY_CORE_FIELDS:
                 val = product.get(attr)
             else:
                 val = product.get("core_attributes", {}).get(attr)
@@ -677,9 +677,9 @@ def compute_results(
 
 
 def compute_fill_rates(products: list[dict], config: dict) -> dict[str, float]:
-    """Compute fill rate for every universal + core attribute."""
-    universals = UNIVERSAL_FIELDS if config["has_prices"] else UNIVERSAL_FIELDS_NO_PRICE
-    all_attrs = list(universals) + list(config["core_attributes"])
+    """Compute fill rate for every mandatory core + category-specific core attribute."""
+    mandatory_fields = MANDATORY_CORE_FIELDS if config["has_prices"] else MANDATORY_CORE_FIELDS_NO_PRICE
+    all_attrs = list(mandatory_fields) + list(config["core_attributes"])
     rates: dict[str, float] = {}
     for attr in all_attrs:
         if not products:
@@ -687,7 +687,7 @@ def compute_fill_rates(products: list[dict], config: dict) -> dict[str, float]:
             continue
         filled = 0
         for product in products:
-            if attr in UNIVERSAL_FIELDS:
+            if attr in MANDATORY_CORE_FIELDS:
                 val = product.get(attr)
             else:
                 val = product.get("core_attributes", {}).get(attr)

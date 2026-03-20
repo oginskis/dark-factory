@@ -3,7 +3,7 @@ name: scraper-generator
 description: >
   Generate a production-ready Python scraper for a company's product catalog.
   Produces a standalone scraper.py, config.json, and test output.
-  Scrapers output the four-level product record format with universal top-level fields, core_attributes, extended_attributes, and extra_attributes.
+  Scrapers output the four-level product record format with mandatory core attributes, core_attributes, extended_attributes, and extra_attributes.
   Use this skill when the user wants to create a scraper for a company that already has a catalog assessment —
   "generate scraper for X", "create scraper for X", "build a scraper for X products", "scrape X's catalog".
   Requires both a company report from /product-classifier and a catalog assessment from /catalog-detector to exist first.
@@ -75,6 +75,7 @@ It defines all steps, decisions, constants, and the fix→retest loop. The coder
 
 - **Coder:** `.claude/skills/scraper-generator/references/coder.md` — writes and patches `scraper.py`.
 - **Tester:** `.claude/skills/scraper-generator/references/tester.md` — runs scraper, evaluates output, writes `report_{n}_{hash}.json`.
+- **Acceptance criteria (shared):** `.claude/skills/scraper-generator/references/acceptance-criteria.md` — single source of truth for all acceptance criteria, thresholds, and status determination. All three agents use this file: the coder targets the criteria, the tester verifies them, the orchestrator uses criterion IDs from the tester's report to drive the fix loop. Include in every sub-agent dispatch prompt.
 - Include these rules in every sub-agent dispatch prompt:
   1. Only read files listed in your input contract. No other scrapers, no archived runs, no files outside the company's directory.
   2. Run external commands in the foreground. Never use background tasks.
@@ -109,6 +110,7 @@ User options per escalation:
 - `probe_extraction_failed` — 1) Provide guidance on how to extract from this site, 2) Stop
 - `scraper_test_failed` — 1) Provide debugging guidance or site-specific hints, 2) Stop
 - `unmapped_url_prefix` — 1) Provide the correct taxonomy ID for the URL prefix, 2) Stop
+- `not_enough_attributes_to_extract` — 1) Expand the SKU schema with attributes the catalog does provide, then retry, 2) Stop
 
 ## Notes
 

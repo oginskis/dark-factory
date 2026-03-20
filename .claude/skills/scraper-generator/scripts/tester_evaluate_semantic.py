@@ -3,7 +3,8 @@
 # dependencies = []
 # ///
 """
-Semantic validation rules M01-M04 for scraper output.
+Semantic validation for scraper output (value formatting, unit separation).
+See references/acceptance-criteria.md for the authoritative list of criteria and thresholds.
 
 Agent: tester sub-agent (references/tester.md)
 
@@ -101,7 +102,7 @@ def issue(rule_id: str, detail: str, failing: list[dict], *,
 
 
 # ---------------------------------------------------------------------------
-# Rules M01-M04
+# Semantic rules — see references/acceptance-criteria.md
 # ---------------------------------------------------------------------------
 
 def m01(products: list[dict], types: dict, units: dict) -> tuple[dict, dict | None]:
@@ -177,7 +178,7 @@ def m04(products: list[dict], types: dict, units: dict) -> tuple[dict, dict | No
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Semantic validation rules M01-M04")
+    parser = argparse.ArgumentParser(description="Semantic validation (value formatting, unit separation)")
     parser.add_argument("--output-dir", required=True,
                         help="Directory containing versioned output files")
     parser.add_argument("--iteration", required=True, type=int,

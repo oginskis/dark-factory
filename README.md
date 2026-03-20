@@ -135,7 +135,7 @@ uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json --collect
 
 | File | Contents |
 |------|----------|
-| `products_{n}_{hash}.jsonl` | One product per line — universal fields plus category-specific attributes (see [Product record format](#product-record-format) below) |
+| `products_{n}_{hash}.jsonl` | One product per line — mandatory core attributes plus category-specific attributes (see [Product record format](#product-record-format) below) |
 | `summary_{n}_{hash}.json` | Run metadata: total products, duration, error count |
 | `debug_{n}_{hash}.log` | Structured JSON log of every HTTP request and parse event |
 
@@ -223,7 +223,7 @@ Every scraped product has four attribute levels plus a units map. The generated 
 
 | Level | What it contains | Extraction effort | Fill rate target |
 |-------|-----------------|-------------------|------------------|
-| **Universal top-level** | `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`, `category_path` | Always extracted — mandatory for every product regardless of category | — |
+| **Mandatory core** | `sku`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`, `category_path` | Always extracted — mandatory for every product regardless of category | — |
 | **`core_attributes`** | Attributes matching the SKU schema's Core table | **High** — scraper actively works to extract these (navigating tabs, parsing spec tables) | >80% of products |
 | **`extended_attributes`** | Attributes matching the SKU schema's Extended table | **Moderate** — extracted when available, no complex parsing for marginal gains | >50% of products |
 | **`extra_attributes`** | Everything else discovered on the page | **Low / opportunistic** — captured naturally, serves as feedback for schema evolution | — |
@@ -261,7 +261,7 @@ Every scraped product has four attribute levels plus a units map. The generated 
 
 **`core_attributes`** and **`extended_attributes`** use keys from the SKU schema exactly. **`extra_attributes`** catches everything else — when an extra attribute appears across multiple companies, the `/product-taxonomy` skill can promote it into the schema for future scrapers.
 
-**Non-English sites:** All attribute keys are English (matching schema Key values or `snake_case`). For universal, core, and extended values, the scraper includes static translation dicts for known value sets (species names, material types, grade labels). Extra attribute values may remain in the original language.
+**Non-English sites:** All attribute keys are English (matching schema Key values or `snake_case`). For mandatory core, `core_attributes`, and `extended_attributes` values, the scraper includes static translation dicts for known value sets (species names, material types, grade labels). Extra attribute values may remain in the original language.
 
 ### Schema lifecycle
 

@@ -7,38 +7,39 @@
 
 ## Core Attributes
 
-| Attribute | Key | Data Type | Unit | Description | Example Values |
-|--------|--------|--------|--------|--------|--------|
-| SKU | sku | text | — | Manufacturer or retailer product identifier, model number, or item code | LS2501-2867, 64090-001, 80116/247DS, L8SK3, 1070LC |
-| Product Name | product_name | text | — | Full product name including type, collection, material, and size where applicable | Signature Round Dutch Oven 5.5 Qt, Spirit 3-Ply 10-Pc Stainless Steel Cookware Set, Tri-Ply Clad 12-Inch Skillet |
-| URL | url | text | — | Direct link to the product page or listing | https://www.example.com/shop/product-name |
-| Price | price | number | — | Numeric price per selling unit, excluding tax and shipping | 19.90, 79.95, 249.95, 399.95 |
-| Currency | currency | text | — | ISO 4217 currency code for the listed price | USD, EUR, GBP, CAD |
-| Cookware Type | cookware_type | text | — | Functional type of the cookware piece | Skillet, Fry Pan, Saute Pan, Saucepan, Saucier, Stockpot, Dutch Oven, Roasting Pan, Wok, Griddle, Grill Pan, Brazier, Sheet Pan, Cake Pan, Loaf Pan, Muffin Pan, Pie Pan, Springform Pan |
-| Material | material | text | — | Primary body material of the cookware | Cast Iron, Enameled Cast Iron, Stainless Steel, Aluminum, Aluminized Steel, Hard-Anodized Aluminum, Copper, Carbon Steel |
-| Coating Type | coating_type | text | — | Specific nonstick or protective coating applied to the cooking surface | Americoat Plus, Ceraforce XTREME Ceramic, PTFE, Silicone Nonstick, Enamel, None |
-| Lid Material | lid_material | text | — | Material of the included lid | Stainless Steel, Tempered Glass, Cast Iron, Enameled Cast Iron |
-| Handle Type | handle_type | text | — | Style and attachment method of the primary handle | Long Riveted, Loop, Dual Loop, Stay-Cool Riveted, V-Shaped Riveted, Helper Handle, Ergonomic |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|--------|--------|--------|--------|-----------|--------|--------|
+| SKU | sku | text | — | yes | Manufacturer or retailer product identifier, model number, or item code | LS2501-2867, 64090-001, 80116/247DS, L8SK3, 1070LC |
+| Product Name | product_name | text | — | yes | Full product name including type, collection, material, and size where applicable | Signature Round Dutch Oven 5.5 Qt, Spirit 3-Ply 10-Pc Stainless Steel Cookware Set, Tri-Ply Clad 12-Inch Skillet |
+| URL | url | text | — | yes | Direct link to the product page or listing | https://www.example.com/shop/product-name |
+| Price | price | number | — | yes | Numeric price per selling unit, excluding tax and shipping | 19.90, 79.95, 249.95, 399.95 |
+| Currency | currency | text | — | yes | ISO 4217 currency code for the listed price | USD, EUR, GBP, CAD |
+| Price Includes VAT | price_includes_vat | boolean | — | — | Whether the listed price includes VAT or sales tax | true, false |
+| Cookware Type | cookware_type | text | — | — | Functional type of the cookware piece | Skillet, Fry Pan, Saute Pan, Saucepan, Saucier, Stockpot, Dutch Oven, Roasting Pan, Wok, Griddle, Grill Pan, Brazier, Sheet Pan, Cake Pan, Loaf Pan, Muffin Pan, Pie Pan, Springform Pan |
+| Material | material | text | — | — | Primary body material of the cookware | Cast Iron, Enameled Cast Iron, Stainless Steel, Aluminum, Aluminized Steel, Hard-Anodized Aluminum, Copper, Carbon Steel |
+| Coating Type | coating_type | text | — | — | Specific nonstick or protective coating applied to the cooking surface | Americoat Plus, Ceraforce XTREME Ceramic, PTFE, Silicone Nonstick, Enamel, None |
+| Lid Material | lid_material | text | — | — | Material of the included lid | Stainless Steel, Tempered Glass, Cast Iron, Enameled Cast Iron |
+| Handle Type | handle_type | text | — | — | Style and attachment method of the primary handle | Long Riveted, Loop, Dual Loop, Stay-Cool Riveted, V-Shaped Riveted, Helper Handle, Ergonomic |
 
 ## Extended Attributes
 
-| Attribute | Key | Data Type | Unit | Description | Example Values |
-|--------|--------|--------|--------|--------|--------|
-| Handle Material | handle_material | text | — | Material used for the handles | Stainless Steel, Cast Iron, Silicone, Bakelite, Wood |
-| Country of Origin | country_of_origin | text | — | Country where the cookware is manufactured | USA, France, China, Vietnam, Brazil, Italy, Belgium |
-| Collection | collection | text | — | Product line, series, or named collection grouping related items | Signature, D3 Stainless Everyday, Chef Collection, Blacklock, Spirit 3-Ply, Naturals, Tri-Ply Clad |
-| Construction | construction | text | — | Layering or build method describing how the cookware body is formed | Tri-Ply Clad, 5-Ply Bonded, Fully Clad, Single-Ply, Cast, Stamped, Drawn |
-| Interior Surface | interior_surface | text | — | Interior cooking surface material or coating type | 18/10 Stainless Steel, Seasoned, Enamel, Ceramic Nonstick, PTFE Nonstick, Bare Cast Iron, Aluminized Steel |
-| Exterior Surface | exterior_surface | text | — | Exterior finish material or coating | Mirror-Polished Stainless Steel, Magnetic Stainless Steel, Enamel, Hard-Anodized, Pre-Seasoned |
-| Dimensions | dimensions | text | inches | Overall exterior dimensions as Length x Width x Height | 10 x 10 x 6.75, 17.75 x 12.75 x 1, 20.98 x 13.98 x 8.98 |
-| Shape | shape | enum | — | Overall shape of the cookware piece | round, oval, square, rectangular |
-| Color | color | text | — | Exterior color or enamel color of the cookware | Silver, Black, Cerise, Marseille, Flame, White, Indigo, Matte Black, Oyster |
-| Lid Included | lid_included | boolean | — | Whether a matching lid is included with the piece | true, false |
-| Oven Safe Temperature | oven_safe_temperature | number | F | Maximum safe oven temperature in degrees Fahrenheit | 400, 450, 500, 600 |
-| Cooktop Compatibility | cooktop_compatibility | text (list) | — | Types of cooktops the cookware is compatible with | Induction, Gas, Electric, Ceramic Glass, Halogen |
-| Induction Compatible | induction_compatible | boolean | — | Whether the cookware works on induction cooktops | true, false |
-| Dishwasher Safe | dishwasher_safe | boolean | — | Whether the cookware is safe for dishwasher cleaning | true, false |
-| Metal Utensil Safe | metal_utensil_safe | boolean | — | Whether the cooking surface is safe for use with metal utensils | true, false |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|--------|--------|--------|--------|-----------|--------|--------|
+| Handle Material | handle_material | text | — | — | Material used for the handles | Stainless Steel, Cast Iron, Silicone, Bakelite, Wood |
+| Country of Origin | country_of_origin | text | — | — | Country where the cookware is manufactured | USA, France, China, Vietnam, Brazil, Italy, Belgium |
+| Collection | collection | text | — | — | Product line, series, or named collection grouping related items | Signature, D3 Stainless Everyday, Chef Collection, Blacklock, Spirit 3-Ply, Naturals, Tri-Ply Clad |
+| Construction | construction | text | — | — | Layering or build method describing how the cookware body is formed | Tri-Ply Clad, 5-Ply Bonded, Fully Clad, Single-Ply, Cast, Stamped, Drawn |
+| Interior Surface | interior_surface | text | — | — | Interior cooking surface material or coating type | 18/10 Stainless Steel, Seasoned, Enamel, Ceramic Nonstick, PTFE Nonstick, Bare Cast Iron, Aluminized Steel |
+| Exterior Surface | exterior_surface | text | — | — | Exterior finish material or coating | Mirror-Polished Stainless Steel, Magnetic Stainless Steel, Enamel, Hard-Anodized, Pre-Seasoned |
+| Dimensions | dimensions | text | inches | — | Overall exterior dimensions as Length x Width x Height | 10 x 10 x 6.75, 17.75 x 12.75 x 1, 20.98 x 13.98 x 8.98 |
+| Shape | shape | enum | — | — | Overall shape of the cookware piece | round, oval, square, rectangular |
+| Color | color | text | — | — | Exterior color or enamel color of the cookware | Silver, Black, Cerise, Marseille, Flame, White, Indigo, Matte Black, Oyster |
+| Lid Included | lid_included | boolean | — | — | Whether a matching lid is included with the piece | true, false |
+| Oven Safe Temperature | oven_safe_temperature | number | F | — | Maximum safe oven temperature in degrees Fahrenheit | 400, 450, 500, 600 |
+| Cooktop Compatibility | cooktop_compatibility | text (list) | — | — | Types of cooktops the cookware is compatible with | Induction, Gas, Electric, Ceramic Glass, Halogen |
+| Induction Compatible | induction_compatible | boolean | — | — | Whether the cookware works on induction cooktops | true, false |
+| Dishwasher Safe | dishwasher_safe | boolean | — | — | Whether the cookware is safe for dishwasher cleaning | true, false |
+| Metal Utensil Safe | metal_utensil_safe | boolean | — | — | Whether the cooking surface is safe for use with metal utensils | true, false |
 
 ## Changelog
 

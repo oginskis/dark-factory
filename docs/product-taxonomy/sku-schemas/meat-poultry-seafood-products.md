@@ -7,38 +7,39 @@
 
 ## Core Attributes
 
-| Attribute | Key | Data Type | Unit | Description | Example Values |
-|--------|--------|--------|--------|--------|--------|
-| SKU | sku | text | — | Retailer or manufacturer product identifier | MPF-20145, IMPS-1112, 079893100036 |
-| Product Name | product_name | text | — | Full product name including protein type, cut, grade, and weight | USDA Choice Boneless Ribeye Steak 12oz, Tyson Boneless Skinless Chicken Breast 40lb Case, Wild-Caught Sockeye Salmon Fillet 6oz |
-| URL | url | text | — | Direct link to the product page | https://example.com/product/usda-choice-ribeye |
-| Price | price | number | — | Numeric price per selling unit (per piece, per lb, or per case), excluding currency symbol | 12.99, 89.50, 7.49, 145.00 |
-| Currency | currency | text | — | ISO 4217 currency code | USD, EUR, GBP, CAD, AUD |
-| Protein Type | protein_type | enum | — | Primary animal protein category | Beef, Pork, Chicken, Turkey, Lamb, Veal, Salmon, Shrimp, Tuna, Cod, Crab, Lobster |
-| Protein Category | protein_category | enum | — | Broad grouping of the protein source | Red Meat, Poultry, Finfish, Shellfish, Game |
-| Cut/Form | cutform | text | — | Specific cut name, portion, or product form | Ribeye, Tenderloin, Breast, Thigh, Wing, Fillet, Steak, Ground, Whole, Rack, Loin |
-| USDA Quality Grade | usda_quality_grade | enum | — | USDA quality grade for beef, poultry, or other graded products | Prime, Choice, Select, Standard, Grade A, Grade B |
-| USDA Yield Grade | usda_yield_grade | enum | — | USDA yield grade indicating ratio of lean meat to fat and bone in beef carcasses | 1, 2, 3, 4, 5 |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|--------|--------|--------|--------|-----------|--------|--------|
+| SKU | sku | text | — | yes | Retailer or manufacturer product identifier | MPF-20145, IMPS-1112, 079893100036 |
+| Product Name | product_name | text | — | yes | Full product name including protein type, cut, grade, and weight | USDA Choice Boneless Ribeye Steak 12oz, Tyson Boneless Skinless Chicken Breast 40lb Case, Wild-Caught Sockeye Salmon Fillet 6oz |
+| URL | url | text | — | yes | Direct link to the product page | https://example.com/product/usda-choice-ribeye |
+| Price | price | number | — | yes | Numeric price per selling unit (per piece, per lb, or per case), excluding currency symbol | 12.99, 89.50, 7.49, 145.00 |
+| Currency | currency | text | — | yes | ISO 4217 currency code | USD, EUR, GBP, CAD, AUD |
+| Price Includes VAT | price_includes_vat | boolean | — | — | Whether the listed price includes VAT or sales tax | true, false |
+| Protein Type | protein_type | enum | — | — | Primary animal protein category | Beef, Pork, Chicken, Turkey, Lamb, Veal, Salmon, Shrimp, Tuna, Cod, Crab, Lobster |
+| Protein Category | protein_category | enum | — | — | Broad grouping of the protein source | Red Meat, Poultry, Finfish, Shellfish, Game |
+| Cut/Form | cutform | text | — | — | Specific cut name, portion, or product form | Ribeye, Tenderloin, Breast, Thigh, Wing, Fillet, Steak, Ground, Whole, Rack, Loin |
+| USDA Quality Grade | usda_quality_grade | enum | — | — | USDA quality grade for beef, poultry, or other graded products | Prime, Choice, Select, Standard, Grade A, Grade B |
+| USDA Yield Grade | usda_yield_grade | enum | — | — | USDA yield grade indicating ratio of lean meat to fat and bone in beef carcasses | 1, 2, 3, 4, 5 |
 
 ## Extended Attributes
 
-| Attribute | Key | Data Type | Unit | Description | Example Values |
-|--------|--------|--------|--------|--------|--------|
-| Country of Origin | country_of_origin | text | — | Country or ocean region where the product was raised, caught, or processed | USA, Canada, Chile, Norway, Thailand, Gulf of Mexico, North Atlantic |
-| Packaging Type | packaging_type | enum | — | Primary packaging format | Vacuum Sealed, MAP, Tray Pack, IQF Bag, Cryovac, Bulk Case, Canned |
-| Manufacturer/Processor | manufacturerprocessor | text | — | Company that processed or packed the product | JBS USA, Tyson Foods, Smithfield Foods, Perdue Farms |
-| UPC/EAN | upcean | text | — | Universal Product Code or European Article Number barcode | 079893100036, 023700013835 |
-| IMPS Number | imps_number | text | — | Institutional Meat Purchase Specification number for standardized cut identification | 1112, 1180A, 1189A, P1100 |
-| Bone Status | bone_status | enum | — | Whether the product contains bone | Bone-In, Boneless, Semi-Boneless |
-| Skin Status | skin_status | enum | — | Whether poultry or fish product has skin | Skin-On, Skinless |
-| Fat Content | fat_content | number | % | Maximum fat percentage, primarily for ground products | 5, 10, 15, 20, 27 |
-| Product State | product_state | enum | — | Physical state of the product at point of sale | Fresh, Frozen, Previously Frozen, Smoked, Cured, Dried |
-| Harvest Method | harvest_method | enum | — | How the seafood was sourced, applicable to fish and shellfish | Wild-Caught, Farm-Raised, Line-Caught, Trawl-Caught |
-| Species | species | text | — | Specific species name for seafood products | Atlantic Salmon, Pacific Cod, Gulf Shrimp, Yellowfin Tuna, Blue Crab |
-| Processing Level | processing_level | enum | — | Degree of processing applied to the product | Whole, Portioned, Ground, Breaded, Marinated, Seasoned, Fully Cooked, Raw |
-| Cooking State | cooking_state | enum | — | Whether the product has been cooked prior to sale | Raw, Partially Cooked, Fully Cooked, Ready to Eat |
-| Storage Temperature | storage_temperature | text | — | Required storage temperature | 0-4C, -18C or below |
-| Shelf Life | shelf_life | number | days | Expected shelf life from packaging date under proper storage | 5, 14, 21, 180, 365, 730 |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|--------|--------|--------|--------|-----------|--------|--------|
+| Country of Origin | country_of_origin | text | — | — | Country or ocean region where the product was raised, caught, or processed | USA, Canada, Chile, Norway, Thailand, Gulf of Mexico, North Atlantic |
+| Packaging Type | packaging_type | enum | — | — | Primary packaging format | Vacuum Sealed, MAP, Tray Pack, IQF Bag, Cryovac, Bulk Case, Canned |
+| Manufacturer/Processor | manufacturerprocessor | text | — | — | Company that processed or packed the product | JBS USA, Tyson Foods, Smithfield Foods, Perdue Farms |
+| UPC/EAN | upcean | text | — | — | Universal Product Code or European Article Number barcode | 079893100036, 023700013835 |
+| IMPS Number | imps_number | text | — | — | Institutional Meat Purchase Specification number for standardized cut identification | 1112, 1180A, 1189A, P1100 |
+| Bone Status | bone_status | enum | — | — | Whether the product contains bone | Bone-In, Boneless, Semi-Boneless |
+| Skin Status | skin_status | enum | — | — | Whether poultry or fish product has skin | Skin-On, Skinless |
+| Fat Content | fat_content | number | % | — | Maximum fat percentage, primarily for ground products | 5, 10, 15, 20, 27 |
+| Product State | product_state | enum | — | — | Physical state of the product at point of sale | Fresh, Frozen, Previously Frozen, Smoked, Cured, Dried |
+| Harvest Method | harvest_method | enum | — | — | How the seafood was sourced, applicable to fish and shellfish | Wild-Caught, Farm-Raised, Line-Caught, Trawl-Caught |
+| Species | species | text | — | — | Specific species name for seafood products | Atlantic Salmon, Pacific Cod, Gulf Shrimp, Yellowfin Tuna, Blue Crab |
+| Processing Level | processing_level | enum | — | — | Degree of processing applied to the product | Whole, Portioned, Ground, Breaded, Marinated, Seasoned, Fully Cooked, Raw |
+| Cooking State | cooking_state | enum | — | — | Whether the product has been cooked prior to sale | Raw, Partially Cooked, Fully Cooked, Ready to Eat |
+| Storage Temperature | storage_temperature | text | — | — | Required storage temperature | 0-4C, -18C or below |
+| Shelf Life | shelf_life | number | days | — | Expected shelf life from packaging date under proper storage | 5, 14, 21, 180, 365, 730 |
 
 ## Changelog
 

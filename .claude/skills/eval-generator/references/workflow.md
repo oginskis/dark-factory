@@ -1,6 +1,6 @@
 # Eval Generator Workflow
 
-**Input:** Company slug, scraper source, catalog assessment, SKU schema, and the shared eval script
+**Input:** Company slug, scraper source, catalog assessment, generator input (routing tables), and the shared eval script
 **Output:** Eval config file, verified by running the shared eval script, or escalation
 
 ---
@@ -9,7 +9,7 @@
 
 This workflow generates a per-company eval config file that the shared eval script uses to validate scrape quality. The config captures company-specific values — expected product counts, core attributes, type mappings, enum constraints, and price availability. The shared eval script implements all check logic; the workflow's job is to determine the correct config values and verify they work.
 
-Read the company report, catalog assessment, scraper source, and SKU schema to understand what the scraper extracts and what the eval should expect.
+Read the company report, catalog assessment, scraper source, and generator input file to understand what the scraper extracts and what the eval should expect.
 
 ---
 
@@ -17,7 +17,7 @@ Read the company report, catalog assessment, scraper source, and SKU schema to u
 
 Read the scraper source to determine:
 
-- Which attributes it extracts (both universal top-level fields and category-specific attributes)
+- Which attributes it extracts (both mandatory core attributes and category-specific attributes)
 - Which attributes go into `core_attributes`, `extended_attributes`, and `extra_attributes`
 - Which attributes are strings, numbers, lists, or booleans
 - Whether it extracts prices
@@ -41,18 +41,37 @@ If the catalog assessment does not contain an estimated product count, handle gr
 
 ---
 
-## Step 3: Load the SKU Schema
+## Step 3: Load the Generator Input
 
-Read the SKU schema for the company's primary subcategory. For multi-subcategory companies, read ALL subcategory schemas and build a per-subcategory map. Each subcategory gets its own `core_attributes`, `extended_attributes`, and `expected_count`. Do NOT union them. Derive `expected_count` per subcategory from the catalog assessment's category tree — sum leaf category product counts that map to each subcategory. If not derivable, divide `expected_product_count` equally among subcategories. The schema tables have 6 columns: Attribute, **Key**, Data Type, Unit, Description, Example Values. The **Key** column contains the exact snake_case identifier that scrapers use in their output — use these Key values (not the display names) everywhere in the eval config.
+Read the generator input file (`generator_input.json`) produced by scraper-generator. This file contains pre-processed SKU schemas with core/extended attribute keys, data types, and units per subcategory — the same routing tables the scraper uses.
 
-Extract:
+If the file does not exist, see the `missing_generator_input` decision.
 
-- Core attributes — the **Key** values from the schema's Core Attributes table (excluding universal keys: `sku`, `product_name`, `url`, `price`, `currency`). Do not include any universal/top-level fields (`sku`, `product_name`, `name`, `url`, `price`, `currency`, `brand`, `product_category`, `scraped_at`, `category_path`) — those are hardcoded in the shared eval script.
-- Extended attributes — the **Key** values from the schema's Extended Attributes table.
-- All attributes the scraper extracts (core, extended, and extra) with their expected types
-- Enum constraints — attributes with a known set of allowed values
+The file has this structure:
 
-If no SKU schema exists for the company's category, check the product taxonomy categories file to verify the subcategory exists — see the `no_sku_schema` decision.
+```json
+{
+  "subcategory_schemas": {
+    "taxonomy_id": {
+      "core_attribute_keys": ["key1", "key2"],
+      "extended_attribute_keys": ["key3", "key4"],
+      "attribute_types": {"key1": "number", "key2": "str", "key3": "str", "key4": "number"},
+      "units": {"key1": "mm", "key4": "kW"}
+    }
+  }
+}
+```
+
+For each subcategory in `subcategory_schemas`, extract:
+
+- **`core_attribute_keys`** → becomes `subcategories.{id}.core_attributes` in the eval config
+- **`extended_attribute_keys`** → becomes `subcategories.{id}.extended_attributes` in the eval config
+- **`attribute_types`** → merged across all subcategories to build the flat `type_map` in the eval config
+- **`units`** → attributes with units are numeric; use to build `semantic_validation.numeric_fields`
+
+Derive `expected_count` per subcategory from the catalog assessment's category tree — sum leaf category product counts that map to each subcategory. If not derivable, divide `expected_product_count` equally among subcategories. Each subcategory gets its own `core_attributes`, `extended_attributes`, and `expected_count`. Do NOT union them.
+
+For `enum_attributes`: inspect the scraper source to identify attributes with a closed set of allowed values. Use an empty object `{}` when no enum constraints are clearly identifiable.
 
 ---
 
@@ -93,24 +112,11 @@ Produce the eval config file with all required fields:
 | `company_slug` | Company report | The slug from the company report |
 | `expected_product_count` | Catalog assessment | The estimated product count. If missing, see the `missing_product_count_estimate` decision. |
 | `expected_top_level_categories` | Catalog assessment | The top-level category names from the category structure section. These are the catalog's own category names (e.g., "Riga Wood"), not taxonomy categories. |
-| `subcategories` | SKU schema + scraper source + catalog assessment | Per-subcategory map. Each entry has core_attributes (from schema Key column), extended_attributes (from schema Key column), and expected_count (from catalog assessment category tree). Only attributes the scraper actually extracts. |
-| `type_map` | SKU schema + scraper source | Maps every attribute **Key** (across core, extended, and extra) to its expected eval type: `"str"`, `"number"`, `"list"`, or `"bool"`. The SKU schema `Data Type` column maps directly — `text`/`enum` → `"str"`, `number` → `"number"`, `text (list)` → `"list"`, `boolean` → `"bool"`. Covers all attributes the scraper extracts. |
-| `enum_attributes` | SKU schema + scraper source | Maps attributes that have a closed set of allowed values to their value arrays. Only include attributes where the allowed values are known from the SKU schema or clearly enumerable from the scraper logic. Use an empty object `{}` when no enum constraints apply. |
+| `subcategories` | Generator input + catalog assessment | Per-subcategory map. Each entry has `core_attributes` (from `core_attribute_keys`), `extended_attributes` (from `extended_attribute_keys`), and `expected_count` (from catalog assessment category tree). Only attributes the scraper actually extracts. |
+| `type_map` | Generator input + scraper source | Merge `attribute_types` from all subcategories in `generator_input.json` into a flat map. Values are already in eval format: `"str"`, `"number"`, `"list"`, `"bool"`. For extra attributes not in the generator input, inspect the scraper source. |
+| `enum_attributes` | Scraper source | Maps attributes that have a closed set of allowed values to their value arrays. Only include attributes where the allowed values are clearly enumerable from the scraper logic. Use an empty object `{}` when no enum constraints apply. |
 | `has_prices` | Catalog assessment + scraper source | `true` if the catalog has prices and the scraper extracts them, `false` otherwise. When `false`, the shared eval script skips the price sanity check. |
-| `semantic_validation` | SKU schema | Object with numeric_fields array listing attributes that should contain numeric values. Derived from SKU schema — include fields with Data Type 'number' or measurement fields like dimensions. |
-
-### SKU schema → eval type mapping
-
-The SKU schema `Data Type` column contains clean types (units are in the separate `Unit` column). Map directly:
-
-| SKU schema Data Type | Eval `type_map` value |
-|---------------------|----------------------|
-| `text`, `enum` | `"str"` |
-| `number` | `"number"` |
-| `text (list)` | `"list"` |
-| `boolean` | `"bool"` |
-
-When in doubt, check the scraper source to see what Python type the attribute actually produces.
+| `semantic_validation` | Generator input | Object with `numeric_fields` array. Derived from `attribute_types` — include all attributes where the type is `"number"`. Also include attributes that have entries in `units` (these are measurement fields). |
 
 ### Checks (13 total)
 
@@ -231,7 +237,7 @@ If the eval runs successfully and all 13 checks appear in the result, the config
 - This workflow generates eval config files only — it does not modify the shared eval script or scraper code.
 - It does not trigger rediscovery — the shared eval script sets `recommend_rediscovery` based on the degradation score.
 - It does not define or modify the product taxonomy or SKU schemas.
-- Universal field checks (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) are hardcoded in the shared eval script. The config only controls category-specific attribute expectations.
+- Mandatory core attribute checks (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) are hardcoded in the shared eval script. The config only controls category-specific attribute expectations.
 
 ---
 
@@ -244,12 +250,12 @@ If the eval runs successfully and all 13 checks appear in the result, the config
 **Escalate when:** Never.
 **Escalation payload:** N/A
 
-### Decision: no_sku_schema
+### Decision: missing_generator_input
 
-**Context:** No SKU schema file exists for the company's product category. The config cannot meaningfully define `core_attributes`, `type_map`, or `enum_attributes` without knowing which attributes are expected.
-**Autonomous resolution:** Verify that the subcategory from the company report exists in the product taxonomy categories file. If it does, the schema simply hasn't been created yet — trigger SKU schema generation for that subcategory. Once the schema is available, return to Step 3 and continue.
-**Escalate when:** The subcategory from the company report does not appear in the product taxonomy categories file. This indicates a taxonomy integrity issue.
-**Escalation payload:** Company slug, the taxonomy ID from the company report, confirmation that the subcategory was not found in the taxonomy.
+**Context:** The generator input file (`generator_input.json`) does not exist in the scraper-generator output directory. This file is produced by scraper-generator and contains the pre-processed SKU schemas needed to build the eval config.
+**Autonomous resolution:** Re-run the prepare script to generate it: `uv run .claude/skills/scraper-generator/scripts/orchestrator_prepare_generator_input.py --schemas {taxonomy_ids} --output docs/scraper-generator/{slug}/generator_input.json` — where `{taxonomy_ids}` are the space-separated subcategory IDs from the company report. If the script exits 0 or 1 (partial), continue with available data.
+**Escalate when:** The scraper-generator stage has never been run for this company (no `docs/scraper-generator/{slug}/` directory exists at all). The eval requires a working scraper to validate.
+**Escalation payload:** Company slug, confirmation that the scraper-generator output directory does not exist.
 
 ### Decision: scraper_output_format_unclear
 

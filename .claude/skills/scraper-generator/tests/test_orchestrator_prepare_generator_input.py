@@ -21,7 +21,7 @@ from orchestrator_prepare_generator_input import (
     SCHEMAS_DIR,
     TAXONOMY_FILE,
     TYPE_MAP,
-    UNIVERSAL_KEYS,
+    TOP_LEVEL_KEYS,
 )
 
 
@@ -222,17 +222,17 @@ class TestExtractRoutingTable:
         | Is Active | is_active | boolean | — | Whether product is active | true, false |
     """)
 
-    def test_core_keys_exclude_universal(self, tmp_path):
+    def test_core_keys_exclude_top_level(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        # sku, product_name, url, price, currency, brand are all UNIVERSAL_KEYS
+        # sku, product_name, url, price, currency, brand are all TOP_LEVEL_KEYS
         assert "sku" not in result["core_attribute_keys"]
         assert "product_name" not in result["core_attribute_keys"]
         assert "url" not in result["core_attribute_keys"]
         assert "price" not in result["core_attribute_keys"]
         assert "currency" not in result["core_attribute_keys"]
         assert "brand" not in result["core_attribute_keys"]
-        # Non-universal core keys should be present
+        # Non-top-level core keys should be present
         assert "widget_type" in result["core_attribute_keys"]
         assert "weight" in result["core_attribute_keys"]
 
@@ -268,10 +268,10 @@ class TestExtractRoutingTable:
         result = extract_routing_table(schema_file)
         assert result["attribute_types"]["is_active"] == "bool"
 
-    def test_structure_has_four_keys(self, tmp_path):
+    def test_structure_has_five_keys(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        assert set(result.keys()) == {"core_attribute_keys", "extended_attribute_keys", "attribute_types", "units"}
+        assert set(result.keys()) == {"core_attribute_keys", "extended_attribute_keys", "mandatory_keys", "attribute_types", "units"}
 
     def test_units_extracted(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
@@ -284,22 +284,54 @@ class TestExtractRoutingTable:
         assert "widget_type" not in result["units"]
         assert "color" not in result["units"]
 
-    def test_units_skips_universal_keys(self, tmp_path):
+    def test_units_skips_top_level_keys(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
         assert "price" not in result["units"]
+
+    def test_mandatory_keys_empty_without_column(self, tmp_path):
+        """Old 6-column schemas (no Mandatory column) produce empty mandatory_keys."""
+        schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
+        result = extract_routing_table(schema_file)
+        assert result["mandatory_keys"] == []
+
+    def test_mandatory_keys_extracted_from_7col(self, tmp_path):
+        """New 7-column schemas with Mandatory column extract mandatory_keys."""
+        content = textwrap.dedent("""\
+            # SKU Schema: Test
+
+            ## Core Attributes
+
+            | Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+            |--------|--------|--------|--------|-----------|--------|--------|
+            | SKU | sku | text | — | yes | ID | X1 |
+            | Model | model_number | text | — | yes | Model | M1 |
+            | Color | color | enum | — | — | Color | Red |
+
+            ## Extended Attributes
+
+            | Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+            |--------|--------|--------|--------|-----------|--------|--------|
+            | Weight | weight | number | kg | — | Weight | 5 |
+        """)
+        schema_file = self._write_schema(tmp_path, content)
+        result = extract_routing_table(schema_file)
+        # sku is a top-level key — filtered out. model_number has yes and is not top-level.
+        assert result["mandatory_keys"] == ["model_number"]
+        assert "color" not in result["mandatory_keys"]
 
     def test_empty_schema(self, tmp_path):
         schema_file = self._write_schema(tmp_path, "# Empty Schema\n")
         result = extract_routing_table(schema_file)
         assert result["core_attribute_keys"] == []
         assert result["extended_attribute_keys"] == []
+        assert result["mandatory_keys"] == []
         assert result["attribute_types"] == {}
 
-    def test_universal_keys_not_in_types(self, tmp_path):
+    def test_top_level_keys_not_in_types(self, tmp_path):
         schema_file = self._write_schema(tmp_path, self.SAMPLE_SCHEMA)
         result = extract_routing_table(schema_file)
-        for key in UNIVERSAL_KEYS:
+        for key in TOP_LEVEL_KEYS:
             assert key not in result["attribute_types"]
 
     def test_unknown_data_type_defaults_to_str(self, tmp_path):
@@ -329,7 +361,7 @@ class TestExtractRoutingTableIntegration:
         if not schema_path.exists():
             pytest.skip("Schema file not present in working tree")
         result = extract_routing_table(schema_path)
-        # Core keys from the actual schema (excluding universals)
+        # Core keys from the actual schema (excluding top-level keys)
         expected_core = [
             "wood_type",
             "structural_grade",
@@ -474,7 +506,7 @@ class TestEndToEnd:
         assert "extended_attribute_keys" in routing
         assert "attribute_types" in routing
 
-        # Core should have non-universal keys
+        # Core should have non-top-level keys
         assert len(routing["core_attribute_keys"]) > 0
         assert "wood_type" in routing["core_attribute_keys"]
 
@@ -487,8 +519,8 @@ class TestEndToEnd:
         all_keys = set(routing["core_attribute_keys"]) | set(routing["extended_attribute_keys"])
         assert all_keys == set(routing["attribute_types"].keys())
 
-        # No universal keys should leak through
-        for key in UNIVERSAL_KEYS:
+        # No top-level keys should leak through
+        for key in TOP_LEVEL_KEYS:
             assert key not in routing["core_attribute_keys"]
             assert key not in routing["extended_attribute_keys"]
             assert key not in routing["attribute_types"]
@@ -511,7 +543,7 @@ class TestEndToEnd:
 
 
 # ---------------------------------------------------------------------------
-# TYPE_MAP and UNIVERSAL_KEYS constants
+# TYPE_MAP and TOP_LEVEL_KEYS constants
 # ---------------------------------------------------------------------------
 
 
@@ -525,16 +557,16 @@ class TestConstants:
         assert TYPE_MAP["text (list)"] == "list"
         assert TYPE_MAP["boolean"] == "bool"
 
-    def test_universal_keys_include_essentials(self):
-        assert "sku" in UNIVERSAL_KEYS
-        assert "product_name" in UNIVERSAL_KEYS
-        assert "url" in UNIVERSAL_KEYS
-        assert "price" in UNIVERSAL_KEYS
-        assert "currency" in UNIVERSAL_KEYS
-        assert "brand" in UNIVERSAL_KEYS
+    def test_top_level_keys_include_essentials(self):
+        assert "sku" in TOP_LEVEL_KEYS
+        assert "product_name" in TOP_LEVEL_KEYS
+        assert "url" in TOP_LEVEL_KEYS
+        assert "price" in TOP_LEVEL_KEYS
+        assert "currency" in TOP_LEVEL_KEYS
+        assert "brand" in TOP_LEVEL_KEYS
 
-    def test_universal_keys_is_a_set(self):
-        assert isinstance(UNIVERSAL_KEYS, set)
+    def test_top_level_keys_is_a_set(self):
+        assert isinstance(TOP_LEVEL_KEYS, set)
 
 
 if __name__ == "__main__":

@@ -100,7 +100,7 @@ After researching multiple companies, synthesize a **two-tier attribute schema**
 
 Produce two attribute tables — **Core Attributes** and **Extended Attributes** — not a single flat list. These two tiers drive how scrapers prioritize extraction effort (see `.claude/skills/scraper-generator/references/coder.md` for the full four-level product record format).
 
-**Core attributes (5-10):** The most important category-specific attributes — scrapers put **high effort** into extracting these. They define what makes a product identifiable and comparable within its subcategory. Selection criteria:
+**Core attributes (5-10 category-specific, plus the 6 mandatory core rows):** The most important category-specific attributes — scrapers put **high effort** into extracting these. They define what makes a product identifiable and comparable within its subcategory. Selection criteria:
 - **Identity**: what kind of product (tool_type, fastener_type, dosage_form)
 - **Material/composition**: what it's made of (material, primary_ingredient)
 - **Primary dimension**: the key size/capacity metric (voltage, thread_size, capacity_oz)
@@ -110,30 +110,42 @@ Produce two attribute tables — **Core Attributes** and **Extended Attributes**
 
 **Which attributes to include:** the ones that are most significant for the subcategory AND commonly appear on pricelists and product catalogs. The test is: "Would this attribute appear on a typical pricelist or product comparison sheet for this subcategory?" If yes, include it. If it's only on deep spec sheets or niche enthusiast sites, leave it out.
 
-Use this as a calibration guide:
-- **Core under 5** — too thin
-- **Core 5-10** — right
-- **Core over 10** — too many, demote to extended
+Use this as a calibration guide (counts are **category-specific** attributes only — the 6 mandatory core rows don't count toward these ranges):
+- **Category-specific core under 5** — too thin
+- **Category-specific core 5-10** — right
+- **Category-specific core over 10** — too many, demote to extended
 - **Extended under 10** — too thin
 - **Extended 10-15** — right
 - **Extended over 15** — trim back
-- **Total 15-30**
+- **Total category-specific 15-30**
 
 ### Mandatory attributes
 
-Every schema must include these 5 attributes as the first rows of the **Core Attributes** table. They appear in every schema regardless of category. Descriptions and example values should be tailored to the category, but the attribute names, keys, and data types are fixed.
+Every schema must include these 5 attributes as the first rows of the **Core Attributes** table, with `Mandatory` set to `yes`. They appear in every schema regardless of category. Descriptions and example values should be tailored to the category, but the attribute names, keys, data types, and mandatory status are fixed.
 
-| Attribute | Key | Data Type | Why mandatory |
-|-----------|-----|-----------|---------------|
-| SKU | sku | text | Every product needs a unique identifier |
-| Product Name | product_name | text | Every product needs a human-readable name |
-| URL | url | text | Link to the product page or listing |
-| Price | price | number | Numeric price value, no currency symbol |
-| Currency | currency | text | ISO 4217 currency code, always separate from Price |
+| Attribute | Key | Data Type | Mandatory | Why |
+|-----------|-----|-----------|-----------|-----|
+| SKU | sku | text | yes | Every product needs a unique identifier |
+| Product Name | product_name | text | yes | Every product needs a human-readable name |
+| URL | url | text | yes | Link to the product page or listing |
+| Price | price | number | yes | Numeric price value, no currency symbol |
+| Currency | currency | text | yes | ISO 4217 currency code, always separate from Price |
 
-Start the Core Attributes table with these 5, then add category-specific core attributes discovered through research.
+Start the Core Attributes table with these 5 (all `yes`), then add the non-mandatory core attribute below, then category-specific core attributes. Extended attributes always have `Mandatory` set to `—`.
 
-**Note on Brand:** Brand is NOT included in SKU schemas — it is a universal top-level field on the product record, handled outside the taxonomy.
+### Non-mandatory core attribute
+
+One additional attribute appears in every schema immediately after the 5 mandatory rows, but with `Mandatory` set to `—`:
+
+| Attribute | Key | Data Type | Mandatory | Why included |
+|-----------|-----|-----------|-----------|---------------|
+| Price Includes VAT | price_includes_vat | boolean | — | Qualifies whether the Price value includes VAT/sales tax. Needed to compare prices across regions and catalogs. Not mandatory because many catalogs don't state this explicitly. |
+
+Row order in Core Attributes: 5 mandatory rows → `price_includes_vat` → category-specific core attributes.
+
+The `Mandatory` column tells downstream consumers (scraper-generator, eval-generator) which core attributes must always be present vs. which are best-effort. Mandatory core attributes get strict 100% validation; category-specific core attributes get coverage-based validation.
+
+**Note on Brand:** Brand is NOT included in SKU schemas — it is a mandatory core attribute on the product record, handled outside the taxonomy.
 
 ### Synthesis steps
 
@@ -159,9 +171,9 @@ Keep compliance and certification attributes **international and universal**. In
 
 **Never delete an attribute.** Downstream systems may depend on it. If an attribute is wrong, redundant, or no longer used, mark it as deprecated:
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| Old Attr | old_attr | text | **DEPRECATED** (2026-03-14) — replaced by "New Attr". Was: original description | — |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|-----------|-----|-----------|------|-----------|-------------|----------------|
+| Old Attr | old_attr | text | — | — | **DEPRECATED** (2026-03-14) — replaced by "New Attr". Was: original description | — |
 
 Mark the description with **DEPRECATED** and the date. This preserves backward compatibility while keeping the schema clean for readers.
 
@@ -186,22 +198,23 @@ Write to `docs/product-taxonomy/sku-schemas/{subcategory-slug}.md` using the **e
 
 ## Core Attributes
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| SKU | sku | text | {category-specific description} | {examples} |
-| Product Name | product_name | text | {category-specific description} | {examples} |
-| URL | url | text | {category-specific description} | {examples} |
-| Price | price | number | {category-specific description} | {examples} |
-| Currency | currency | text | {category-specific description} | {examples} |
-| {core attr} | {key} | {type} | {description} | {examples} |
-| ... | ... | ... | ... | ... |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|-----------|-----|-----------|------|-----------|-------------|----------------|
+| SKU | sku | text | — | yes | {category-specific description} | {examples} |
+| Product Name | product_name | text | — | yes | {category-specific description} | {examples} |
+| URL | url | text | — | yes | {category-specific description} | {examples} |
+| Price | price | number | — | yes | {category-specific description} | {examples} |
+| Currency | currency | text | — | yes | {category-specific description} | {examples} |
+| Price Includes VAT | price_includes_vat | boolean | — | — | {category-specific description} | true, false |
+| {core attr} | {key} | {type} | {unit or —} | — | {description} | {examples} |
+| ... | ... | ... | ... | ... | ... | ... |
 
 ## Extended Attributes
 
-| Attribute | Key | Data Type | Description | Example Values |
-|-----------|-----|-----------|-------------|----------------|
-| {extended attr} | {key} | {type} | {description} | {examples} |
-| ... | ... | ... | ... | ... |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|-----------|-----|-----------|------|-----------|-------------|----------------|
+| {extended attr} | {key} | {type} | {unit or —} | — | {description} | {examples} |
+| ... | ... | ... | ... | ... | ... | ... |
 
 ## Changelog
 
@@ -218,13 +231,15 @@ These rules are non-negotiable. Every schema must comply exactly.
 
 | Rule | Correct | Wrong |
 |------|---------|-------|
-| **Table has exactly 5 columns** | `\| Attribute \| Key \| Data Type \| Description \| Example Values \|` | Missing Key column, extra columns, row-number column |
+| **Table has exactly 7 columns** | `\| Attribute \| Key \| Data Type \| Unit \| Mandatory \| Description \| Example Values \|` | Missing columns, extra columns, row-number column |
 | **Key column contains valid snake_case** | `wood_type`, `structural_grade`, `charging_power_kw` | camelCase, display names, empty keys |
 | **Key derivation rule** | Lowercase, spaces to underscores, drop `/ ( ) , &`, collapse consecutive underscores, strip leading/trailing underscores. Example: "GTIN / EAN" becomes `gtin_ean`, "Charging Power (kW)" becomes `charging_power_kw` | Invented keys not derivable from the display name |
+| **Unit column** | Measurement unit as a string (`mm`, `kg`, `W`, `kW`) or `—` when not applicable | Units embedded in Data Type (`number (kg)`), empty cell |
+| **Mandatory column** | `yes` for the 5 mandatory core attributes (sku, product_name, url, price, currency); `—` for all others | `no`, `false`, empty cell, `yes` on non-mandatory attributes |
 | **No backticks in table cells** | `9x19mm, 5.56x45mm NATO` | `` `9x19mm`, `5.56x45mm NATO` `` |
 | **Only three `##` sections** | `## Core Attributes` then `## Extended Attributes` then `## Changelog` | No `## Notes`, `## Summary`, or other sections |
 | **Example values are comma-separated plain text** | `Red, Blue, Green` | `Red \| Blue \| Green` or bullet lists |
-| **Data types use lowercase** | `text`, `number`, `enum`, `boolean`. Append unit in parentheses when relevant: `number (kg)`, `number (kW)`, `text (mm)`. Use `text (list)` for multi-value fields. | `Text`, `Number`, `integer`, compound types without parentheses like `currency` |
+| **Data types use lowercase** | `text`, `number`, `enum`, `boolean`. Use `text (list)` for multi-value fields. Units go in the Unit column, not in Data Type. | `Text`, `Number`, `integer`, `number (kg)` |
 | **No markdown formatting in table cells** | Plain text descriptions | No bold, italic, links, or code blocks inside cells (except **DEPRECATED** markers) |
 | **Changelog sources use markdown links** | `[Company](url)` | Plain URLs or company names without links |
 
@@ -240,8 +255,8 @@ Before presenting results, re-read the schema file you just wrote and check it a
 
 | # | Check | Pass criteria |
 |---|-------|---------------|
-| 1 | **Mandatory attributes present and first** | SKU, Product Name, URL, Price, Currency are rows 1-5 in Core Attributes |
-| 2 | **Attribute count in range** | Core: 5-10, Extended: 10-15, Total: 15-30 |
+| 1 | **Mandatory core attributes present and ordered** | Rows 1-5: SKU, Product Name, URL, Price, Currency (all `Mandatory` = `yes`). Row 6: Price Includes VAT (`Mandatory` = `—`). Category-specific core attributes start at row 7. |
+| 2 | **Attribute count in range** | Category-specific core: 5-10 (excludes 6 mandatory core rows), Extended: 10-15, Total category-specific: 15-30 |
 | 3 | **Two table sections** | `## Core Attributes` and `## Extended Attributes`, plus `## Changelog` — no `## Notes`, no other sections |
 | 3a | **Taxonomy ID present** | `**Taxonomy ID:**` is in the header and matches an ID found in `categories.md` |
 | 4 | **Currency separate from Price** | Price is `number`, Currency is `text` — two distinct rows |
@@ -250,8 +265,9 @@ Before presenting results, re-read the schema file you just wrote and check it a
 | 7 | **No sub-subcategory drilling** | No third-level nesting (e.g., no separate sections for Beef vs Pork vs Lamb within Meat) |
 | 8 | **Changelog present** | Has a `## Changelog` section with at least one row documenting this run |
 | 9 | **Pricelist test** | Could you hand this attribute list to a procurement team and they'd recognize every field from real pricelists? If any attribute would only appear on a deep spec sheet, remove it. |
-| 10 | **Format compliance** | Table has exactly 5 columns (Attribute, Key, Data Type, Description, Example Values), no backticks in any table cell, no markdown formatting in cells (except **DEPRECATED** markers), example values are comma-separated plain text, data types are lowercase |
-| 11 | **Key column correct** | Every Key value matches the conversion rule applied to its Attribute display name (lowercase, spaces→underscores, drop `/()&,`, collapse underscores). Universal keys are: `sku`, `product_name`, `url`, `price`, `currency` |
+| 10 | **Format compliance** | Table has exactly 7 columns (Attribute, Key, Data Type, Unit, Mandatory, Description, Example Values), no backticks in any table cell, no markdown formatting in cells (except **DEPRECATED** markers), example values are comma-separated plain text, data types are lowercase, units in Unit column (not in Data Type) |
+| 11 | **Key column correct** | Every Key value matches the conversion rule applied to its Attribute display name (lowercase, spaces→underscores, drop `/()&,`, collapse underscores). Mandatory core keys are: `sku`, `product_name`, `url`, `price`, `currency` |
+| 12 | **Mandatory column correct** | Exactly the 5 mandatory core keys have `yes`; all other rows (core and extended) have `—`. No extended attribute is mandatory. |
 
 If all checks pass, proceed to the summary.
 

@@ -3,7 +3,8 @@
 # dependencies = []
 # ///
 """
-Structural validation rules S01-S09 for scraper output.
+Structural validation for scraper output (attribute coverage, mandatory fields, execution).
+See references/acceptance-criteria.md for the authoritative list of criteria and thresholds.
 
 Agent: tester sub-agent (references/tester.md)
 
@@ -13,11 +14,13 @@ merges them, then evaluates structural rules.
 Usage:
     uv run tester_evaluate_structural.py \
         --output-dir docs/scraper-generator/acme/output \
-        --iteration 1 --exit-code 0
+        --iteration 1 --exit-code 0 \
+        --routing-tables docs/scraper-generator/acme/generator_input.json
 
     uv run tester_evaluate_structural.py \
         --output-dir docs/scraper-generator/acme/output \
-        --iteration 1 --exit-code 0 --skip-s06
+        --iteration 1 --exit-code 0 --skip-s06 \
+        --routing-tables docs/scraper-generator/acme/generator_input.json
 """
 from __future__ import annotations
 
@@ -88,6 +91,16 @@ def load_merged_summary(output_dir: Path, iteration: int) -> dict:
     return merged
 
 
+def load_routing_tables(path: Path) -> dict:
+    """Load generator_input.json routing tables."""
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
 def load_taxonomy_ids() -> set[str]:
     ids: set[str] = set()
     if not TAXONOMY_PATH.exists():
@@ -109,13 +122,6 @@ def top_category(p: dict) -> str:
     return cp.split(" > ")[0] if cp else "unknown"
 
 
-def per_cat_rate(products: list[dict], pred) -> dict[str, float]:
-    cats: dict[str, list[dict]] = {}
-    for p in products:
-        cats.setdefault(top_category(p), []).append(p)
-    return {c: round(sum(1 for p in ps if pred(p)) / len(ps), 4) for c, ps in cats.items()}
-
-
 def issue(rule_id: str, detail: str, failing: list[dict]) -> dict:
     return {
         "rule_id": rule_id,
@@ -125,33 +131,120 @@ def issue(rule_id: str, detail: str, failing: list[dict]) -> dict:
     }
 
 
+def _group_by_subcategory(products: list[dict]) -> dict[str, list[dict]]:
+    """Group products by their product_category (taxonomy ID)."""
+    by_subcat: dict[str, list[dict]] = {}
+    for p in products:
+        cat = p.get("product_category", "_unclassified")
+        by_subcat.setdefault(cat, []).append(p)
+    return by_subcat
+
+
+def _key_coverage(products: list[dict], expected_keys: list[str], bucket: str) -> tuple[float, list[str]]:
+    """Compute what fraction of expected_keys appear non-null in at least one product.
+
+    Returns (coverage_ratio, missing_keys).
+    """
+    if not expected_keys:
+        return 1.0, []
+    found = set()
+    for p in products:
+        attrs = p.get(bucket) or {}
+        for k, v in attrs.items():
+            if v is not None:
+                found.add(k)
+    expected_set = set(expected_keys)
+    matched = found & expected_set
+    missing = [k for k in expected_keys if k not in matched]
+    return len(matched) / len(expected_keys), missing
+
+
 # ---------------------------------------------------------------------------
-# Rules S01-S09
+# Structural rules — see references/acceptance-criteria.md
 # ---------------------------------------------------------------------------
 
-def s01(products: list[dict]) -> tuple[dict, dict | None]:
-    def has(p):
-        ca = p.get("core_attributes")
-        return bool(ca and any(v is not None for v in ca.values()))
-    if not products:
-        return {"id": "S01", "status": "fail", "value": 0, "threshold": 0.30, "per_category": {}}, None
-    rate = sum(1 for p in products if has(p)) / len(products)
-    pc = per_cat_rate(products, has)
-    st = "pass" if rate >= 0.30 else "fail"
-    iss = issue("S01", f"Core fill {rate:.0%} < 30%", [p for p in products if not has(p)]) if st == "fail" else None
-    return {"id": "S01", "status": st, "value": round(rate, 4), "threshold": 0.30, "per_category": pc}, iss
+def s01(products: list[dict], routing_tables: dict) -> tuple[dict, dict | None]:
+    """S01: ≥75% of core_attribute_keys appear (non-null) in at least one product, per subcategory."""
+    schemas = routing_tables.get("subcategory_schemas", {})
+    if not products or not schemas:
+        return {"id": "S01", "status": "fail", "value": 0, "threshold": 0.75, "per_category": {}}, \
+            {"rule_id": "S01", "detail": "No products or no routing tables", "affected_categories": [], "sample_urls": []}
+
+    by_subcat = _group_by_subcategory(products)
+    per_category = {}
+    worst = 1.0
+    all_missing: dict[str, list[str]] = {}
+
+    for subcat_id, schema in schemas.items():
+        expected = schema.get("core_attribute_keys", [])
+        if not expected:
+            per_category[subcat_id] = {"value": 1.0, "threshold": 0.75, "status": "pass"}
+            continue
+        subcat_products = by_subcat.get(subcat_id, [])
+        if not subcat_products:
+            per_category[subcat_id] = {"value": 0, "threshold": 0.75, "status": "fail"}
+            worst = 0
+            all_missing[subcat_id] = expected
+            continue
+        cov, missing = _key_coverage(subcat_products, expected, "core_attributes")
+        st = "pass" if cov >= 0.75 else "fail"
+        per_category[subcat_id] = {"value": round(cov, 4), "threshold": 0.75, "status": st}
+        worst = min(worst, cov)
+        if missing:
+            all_missing[subcat_id] = missing
+
+    overall = "pass" if worst >= 0.75 else "fail"
+    iss = None
+    if overall == "fail":
+        iss = {
+            "rule_id": "S01",
+            "detail": f"Core key coverage {worst:.0%} < 75%. Missing: {all_missing}",
+            "affected_categories": list(all_missing.keys()),
+            "sample_urls": [p.get("url", "") for p in products[:5] if p.get("url")],
+        }
+    return {"id": "S01", "status": overall, "value": round(worst, 4), "threshold": 0.75, "per_category": per_category}, iss
 
 
-def s02(products: list[dict]) -> tuple[dict, dict | None]:
-    def has(p):
-        ea = p.get("extended_attributes")
-        return bool(ea and any(v is not None for v in ea.values()))
-    if not products:
-        return {"id": "S02", "status": "warn", "value": 0, "threshold": 0.20}, None
-    rate = sum(1 for p in products if has(p)) / len(products)
-    st = "pass" if rate >= 0.20 else "warn"
-    iss = issue("S02", f"Extended fill {rate:.0%} < 20%", [p for p in products if not has(p)]) if st == "warn" else None
-    return {"id": "S02", "status": st, "value": round(rate, 4), "threshold": 0.20}, iss
+def s02(products: list[dict], routing_tables: dict) -> tuple[dict, dict | None]:
+    """S02: ≥50% of extended_attribute_keys appear (non-null) in at least one product, per subcategory."""
+    schemas = routing_tables.get("subcategory_schemas", {})
+    if not products or not schemas:
+        return {"id": "S02", "status": "fail", "value": 0, "threshold": 0.50, "per_category": {}}, \
+            {"rule_id": "S02", "detail": "No products or no routing tables", "affected_categories": [], "sample_urls": []}
+
+    by_subcat = _group_by_subcategory(products)
+    per_category = {}
+    worst = 1.0
+    all_missing: dict[str, list[str]] = {}
+
+    for subcat_id, schema in schemas.items():
+        expected = schema.get("extended_attribute_keys", [])
+        if not expected:
+            per_category[subcat_id] = {"value": 1.0, "threshold": 0.50, "status": "pass"}
+            continue
+        subcat_products = by_subcat.get(subcat_id, [])
+        if not subcat_products:
+            per_category[subcat_id] = {"value": 0, "threshold": 0.50, "status": "fail"}
+            worst = 0
+            all_missing[subcat_id] = expected
+            continue
+        cov, missing = _key_coverage(subcat_products, expected, "extended_attributes")
+        st = "pass" if cov >= 0.50 else "fail"
+        per_category[subcat_id] = {"value": round(cov, 4), "threshold": 0.50, "status": st}
+        worst = min(worst, cov)
+        if missing:
+            all_missing[subcat_id] = missing
+
+    overall = "pass" if worst >= 0.50 else "fail"
+    iss = None
+    if overall == "fail":
+        iss = {
+            "rule_id": "S02",
+            "detail": f"Extended key coverage {worst:.0%} < 50%. Missing: {all_missing}",
+            "affected_categories": list(all_missing.keys()),
+            "sample_urls": [p.get("url", "") for p in products[:5] if p.get("url")],
+        }
+    return {"id": "S02", "status": overall, "value": round(worst, 4), "threshold": 0.50, "per_category": per_category}, iss
 
 
 def s03(products: list[dict]) -> tuple[dict, dict | None]:
@@ -252,7 +345,7 @@ def s09(output_dir: Path, iteration: int) -> tuple[dict, dict | None]:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Structural validation rules S01-S09")
+    parser = argparse.ArgumentParser(description="Structural validation (attribute coverage, mandatory fields, execution)")
     parser.add_argument("--output-dir", required=True,
                         help="Directory containing versioned output files")
     parser.add_argument("--iteration", required=True, type=int,
@@ -260,14 +353,28 @@ def main() -> None:
     parser.add_argument("--exit-code", type=int, default=0, help="Scraper exit code")
     parser.add_argument("--skip-s06", action="store_true",
                         help="Skip category diversity (retest mode)")
+    parser.add_argument("--routing-tables", default=None,
+                        help="Path to generator_input.json (required for S01/S02 schema-aware checks)")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
     products = load_products_for_iteration(output_dir, args.iteration)
     merged_summary = load_merged_summary(output_dir, args.iteration)
+    routing_tables = load_routing_tables(Path(args.routing_tables)) if args.routing_tables else {}
 
     results, issues = [], []
-    for fn in [s01, s02, s03, s04, s05]:
+
+    # S01/S02 need routing tables for schema-aware key coverage
+    r, i = s01(products, routing_tables)
+    results.append(r)
+    if i:
+        issues.append(i)
+    r, i = s02(products, routing_tables)
+    results.append(r)
+    if i:
+        issues.append(i)
+
+    for fn in [s03, s04, s05]:
         r, i = fn(products)
         results.append(r)
         if i:

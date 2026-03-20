@@ -25,11 +25,11 @@ Generate an eval config that validates scraper quality using thirteen weighted c
 | Company report | `docs/product-classifier/{slug}.md` |
 | Catalog assessment | `docs/catalog-detector/{slug}/assessment.md` |
 | Scraper source | `docs/scraper-generator/{slug}/scraper.py` |
-| Product taxonomy categories | `docs/product-taxonomy/categories.md` |
-| SKU schema | `docs/product-taxonomy/sku-schemas/{category-slug}.md` |
+| Generator input (routing tables) | `docs/scraper-generator/{slug}/generator_input.json` — pre-processed SKU schemas with core/extended keys, types, and units per subcategory |
 | Scrape output (products) | `docs/scraper-generator/{slug}/output/products.jsonl` — eval.py writes here via `--output-file` when running the scraper |
 | Scrape run summary | `docs/scraper-generator/{slug}/output/summary.json` — eval.py writes here via `--summary-file` when running the scraper |
 | Shared eval script | `eval/eval.py` |
+| Archived previous runs | `docs/eval-generator/{slug}-archived-{YYYYMMDDTHHMMSS}/` — never read these |
 | Eval config (output) | `docs/eval-generator/{slug}/eval_config.json` |
 | Eval result (output) | `docs/eval-generator/{slug}/output/eval_result.json` |
 | Eval history (output) | `docs/eval-generator/{slug}/output/eval_history.json` |
@@ -38,7 +38,6 @@ Generate an eval config that validates scraper quality using thirteen weighted c
 ### Slug derivation
 
 - **`{slug}`** — the company slug from `$ARGUMENTS` (e.g., `festool`).
-- **`{category-slug}`** — derived from the subcategory display name corresponding to the company's Primary taxonomy ID. Look up the taxonomy ID in `categories.md` to find the display name, then slugify: lowercase, replace spaces with hyphens, drop special characters (`&`, `/`, `(`, `)`, `,`). Example: taxonomy ID `wood.softwood_hardwood_lumber` → display name "Softwood & Hardwood Lumber" → slug `softwood-hardwood-lumber`.
 
 ## Eval and the four-level product record
 
@@ -46,7 +45,7 @@ The eval validates scraper output against the four-level product record format (
 
 | Level | Eval check | Weight | Threshold | Rationale |
 |-------|-----------|--------|-----------|-----------|
-| Universal top-level | Hardcoded in eval script | — | — | Always validated (sku, name, url, price, etc.) |
+| Mandatory core | Hardcoded in eval script | — | — | Always validated (sku, name, url, price, etc.) |
 | `core_attributes` | `core_attribute_coverage` | 20 | 0.90 | High effort expected → strict validation |
 | `extended_attributes` | `extended_attribute_coverage` | 5 | 0.50 | Moderate effort → lighter validation |
 | `extra_attributes` | `extra_attributes_ratio` | 5 | 0.50 | Low effort / opportunistic → monitors schema adequacy |
@@ -56,8 +55,8 @@ The eval validates scraper output against the four-level product record format (
 Read and follow `references/workflow.md`.
 
 - **Archive previous run:** Before starting, check if `docs/eval-generator/{slug}/` exists. If it does, archive it: `mv docs/eval-generator/{slug} docs/eval-generator/{slug}-archived-$(date -u +%Y%m%dT%H%M%S)`. Then create the fresh directory: `mkdir -p docs/eval-generator/{slug}/output`. Every invocation generates from scratch — never read from or make decisions based on archived directories (`{slug}-archived-*`).
-- Provide the file paths from the table above when the workflow references logical resources (e.g., "the scraper source", "the company report", "the catalog assessment", "the SKU schema", "the product taxonomy categories file", "the scrape output file", "the scrape run summary", "the shared eval script", "the eval config file", "the eval result file", "the eval history file", "the eval baseline file").
-- The `no_sku_schema` decision has an autonomous resolution path: when the subcategory exists in the taxonomy but the SKU schema hasn't been created yet, invoke `/product-taxonomy` for that subcategory to generate the schema, then continue. Only escalate if the subcategory itself is missing from the taxonomy.
+- Provide the file paths from the table above when the workflow references logical resources (e.g., "the scraper source", "the company report", "the catalog assessment", "the generator input file", "the scrape output file", "the scrape run summary", "the shared eval script", "the eval config file", "the eval result file", "the eval history file", "the eval baseline file").
+- The `missing_generator_input` decision has an autonomous resolution path: re-run the prepare script to generate `generator_input.json`. Only escalate if the scraper-generator stage has never been run for this company.
 - Run the shared eval script for verification — see the commands reference below for the correct invocation.
 - The `missing_product_count_estimate` decision is handled autonomously without escalation — the workflow uses the best available estimate (from scraper source, category structure, or current output count). This is a graceful degradation, not a stop. No user interaction needed.
 - No web search or browsing tools are needed — this stage generates a config file locally.
@@ -78,7 +77,7 @@ When the workflow reaches an escalation point, present it to the user using this
 ```
 
 User options per escalation:
-- `no_sku_schema` (taxonomy issue) — 1) Add the missing subcategory to `docs/product-taxonomy/categories.md` and retry, 2) Stop
+- `missing_generator_input` — 1) Run `/scraper-generator {slug}` to produce the scraper and generator input, then retry, 2) Stop
 - `scraper_output_format_unclear` — 1) Fix the scraper and retry, 2) Describe the expected output format so the eval can be generated, 3) Stop
 
 ## Eval commands

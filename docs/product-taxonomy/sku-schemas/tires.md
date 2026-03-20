@@ -7,36 +7,37 @@
 
 ## Core Attributes
 
-| Attribute | Key | Data Type | Unit | Description | Example Values |
-|--------|--------|--------|--------|--------|--------|
-| SKU | sku | text | — | Retailer or manufacturer product identifier | 407285374, 5492, T431320 |
-| Product Name | product_name | text | — | Full product name including brand, model, and size designation | Goodyear Assurance All-Season 225/65R17, Michelin Defender 2 235/55R18, Continental PremiumContact 7 205/55R16 |
-| URL | url | text | — | Direct link to the product page | https://example.com/tires/goodyear-assurance-225-65r17 |
-| Price | price | number | — | Numeric price per tire excluding currency symbol | 111.00, 189.99, 246.00 |
-| Currency | currency | text | — | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Tire Type | tire_type | enum | — | Vehicle application category | Passenger (P), Light Truck (LT), Special Trailer (ST), Temporary Spare (T) |
-| Sidewall Type | sidewall_type | enum | — | Visual style of the sidewall | BSW (Black Sidewall), WSW (White Sidewall), OWL (Outlined White Letters), RWL (Raised White Letters), BSL (Black Serrated Letters) |
-| Rim Diameter | rim_diameter | number | in | Diameter of the wheel rim the tire fits, in inches | 14, 15, 16, 17, 18, 19, 20, 22 |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|--------|--------|--------|--------|-----------|--------|--------|
+| SKU | sku | text | — | yes | Retailer or manufacturer product identifier | 407285374, 5492, T431320 |
+| Product Name | product_name | text | — | yes | Full product name including brand, model, and size designation | Goodyear Assurance All-Season 225/65R17, Michelin Defender 2 235/55R18, Continental PremiumContact 7 205/55R16 |
+| URL | url | text | — | yes | Direct link to the product page | https://example.com/tires/goodyear-assurance-225-65r17 |
+| Price | price | number | — | yes | Numeric price per tire excluding currency symbol | 111.00, 189.99, 246.00 |
+| Currency | currency | text | — | yes | ISO 4217 currency code | USD, EUR, GBP, CAD |
+| Price Includes VAT | price_includes_vat | boolean | — | — | Whether the listed price includes VAT or sales tax | true, false |
+| Tire Type | tire_type | enum | — | — | Vehicle application category | Passenger (P), Light Truck (LT), Special Trailer (ST), Temporary Spare (T) |
+| Sidewall Type | sidewall_type | enum | — | — | Visual style of the sidewall | BSW (Black Sidewall), WSW (White Sidewall), OWL (Outlined White Letters), RWL (Raised White Letters), BSL (Black Serrated Letters) |
+| Rim Diameter | rim_diameter | number | in | — | Diameter of the wheel rim the tire fits, in inches | 14, 15, 16, 17, 18, 19, 20, 22 |
 
 ## Extended Attributes
 
-| Attribute | Key | Data Type | Unit | Description | Example Values |
-|--------|--------|--------|--------|--------|--------|
-| Model/Product Line | modelproduct_line | text | — | Tire model or product line name | Assurance All-Season, Defender 2, PremiumContact 7, Pilot Sport 5, CrossClimate 2 |
-| Season | season | enum | — | Seasonal classification of the tire | Summer, Winter, All-Season, All-Weather |
-| Section Width | section_width | number | mm | Nominal cross-section width of the tire in millimetres | 185, 205, 225, 245, 275, 315 |
-| Aspect Ratio | aspect_ratio | number | — | Sidewall height as a percentage of section width | 30, 40, 45, 50, 55, 60, 65, 70 |
-| Construction | construction | enum | — | Internal construction method of the tire | R (Radial), D (Diagonal/Bias), B (Belted-Bias) |
-| Load Index | load_index | number | — | Standardised code indicating maximum load capacity per tire | 91, 97, 102, 105, 117 |
-| Speed Rating | speed_rating | text | — | Letter code indicating maximum rated speed capability | S (180 km/h), H (210 km/h), V (240 km/h), W (270 km/h), Y (300 km/h) |
-| Load Range | load_range | text | — | Ply-equivalent strength rating used primarily on light truck and trailer tires | SL, XL, C, D, E |
-| UTQG Treadwear | utqg_treadwear | number | — | Uniform Tire Quality Grading treadwear rating; higher values indicate longer tread life | 100, 300, 500, 700, 900 |
-| UTQG Traction | utqg_traction | enum | — | UTQG traction grade indicating wet stopping distance performance | AA, A, B, C |
-| UTQG Temperature | utqg_temperature | enum | — | UTQG temperature resistance grade | A, B, C |
-| Tread Depth | tread_depth | number | mm | Depth of the tread grooves when new, measured from tread surface to groove bottom | 7.5, 8.5, 9.5, 10.5, 12.0 |
-| Approved Rim Width Range | approved_rim_width_range | text | in | Minimum and maximum rim widths the tire can be safely mounted on | 6.0-7.5, 6.5-8.0, 7.0-9.0 |
-| Max Inflation Pressure | max_inflation_pressure | number | kPa | Maximum cold inflation pressure moulded on the sidewall | 240, 300, 340, 350, 550 |
-| Revolutions per Kilometre | revolutions_per_kilometre | number | — | Number of full revolutions the tire makes per kilometre of travel | 468, 498, 530, 575 |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|--------|--------|--------|--------|-----------|--------|--------|
+| Model/Product Line | modelproduct_line | text | — | — | Tire model or product line name | Assurance All-Season, Defender 2, PremiumContact 7, Pilot Sport 5, CrossClimate 2 |
+| Season | season | enum | — | — | Seasonal classification of the tire | Summer, Winter, All-Season, All-Weather |
+| Section Width | section_width | number | mm | — | Nominal cross-section width of the tire in millimetres | 185, 205, 225, 245, 275, 315 |
+| Aspect Ratio | aspect_ratio | number | — | — | Sidewall height as a percentage of section width | 30, 40, 45, 50, 55, 60, 65, 70 |
+| Construction | construction | enum | — | — | Internal construction method of the tire | R (Radial), D (Diagonal/Bias), B (Belted-Bias) |
+| Load Index | load_index | number | — | — | Standardised code indicating maximum load capacity per tire | 91, 97, 102, 105, 117 |
+| Speed Rating | speed_rating | text | — | — | Letter code indicating maximum rated speed capability | S (180 km/h), H (210 km/h), V (240 km/h), W (270 km/h), Y (300 km/h) |
+| Load Range | load_range | text | — | — | Ply-equivalent strength rating used primarily on light truck and trailer tires | SL, XL, C, D, E |
+| UTQG Treadwear | utqg_treadwear | number | — | — | Uniform Tire Quality Grading treadwear rating; higher values indicate longer tread life | 100, 300, 500, 700, 900 |
+| UTQG Traction | utqg_traction | enum | — | — | UTQG traction grade indicating wet stopping distance performance | AA, A, B, C |
+| UTQG Temperature | utqg_temperature | enum | — | — | UTQG temperature resistance grade | A, B, C |
+| Tread Depth | tread_depth | number | mm | — | Depth of the tread grooves when new, measured from tread surface to groove bottom | 7.5, 8.5, 9.5, 10.5, 12.0 |
+| Approved Rim Width Range | approved_rim_width_range | text | in | — | Minimum and maximum rim widths the tire can be safely mounted on | 6.0-7.5, 6.5-8.0, 7.0-9.0 |
+| Max Inflation Pressure | max_inflation_pressure | number | kPa | — | Maximum cold inflation pressure moulded on the sidewall | 240, 300, 340, 350, 550 |
+| Revolutions per Kilometre | revolutions_per_kilometre | number | — | — | Number of full revolutions the tire makes per kilometre of travel | 468, 498, 530, 575 |
 
 ## Changelog
 

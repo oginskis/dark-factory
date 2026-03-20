@@ -7,36 +7,37 @@
 
 ## Core Attributes
 
-| Attribute | Key | Data Type | Unit | Description | Example Values |
-|--------|--------|--------|--------|--------|--------|
-| SKU | sku | text | — | Retailer or manufacturer product identifier | IDL-1650-4C, USP-23655, VP-612PE |
-| Product Name | product_name | text | — | Full product name including material, thickness, and dimensions | Clear 6 mil LDPE Sheeting 20 ft x 100 ft, Black HDPE Vapor Barrier 10 mil |
-| URL | url | text | — | Direct link to the product page | https://example.com/product/ldpe-6mil-20x100 |
-| Price | price | number | — | Numeric price per roll or per sheet, excluding currency symbol | 54.95, 189.00, 12.50 |
-| Currency | currency | text | — | ISO 4217 currency code | USD, EUR, GBP, CAD |
-| Material | material | enum | — | Primary polymer type | LDPE, LLDPE, HDPE, PVC, PTFE, EVA, PP |
-| Country of Origin | country_of_origin | text | — | Manufacturing country | USA, China, Germany, Canada |
-| Length | length | number | ft | Roll or sheet length | 25, 50, 100, 200, 500 |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|--------|--------|--------|--------|-----------|--------|--------|
+| SKU | sku | text | — | yes | Retailer or manufacturer product identifier | IDL-1650-4C, USP-23655, VP-612PE |
+| Product Name | product_name | text | — | yes | Full product name including material, thickness, and dimensions | Clear 6 mil LDPE Sheeting 20 ft x 100 ft, Black HDPE Vapor Barrier 10 mil |
+| URL | url | text | — | yes | Direct link to the product page | https://example.com/product/ldpe-6mil-20x100 |
+| Price | price | number | — | yes | Numeric price per roll or per sheet, excluding currency symbol | 54.95, 189.00, 12.50 |
+| Currency | currency | text | — | yes | ISO 4217 currency code | USD, EUR, GBP, CAD |
+| Price Includes VAT | price_includes_vat | boolean | — | — | Whether the listed price includes VAT or sales tax | true, false |
+| Material | material | enum | — | — | Primary polymer type | LDPE, LLDPE, HDPE, PVC, PTFE, EVA, PP |
+| Country of Origin | country_of_origin | text | — | — | Manufacturing country | USA, China, Germany, Canada |
+| Length | length | number | ft | — | Roll or sheet length | 25, 50, 100, 200, 500 |
 
 ## Extended Attributes
 
-| Attribute | Key | Data Type | Unit | Description | Example Values |
-|--------|--------|--------|--------|--------|--------|
-| Thickness | thickness | number | mil | Film or sheet thickness in mils (thousandths of an inch) | 1, 2, 4, 6, 10, 20, 40 |
-| Width | width | number | ft | Roll or sheet width | 3, 8, 10, 12, 16, 20, 24, 36 |
-| Area Coverage | area_coverage | number | sq ft | Total surface area per roll or sheet | 150, 500, 1000, 2000 |
-| Color/Clarity | colorclarity | text | — | Visual appearance of the film | Clear, Black, White, Translucent, Blue, Amber, Frosted |
-| Density | density | number | g/cm3 | Material density | 0.91, 0.92, 0.95, 0.96 |
-| Tensile Strength | tensile_strength | number | psi | Maximum stress before breaking | 850, 1400, 2200, 3500 |
-| Elongation at Break | elongation_at_break | number | % | Percentage stretch before failure | 100, 300, 500, 700 |
-| Puncture Resistance | puncture_resistance | text | — | Resistance to tearing and puncture | Low, Medium, High |
-| Temperature Range | temperature_range | text | — | Continuous service temperature range | -60 F to 150 F, -40 F to 180 F |
-| UV Stabilized | uv_stabilized | enum | — | Whether UV inhibitors are added for outdoor use | Yes, No |
-| Flame Retardant | flame_retardant | enum | — | Whether flame-retardant additives are present | Yes, No |
-| Fire Rating | fire_rating | text | — | Fire safety classification when flame retardant | NFPA 701 Test 1, ASTM E-84 Class A, FAR 25.853a |
-| Moisture Vapor Transmission | moisture_vapor_transmission | number | perms | Water vapor permeability rate | 0.01, 0.06, 0.5, 1.2 |
-| Application | application | text (list) | — | Primary intended uses | Vapor Barrier, Construction Enclosure, Painting Protection, Greenhouse Cover, Packaging, Fumigation |
-| Slip Treatment | slip_treatment | enum | — | Whether the film has a slip-resistant or anti-static surface | Slip, Non-Slip, Anti-Static |
+| Attribute | Key | Data Type | Unit | Mandatory | Description | Example Values |
+|--------|--------|--------|--------|-----------|--------|--------|
+| Thickness | thickness | number | mil | — | Film or sheet thickness in mils (thousandths of an inch) | 1, 2, 4, 6, 10, 20, 40 |
+| Width | width | number | ft | — | Roll or sheet width | 3, 8, 10, 12, 16, 20, 24, 36 |
+| Area Coverage | area_coverage | number | sq ft | — | Total surface area per roll or sheet | 150, 500, 1000, 2000 |
+| Color/Clarity | colorclarity | text | — | — | Visual appearance of the film | Clear, Black, White, Translucent, Blue, Amber, Frosted |
+| Density | density | number | g/cm3 | — | Material density | 0.91, 0.92, 0.95, 0.96 |
+| Tensile Strength | tensile_strength | number | psi | — | Maximum stress before breaking | 850, 1400, 2200, 3500 |
+| Elongation at Break | elongation_at_break | number | % | — | Percentage stretch before failure | 100, 300, 500, 700 |
+| Puncture Resistance | puncture_resistance | text | — | — | Resistance to tearing and puncture | Low, Medium, High |
+| Temperature Range | temperature_range | text | — | — | Continuous service temperature range | -60 F to 150 F, -40 F to 180 F |
+| UV Stabilized | uv_stabilized | enum | — | — | Whether UV inhibitors are added for outdoor use | Yes, No |
+| Flame Retardant | flame_retardant | enum | — | — | Whether flame-retardant additives are present | Yes, No |
+| Fire Rating | fire_rating | text | — | — | Fire safety classification when flame retardant | NFPA 701 Test 1, ASTM E-84 Class A, FAR 25.853a |
+| Moisture Vapor Transmission | moisture_vapor_transmission | number | perms | — | Water vapor permeability rate | 0.01, 0.06, 0.5, 1.2 |
+| Application | application | text (list) | — | — | Primary intended uses | Vapor Barrier, Construction Enclosure, Painting Protection, Greenhouse Cover, Packaging, Fumigation |
+| Slip Treatment | slip_treatment | enum | — | — | Whether the film has a slip-resistant or anti-static surface | Slip, Non-Slip, Anti-Static |
 
 ## Changelog
 

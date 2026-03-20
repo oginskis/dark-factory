@@ -4,7 +4,7 @@
 #     "pytest",
 # ]
 # ///
-"""Tests for tester_evaluate_semantic.py — M01-M04 with glob-based file loading."""
+"""Tests for tester_evaluate_semantic.py — semantic validation with glob-based file loading."""
 from __future__ import annotations
 
 import json
