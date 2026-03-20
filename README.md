@@ -2,6 +2,8 @@
 
 Product discovery pipeline: give it a company name or URL, get back a production-ready scraper that produces structured product data daily.
 
+**Current scale:** 22 companies onboarded across 6 product categories (power tools, solar panels, cookware, safety PPE, wood products, pet food). 86% first-pass scraper success rate. 5,773 products scraped in the latest full run.
+
 ## How It Works
 
 Two cost tiers separate expensive LLM reasoning (runs once per company) from cheap daily execution (standalone Python, no LLM).
@@ -79,6 +81,21 @@ flowchart TD
     classDef default fill:#1e3a5f,stroke:#4a90d9,color:#e0e0e0
 ```
 
+### Scraper quality: self-correcting loop
+
+The coder → tester fix loop automatically resolves most issues. Across 22 companies:
+
+| Metric | Value |
+|--------|-------|
+| First-pass success (no fix cycles needed) | 86% (19/22) |
+| Max fix cycles needed | 1 |
+| Template-caused value/unit failures (M01/M04) | 0% |
+| Final validation pass rate | 100% |
+
+The most common fix-cycle trigger was **value/unit concatenation** (e.g., `"53 mm"` stored as a string instead of `53` + `unit: "mm"`). This was eliminated by mandating a tuple-returning `_parse_numeric()` pattern in the coder's reference docs. The remaining fix cycles are site-specific edge cases (compound units like `in-lbf`, dual-unit formats like `1.8 HP/1.3 kW`).
+
+The coder's FR6 self-test (probe check) catches embedded units **before** dispatching to the tester — shifting failures left and reducing fix cycles further.
+
 ## Prerequisites
 
 | Requirement | Version | Purpose |
@@ -123,10 +140,10 @@ Replace `{slug}` with the company slug from the pipeline summary (e.g., `ytglove
 
 ```bash
 # Score existing output
-uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json
+uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json
 
 # Collect fresh sample and score (20% per subcategory, max 100)
-uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json --collect
+uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json --collect
 ```
 
 ### 4. Interpret the results
@@ -185,7 +202,7 @@ Checks that can't run (no baseline yet, limited sample, no prices) are skipped a
 
 The pipeline classifies every company into a canonical taxonomy of physical product subcategories. This classification drives everything downstream — which attributes to extract, how to validate quality, and how to compare products across companies.
 
-**Scale:** 26 top-level categories, 238 subcategories, 238 SKU schemas covering industries from food to firearms.
+**Scale:** 26 top-level categories, 238+ subcategories, with SKU schemas covering industries from food to firearms. New schemas are auto-generated when the pipeline encounters a subcategory without one (e.g., `consumer.pet_food_pet_care` was created automatically during the pet food company batch).
 
 ### Taxonomy IDs
 
@@ -325,10 +342,11 @@ dark-factory/
     product-classifier/                     #   Stage 1: company classification
     catalog-detector/                       #   Stage 2: catalog assessment
     scraper-generator/                      #   Stage 3: scraper generation (3-agent architecture)
-    eval-generator/                         #   Stage 4: eval config generation + eval script
+    eval-generator/                         #   Stage 4: eval config generation
     product-discovery/                      #   Orchestrator: chains all 4 stages
     product-taxonomy/                       #   Utility: research SKU attribute schemas
     skill-creator-local/                    #   Meta: create/review pipeline skills
+  eval/                                     # Shared eval script (eval.py — 13 weighted quality checks)
   scripts/                                  # Utility scripts (schema verification, migrations)
   docs/
     product-taxonomy/                       # Canonical taxonomy + SKU schemas (tracked)
