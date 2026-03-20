@@ -765,5 +765,76 @@ class TestNoHistoryFlag:
         assert result_baseline == baseline
 
 
+# ---------------------------------------------------------------------------
+# Conditions consistency — conditions.md must match eval_run.py
+# ---------------------------------------------------------------------------
+
+
+class TestConditionsConsistency:
+    """Verify conditions.md documents the same checks/thresholds as eval_run.py."""
+
+    CONDITIONS_PATH = Path(__file__).resolve().parent.parent / "references" / "conditions.md"
+
+    def _parse_checks_table(self) -> dict[str, dict]:
+        text = self.CONDITIONS_PATH.read_text()
+        checks = {}
+        in_table = False
+        for line in text.splitlines():
+            if "| Check " in line and "| Weight " in line:
+                in_table = True
+                continue
+            if in_table and line.startswith("|---"):
+                continue
+            if in_table and line.startswith("|"):
+                cols = [c.strip() for c in line.split("|")[1:-1]]
+                if len(cols) >= 3:
+                    name = cols[0].strip("`")
+                    weight = int(cols[1])
+                    threshold = float(cols[2])
+                    checks[name] = {"weight": weight, "threshold": threshold}
+            elif in_table and not line.startswith("|"):
+                break
+        return checks
+
+    def test_all_checks_documented(self):
+        """Every check in eval_run.py appears in conditions.md."""
+        from eval_run import CHECKS
+        doc_checks = self._parse_checks_table()
+        for name in CHECKS:
+            assert name in doc_checks, f"'{name}' in eval_run.py but missing from conditions.md"
+
+    def test_no_extra_checks_in_docs(self):
+        """No checks in conditions.md that aren't in eval_run.py."""
+        from eval_run import CHECKS
+        doc_checks = self._parse_checks_table()
+        for name in doc_checks:
+            assert name in CHECKS, f"'{name}' in conditions.md but missing from eval_run.py"
+
+    def test_weights_match(self):
+        """Weights in conditions.md match eval_run.py."""
+        from eval_run import CHECKS
+        doc_checks = self._parse_checks_table()
+        for name in CHECKS:
+            if name in doc_checks:
+                assert CHECKS[name]["weight"] == doc_checks[name]["weight"], \
+                    f"'{name}' weight: code={CHECKS[name]['weight']}, doc={doc_checks[name]['weight']}"
+
+    def test_thresholds_match(self):
+        """Thresholds in conditions.md match eval_run.py."""
+        from eval_run import CHECKS
+        doc_checks = self._parse_checks_table()
+        for name in CHECKS:
+            if name in doc_checks:
+                assert abs(CHECKS[name]["threshold"] - doc_checks[name]["threshold"]) < 0.001, \
+                    f"'{name}' threshold: code={CHECKS[name]['threshold']}, doc={doc_checks[name]['threshold']}"
+
+    def test_weights_sum_to_100(self):
+        """Both code and docs weights sum to 100."""
+        from eval_run import CHECKS
+        doc_checks = self._parse_checks_table()
+        assert sum(c["weight"] for c in CHECKS.values()) == 100, "Code weights don't sum to 100"
+        assert sum(c["weight"] for c in doc_checks.values()) == 100, "Doc weights don't sum to 100"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

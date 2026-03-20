@@ -92,7 +92,7 @@ If no SKU schema exists but the subcategory is valid, the scraper-generator will
 
 Invoke `/eval-generator {slug}`.
 
-This stage generates an eval config that the shared eval script uses to validate scrape quality using twelve weighted checks.
+This stage generates an eval config that the eval script uses to validate scrape quality using thirteen weighted checks.
 
 **Stop the pipeline if:**
 - The company's subcategory is not found in the product taxonomy categories file (same gate as Stage 3 — should not occur if Stage 3 already generated the schema)
@@ -130,7 +130,7 @@ When all four stages complete successfully, present a structured summary to the 
 - **Category-specific attributes extracted:** {comma-separated list of attribute names found in test products}
 
 ### Eval
-- **Checks:** 12 weighted checks configured
+- **Checks:** 13 weighted checks configured
 - **Status from test run:** {pass / degraded / fail} (score: {N})
 
 ### Notes

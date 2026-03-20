@@ -1,15 +1,41 @@
 # Eval Generator Workflow
 
-**Input:** Company slug, scraper source, catalog assessment, generator input (routing tables), eval script
-**Output:** Eval config file, verified by running the eval script, or escalation
+**Input:** Company slug, scraper source, catalog assessment, generator input, eval script
+**Output:** eval_config.json, verified by running the scraper and eval script, or escalation
 
 ---
 
 ## Context
 
-This workflow generates a per-company eval config file that the shared eval script uses to validate scrape quality. The config captures company-specific values — expected product counts, core attributes, type mappings, enum constraints, and price availability. The shared eval script implements all check logic; the workflow's job is to determine the correct config values and verify they work.
+This workflow generates a per-company eval config file that the eval script uses to validate scrape quality. The config captures company-specific values — expected product counts, core attributes, type mappings, enum constraints, and price availability. The eval script implements all check logic; the workflow's job is to determine the correct config values and verify they work.
 
 Read the company report, catalog assessment, scraper source, and generator input file to understand what the scraper extracts and what the eval should expect.
+
+### Inputs
+
+These files must exist before the workflow starts. SKILL.md is responsible for providing them.
+
+| File | Path | Used in | What the workflow reads from it |
+|------|------|---------|-------------------------------|
+| Company report | `docs/product-classifier/{slug}.md` | Step 2 | Business model, product lines |
+| Catalog assessment | `docs/catalog-detector/{slug}/assessment.md` | Step 2 | Estimated product count, top-level categories, has_prices |
+| Scraper source | `docs/scraper-generator/{slug}/scraper.py` | Step 1 | Which attributes it extracts, output structure, price extraction |
+| Generator input | `docs/scraper-generator/{slug}/generator_input.json` | Step 3 | Core/extended attribute keys, types, units per subcategory |
+| Eval script | `.claude/skills/eval-generator/scripts/eval_run.py` | Step 5 | Runs checks against collected products |
+
+### Outputs
+
+All outputs are written to `docs/eval-generator/{slug}/`.
+
+| File | Written by | Description |
+|------|-----------|-------------|
+| `docs/eval-generator/{slug}/eval_config.json` | Workflow (Step 4) | Per-company eval config with subcategory attribute maps, type_map, semantic_validation |
+| `docs/eval-generator/{slug}/output/products.jsonl` | Scraper (Step 5a) | Products scraped per sampling rules in `references/conditions.md` |
+| `docs/eval-generator/{slug}/output/summary.json` | Scraper (Step 5a) | Run metadata (total_products, duration, errors) |
+| `docs/eval-generator/{slug}/output/debug.log` | Scraper (Step 5a) | Structured log of HTTP requests and parse events |
+| `docs/eval-generator/{slug}/output/eval_result.json` | Eval script (Step 5b) | Thirteen weighted check scores, degradation score, pass/degraded/fail status |
+| `docs/eval-generator/{slug}/output/eval_history.json` | Eval script (Step 5b) | Append-only log of all eval runs |
+| `docs/eval-generator/{slug}/output/baseline.json` | Eval script (Step 5b) | First-run attribute fill rates for regression detection |
 
 ---
 
@@ -30,9 +56,9 @@ If the scraper source is missing or its output structure cannot be determined, e
 
 Read the catalog assessment to extract:
 
-- Estimated product count (becomes `expected_product_count`)
-- Top-level product category names (becomes `expected_top_level_categories`)
-- Whether the catalog has prices (becomes `has_prices`)
+- Estimated product count → use for `expected_product_count` in eval config
+- Top-level product category names → use for `expected_top_level_categories` in eval config
+- Whether the catalog has prices → use for `has_prices` in eval config
 - Any notes about catalog structure or known gaps
 
 Read the company report for additional context on business model and product lines.
@@ -55,6 +81,7 @@ The file has this structure:
     "taxonomy_id": {
       "core_attribute_keys": ["key1", "key2"],
       "extended_attribute_keys": ["key3", "key4"],
+      "mandatory_keys": ["key1"],
       "attribute_types": {"key1": "number", "key2": "str", "key3": "str", "key4": "number"},
       "units": {"key1": "mm", "key4": "kW"}
     }
@@ -109,47 +136,36 @@ Produce the eval config file with all required fields:
 
 | Field | Source | How to determine |
 |-------|--------|------------------|
-| `company_slug` | Company report | The slug from the company report |
+| `company_slug` | Skill input | The company slug (e.g., `festool`) — same `{slug}` used in all file paths |
 | `expected_product_count` | Catalog assessment | The estimated product count. If missing, see the `missing_product_count_estimate` decision. |
 | `expected_top_level_categories` | Catalog assessment | The top-level category names from the category structure section. These are the catalog's own category names (e.g., "Riga Wood"), not taxonomy categories. |
 | `subcategories` | Generator input + catalog assessment | Per-subcategory map. Each entry has `core_attributes` (from `core_attribute_keys`), `extended_attributes` (from `extended_attribute_keys`), and `expected_count` (from catalog assessment category tree). Only attributes the scraper actually extracts. |
 | `type_map` | Generator input + scraper source | Merge `attribute_types` from all subcategories in `generator_input.json` into a flat map. Values are already in eval format: `"str"`, `"number"`, `"list"`, `"bool"`. For extra attributes not in the generator input, inspect the scraper source. |
 | `enum_attributes` | Scraper source | Maps attributes that have a closed set of allowed values to their value arrays. Only include attributes where the allowed values are clearly enumerable from the scraper logic. Use an empty object `{}` when no enum constraints apply. |
-| `has_prices` | Catalog assessment + scraper source | `true` if the catalog has prices and the scraper extracts them, `false` otherwise. When `false`, the shared eval script skips the price sanity check. |
+| `has_prices` | Catalog assessment + scraper source | `true` if the catalog has prices and the scraper extracts them, `false` otherwise. When `false`, the eval script skips the price sanity check. |
 | `semantic_validation` | Generator input | Object with `numeric_fields` array. Derived from `attribute_types` — include all attributes where the type is `"number"`. Also include attributes that have entries in `units` (these are measurement fields). |
 
-### Checks (13 total)
+### Config format rules
 
-See `references/checks.md` for the full check reference — summary table, implementation details, weight redistribution, and self-verification checklist.
-
-### Strict format rules
-
-| Rule | Correct | Wrong |
-|------|---------|-------|
-| **Valid JSON** | Single JSON object, parseable | Trailing commas, comments, multiple objects |
-| **All required fields present** | Every field from the schema above | Missing fields, extra fields |
-| **`company_slug` is a string** | `"finieris"` | Missing or numeric |
-| **`expected_product_count` is a positive integer** | `31` | `0`, negative, string, float |
-| **`expected_top_level_categories` is a non-empty array of strings** | `["Riga Wood"]` | Empty array, array of numbers |
-| **`subcategories` must be an object where each key is a taxonomy ID (contains dot)** | `{"wood.softwood_hardwood_lumber": {...}}` | Array, flat attributes, keys without dots |
-| **Each subcategory value must have `core_attributes` (array), `extended_attributes` (array), and `expected_count` (number)** | `{"core_attributes": ["material"], "extended_attributes": ["color"], "expected_count": 200}` | Missing fields, wrong types |
-| **`semantic_validation` is optional, when present it must be an object with `numeric_fields` array** | `{"numeric_fields": ["width", "thickness"]}` | String, array, missing numeric_fields key |
-| **`type_map` values use exact type strings** | `"str"`, `"number"`, `"list"`, `"bool"` | `"string"`, `"int"`, `"float"`, `"array"`, `"boolean"` |
-| **`type_map` covers all attributes across all subcategories** | Every core and extended attribute from all subcategories has a type entry | Attribute missing from type_map |
-| **`enum_attributes` values are arrays of strings** | `{"surface_treatment": ["Uncoated", "Film-faced"]}` | Values as a single string, nested objects |
-| **`has_prices` is a boolean** | `true` or `false` | `"true"`, `"false"`, `0`, `1` |
+Validate the generated config against the format rules in `references/conditions.md` § Config format rules.
 
 ---
 
-## Step 5: Run Eval Script
+## Step 5: Verify End-to-End
 
-Run the eval script with `--collect` to validate the config end-to-end:
+Two commands: run the scraper to collect products, then run the eval to score them.
+
+### Step 5a: Collect products
+
+Follow the collection strategy in `references/conditions.md` to determine sample sizes and invocation pattern (single vs per-subcategory). Output all files to `docs/eval-generator/{slug}/output/`.
+
+### Step 5b: Score with eval
+
+Run the eval script pointing to the collected products:
 
 ```
-uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json --collect
+uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json
 ```
-
-`--collect` runs the scraper to collect a per-subcategory sample (20% of capacity, max 100 per subcategory), then scores the output against the config. Products are written to `docs/eval-generator/{slug}/output/products.jsonl`. This is the only way to verify the config actually works — a dry run without products proves nothing.
 
 If the eval fails or produces unexpected results, review the config for these common problems:
 
@@ -160,7 +176,7 @@ If the eval fails or produces unexpected results, review the config for these co
 
 ## Step 6: Self-Verification
 
-After the run completes, read the eval result file and verify all 13 checks appear in the output. Use the self-verification checklist in `references/checks.md`.
+After the run completes, read the eval result file (`docs/eval-generator/{slug}/output/eval_result.json`) and verify all 13 checks appear in the output. Use the self-verification checklist in `references/conditions.md`.
 
 If the eval runs successfully and all 13 checks appear in the result, the config is verified.
 
@@ -168,10 +184,10 @@ If the eval runs successfully and all 13 checks appear in the result, the config
 
 ## Boundaries
 
-- This workflow generates eval config files only — it does not modify the shared eval script or scraper code.
-- It does not trigger rediscovery — the shared eval script sets `recommend_rediscovery` based on the degradation score.
+- This workflow generates eval config files only — it does not modify the eval script or scraper code.
+- It does not trigger rediscovery — the eval script sets `recommend_rediscovery` based on the degradation score.
 - It does not define or modify the product taxonomy or SKU schemas.
-- Mandatory core attribute checks (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) are hardcoded in the shared eval script. The config only controls category-specific attribute expectations.
+- Mandatory core attribute checks (`sku`, `name`, `url`, `price`, `currency`, `brand`, `scraped_at`) are hardcoded in the eval script. The config only controls category-specific attribute expectations.
 
 ---
 

@@ -40,28 +40,18 @@ Generate an eval config that validates scraper quality using thirteen weighted c
 
 - **`{slug}`** — the company slug from `$ARGUMENTS` (e.g., `festool`).
 
-## Eval and the four-level product record
+## Eval conditions
 
-The eval validates scraper output against the four-level product record format (see `.claude/skills/scraper-generator/references/coder.md` for the canonical definition). Check weights reflect the extraction effort hierarchy:
-
-| Level | Eval check | Rationale |
-|-------|-----------|-----------|
-| Mandatory core | Hardcoded in eval script | Always validated (sku, name, url, price, etc.) |
-| `core_attributes` | `core_attribute_coverage` | High effort expected → strict validation |
-| `extended_attributes` | `extended_attribute_coverage` | Moderate effort → tracked with high overall threshold |
-| `extra_attributes` | `extra_attributes_ratio` | Low effort / opportunistic → monitors schema adequacy |
-
-For full check details (weights, thresholds, implementation), see `references/checks.md`.
+All eval conditions — collection strategy, quality checks, thresholds, scoring rules, config format rules — are defined in `references/conditions.md` (single source of truth).
 
 ## Workflow
 
 Read and follow `references/workflow.md`.
 
 - **Archive previous run:** Before starting, check if `docs/eval-generator/{slug}/` exists. If it does, archive it: `mv docs/eval-generator/{slug} docs/eval-generator/{slug}-archived-$(date -u +%Y%m%dT%H%M%S)`. Then create the fresh directory: `mkdir -p docs/eval-generator/{slug}/output`. Every invocation generates from scratch — never read from or make decisions based on archived directories (`{slug}-archived-*`).
-- Provide the file paths from the table above when the workflow references logical resources (e.g., "the scraper source", "the company report", "the catalog assessment", "the generator input file", "the scrape output file", "the scrape run summary", "the shared eval script", "the eval config file", "the eval result file", "the eval history file", "the eval baseline file").
+- Provide the file paths from the table above when the workflow references logical resources (e.g., "the company report", "the catalog assessment", "the generator input file", "the eval result file").
 - The `missing_generator_input` decision has an autonomous resolution path: re-run the prepare script to generate `generator_input.json`. Only escalate if the scraper-generator stage has never been run for this company.
-- Run the shared eval script for verification — see the commands reference below for the correct invocation.
-- The `missing_product_count_estimate` decision is handled autonomously without escalation — the workflow uses the best available estimate (from scraper source, category structure, or current output count). This is a graceful degradation, not a stop. No user interaction needed.
+- The `missing_product_count_estimate` decision is handled autonomously without escalation — the workflow uses the best available estimate (from scraper source, category structure, or current output count). No user interaction needed.
 - No web search or browsing tools are needed — this stage generates a config file locally.
 
 ## Escalation handling
@@ -82,16 +72,6 @@ When the workflow reaches an escalation point, present it to the user using this
 User options per escalation:
 - `missing_generator_input` — 1) Run `/scraper-generator {slug}` to produce the scraper and generator input, then retry, 2) Stop
 - `scraper_output_format_unclear` — 1) Fix the scraper and retry, 2) Describe the expected output format so the eval can be generated, 3) Stop
-
-## Eval commands
-
-The eval script (`.claude/skills/eval-generator/scripts/eval_run.py`) supports these invocations:
-
-| Command | When to use |
-|---------|-------------|
-| `uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json --collect` | **Primary verification.** Runs the scraper to collect a sufficient sample (20% of capacity per subcategory, max 100), then scores. Use this in Step 5 to validate the config end-to-end. |
-| `uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json` | Score existing eval output only (no scraper invocation). Use when `products.jsonl` already exists and you just want to re-score. |
-| `uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json --no-history` | Score without updating `eval_history.json` or baseline. Use for remediation re-runs where you don't want to pollute the history timeline. |
 
 ## Notes
 
