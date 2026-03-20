@@ -17,7 +17,6 @@ Pipeline stages: product-classifier → catalog-detector → scraper-generator �
 - `docs/product-classifier/` — Company reports (output of product-classifier)
 - `docs/catalog-detector/` — Catalog assessments (output of catalog-detector)
 - `docs/scraper-generator/` — Scraper artifacts (scraper.py, config.json, output/)
-- `eval/` — Shared eval script (quality validation for scrapers)
 - `docs/eval-generator/` — Eval artifacts (eval_config.json, output/)
 - `scripts/` — Utility scripts (schema verification, migrations)
 
@@ -74,7 +73,7 @@ uv run --with pytest --with httpx --with selectolax python -m pytest -m "not int
 2. **PEP 723 metadata at top.** Each test file declares its dependencies inline so `uv run test_file.py` works standalone.
 3. **`__main__` block at bottom.** `if __name__ == "__main__": raise SystemExit(pytest.main([__file__, "-v"]))`.
 4. **Test pure functions, mock HTTP.** Keep parsing/analysis logic in testable functions. Use `unittest.mock.patch` for HTTP calls.
-5. **Class-based grouping.** Follow `eval/test_eval.py` pattern — `TestClassName` with `test_` methods.
+5. **Class-based grouping.** Follow `TestClassName` with `test_` methods pattern.
 6. **Real data for validators.** Gate functions should use realistic markdown and real repo files (`categories.md`, knowledgebase files).
 7. **Mark integration tests.** `@pytest.mark.integration` for tests that hit real URLs. Skip in CI with `-m "not integration"`.
 8. **Tests must pass before committing skill changes.** Run `uv run --with pytest --with httpx --with selectolax python -m pytest` after modifying scripts.

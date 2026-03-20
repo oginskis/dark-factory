@@ -1,7 +1,7 @@
 # Eval Generator Workflow
 
-**Input:** Company slug, scraper source, catalog assessment, generator input (routing tables), and the shared eval script
-**Output:** Eval config file, verified by running the shared eval script, or escalation
+**Input:** Company slug, scraper source, catalog assessment, generator input (routing tables), eval script
+**Output:** Eval config file, verified by running the eval script, or escalation
 
 ---
 
@@ -120,55 +120,7 @@ Produce the eval config file with all required fields:
 
 ### Checks (13 total)
 
-The shared eval script implements 13 weighted checks. Weights sum to 100:
-
-| Check | Weight | Threshold | What it catches |
-|-------|--------|-----------|-----------------|
-| `core_attribute_coverage` | 20 | 0.90 | Core attributes missing — selector changes, schema drift |
-| `extended_attribute_coverage` | 5 | 0.50 | Extended attributes missing — less critical but tracked |
-| `pagination_completeness` | 10 | 0.70 | Broken pagination, removed categories |
-| `category_diversity` | 5 | 0.50 | Broken category traversal, sitemap gaps |
-| `category_classification` | 10 | 0.95 | Products with invalid `product_category` — note: `product_category` is validated by this dedicated check, not by `core_attribute_coverage` |
-| `price_sanity` | 10 | 1.00 | Parser errors, currency confusion |
-| `data_freshness` | 5 | 1.00 | Stale cache, broken upsert |
-| `schema_conformance` | 5 | 1.00 | Site redesign, new data format |
-| `row_count_trend` | 5 | 0.80 | Category removal, pagination break |
-| `duplicate_detection` | 5 | 0.99 | Duplicate products by SKU |
-| `field_level_regression` | 10 | 0.50 | Per-field fill rate drops vs previous run |
-| `extra_attributes_ratio` | 5 | 0.50 | Too many unmapped attributes — schema inadequate |
-| `semantic_validation` | 5 | 0.95 | Composite: value cleanliness, non-product detection, numeric format |
-
-### Check implementation details
-
-**core_attribute_coverage** (weight 20, threshold 0.90): Count how many core schema attributes are present and non-empty in `core_attributes`. Compute per-product coverage, measure fraction of products above 80%. Threshold: 0.90 (90% of products must have >80% of core attributes filled). Core attributes receive the highest weight because scrapers are expected to put high effort into extracting them — they define what makes a product identifiable and comparable.
-
-**extended_attribute_coverage** (weight 5, threshold 0.50): Same logic as core but applied to `extended_attributes`. Lighter threshold: 0.50 (50% of products must have >50% of extended attributes filled). Lower weight and threshold reflect that scrapers put moderate effort into these — they are important but secondary to core. Skipped when `extended_attributes` list is empty.
-
-**pagination_completeness** (weight 10, threshold 0.70): Compares actual product count to `expected_product_count`. Skipped on limited runs.
-
-**category_diversity** (weight 5, threshold 0.50): Checks that scraped products span the `expected_top_level_categories`. Skipped on limited runs.
-
-**category_classification** (weight 10, threshold 0.95): Count products where `product_category` is not `_unclassified` and is a valid taxonomy ID. Ratio must be >= 0.95. Skipped on limited runs.
-
-**price_sanity** (weight 10, threshold 1.00): Validates price values are positive numbers with valid currency codes. Skipped when `has_prices` is false.
-
-**data_freshness** (weight 5, threshold 1.00): Checks `scraped_at` timestamps are recent (within expected window).
-
-**schema_conformance** (weight 5, threshold 1.00): Validates attribute types match `type_map` and enum values match `enum_attributes`.
-
-**row_count_trend** (weight 5, threshold 0.80): Compares current row count to previous run baseline. Skipped on first run or limited runs.
-
-**duplicate_detection** (weight 5, threshold 0.99): Checks for duplicate products by SKU. Ratio of unique SKUs to total must be >= 0.99.
-
-**field_level_regression** (weight 10, threshold 0.50): Compares per-field fill rates against previous run baseline. Flags fields where fill rate dropped significantly. Skipped when no baseline exists.
-
-**extra_attributes_ratio** (weight 5, threshold 0.50): Computes `1 - (extra_count / (core_count + extended_count))` averaged across all products. Higher is better (fewer unmapped extras). Threshold: 0.50. This flags schemas that are inadequate for the company.
-
-**semantic_validation** (weight 5, threshold 0.95): Composite check covering value cleanliness, non-product detection, and numeric format. Uses the `semantic_validation` config field — when `numeric_fields` is provided, validates that those fields contain properly formatted numeric values.
-
-### Weight redistribution
-
-When checks are skipped (e.g., no baseline for `field_level_regression`, limited run for `pagination_completeness`, empty `extended_attributes` for `extended_attribute_coverage`), their weights are redistributed proportionally among the remaining active checks. This ensures the total always sums to 100.
+See `references/checks.md` for the full check reference — summary table, implementation details, weight redistribution, and self-verification checklist.
 
 ### Strict format rules
 
@@ -191,13 +143,13 @@ When checks are skipped (e.g., no baseline for `field_level_regression`, limited
 
 ## Step 5: Run Eval Script
 
-Run the shared eval script with `--collect` to validate the config end-to-end:
+Run the eval script with `--collect` to validate the config end-to-end:
 
 ```
-uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json --collect
+uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json --collect
 ```
 
-`--collect` runs the scraper to gather a sufficient sample, then scores the output against the config. This is the only way to verify the config actually works — a dry run without products proves nothing.
+`--collect` runs the scraper to collect a per-subcategory sample (20% of capacity, max 100 per subcategory), then scores the output against the config. Products are written to `docs/eval-generator/{slug}/output/products.jsonl`. This is the only way to verify the config actually works — a dry run without products proves nothing.
 
 If the eval fails or produces unexpected results, review the config for these common problems:
 
@@ -208,25 +160,7 @@ If the eval fails or produces unexpected results, review the config for these co
 
 ## Step 6: Self-Verification
 
-After the run completes, read the eval result file and verify all 13 checks appear in the output:
-
-| # | Check name | Verify |
-|---|------------|--------|
-| 1 | `core_attribute_coverage` | Present, weight 20, threshold 0.90 |
-| 2 | `extended_attribute_coverage` | Present, weight 5, threshold 0.50 (or skipped when extended_attributes is empty) |
-| 3 | `pagination_completeness` | Present, weight 10, threshold 0.70 (or skipped on limited run) |
-| 4 | `category_diversity` | Present, weight 5, threshold 0.50 (or skipped on limited run) |
-| 5 | `category_classification` | Present, weight 10, threshold 0.95 (or skipped on limited run) |
-| 6 | `price_sanity` | Present, weight 10, threshold 1.0 (or skipped if `has_prices` is false) |
-| 7 | `data_freshness` | Present, weight 5, threshold 1.0 |
-| 8 | `schema_conformance` | Present, weight 5, threshold 1.0 |
-| 9 | `row_count_trend` | Present, weight 5, threshold 0.80 (or skipped on limited/first run) |
-| 10 | `duplicate_detection` | Present, weight 5, threshold 0.99 |
-| 11 | `field_level_regression` | Present, weight 10, threshold 0.50 (or skipped if no baseline) |
-| 12 | `extra_attributes_ratio` | Present, weight 5, threshold 0.50 |
-| 13 | `semantic_validation` | Present, weight 5, threshold 0.95 |
-
-Skipped checks have `"value": null` and `"skipped": true` — this is expected behavior, not an error.
+After the run completes, read the eval result file and verify all 13 checks appear in the output. Use the self-verification checklist in `references/checks.md`.
 
 If the eval runs successfully and all 13 checks appear in the result, the config is verified.
 

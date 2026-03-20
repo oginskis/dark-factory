@@ -26,9 +26,10 @@ Generate an eval config that validates scraper quality using thirteen weighted c
 | Catalog assessment | `docs/catalog-detector/{slug}/assessment.md` |
 | Scraper source | `docs/scraper-generator/{slug}/scraper.py` |
 | Generator input (routing tables) | `docs/scraper-generator/{slug}/generator_input.json` — pre-processed SKU schemas with core/extended keys, types, and units per subcategory |
-| Scrape output (products) | `docs/scraper-generator/{slug}/output/products.jsonl` — eval.py writes here via `--output-file` when running the scraper |
-| Scrape run summary | `docs/scraper-generator/{slug}/output/summary.json` — eval.py writes here via `--summary-file` when running the scraper |
-| Shared eval script | `eval/eval.py` |
+| Eval products (output) | `docs/eval-generator/{slug}/output/products.jsonl` — eval_run.py writes here via `--output-file` when running the scraper |
+| Eval run summary (output) | `docs/eval-generator/{slug}/output/summary.json` — eval_run.py writes here via `--summary-file` when running the scraper |
+| Eval debug log (output) | `docs/eval-generator/{slug}/output/debug.log` — eval_run.py writes here via `--log-file` when running the scraper |
+| Eval script | `.claude/skills/eval-generator/scripts/eval_run.py` |
 | Archived previous runs | `docs/eval-generator/{slug}-archived-{YYYYMMDDTHHMMSS}/` — never read these |
 | Eval config (output) | `docs/eval-generator/{slug}/eval_config.json` |
 | Eval result (output) | `docs/eval-generator/{slug}/output/eval_result.json` |
@@ -43,12 +44,14 @@ Generate an eval config that validates scraper quality using thirteen weighted c
 
 The eval validates scraper output against the four-level product record format (see `.claude/skills/scraper-generator/references/coder.md` for the canonical definition). Check weights reflect the extraction effort hierarchy:
 
-| Level | Eval check | Weight | Threshold | Rationale |
-|-------|-----------|--------|-----------|-----------|
-| Mandatory core | Hardcoded in eval script | — | — | Always validated (sku, name, url, price, etc.) |
-| `core_attributes` | `core_attribute_coverage` | 20 | 0.90 | High effort expected → strict validation |
-| `extended_attributes` | `extended_attribute_coverage` | 5 | 0.50 | Moderate effort → lighter validation |
-| `extra_attributes` | `extra_attributes_ratio` | 5 | 0.50 | Low effort / opportunistic → monitors schema adequacy |
+| Level | Eval check | Rationale |
+|-------|-----------|-----------|
+| Mandatory core | Hardcoded in eval script | Always validated (sku, name, url, price, etc.) |
+| `core_attributes` | `core_attribute_coverage` | High effort expected → strict validation |
+| `extended_attributes` | `extended_attribute_coverage` | Moderate effort → tracked with high overall threshold |
+| `extra_attributes` | `extra_attributes_ratio` | Low effort / opportunistic → monitors schema adequacy |
+
+For full check details (weights, thresholds, implementation), see `references/checks.md`.
 
 ## Workflow
 
@@ -82,13 +85,13 @@ User options per escalation:
 
 ## Eval commands
 
-The shared eval script (`eval/eval.py`) supports these invocations:
+The eval script (`.claude/skills/eval-generator/scripts/eval_run.py`) supports these invocations:
 
 | Command | When to use |
 |---------|-------------|
-| `uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json --collect` | **Primary verification.** Runs the scraper to collect a sufficient sample, then scores. Use this in Step 5 to validate the config end-to-end. |
-| `uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json` | Score existing scraper output only (no scraper invocation). Use when `products.jsonl` already exists and you just want to re-score. |
-| `uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json --no-history` | Score without updating `eval_history.json` or baseline. Use for remediation re-runs where you don't want to pollute the history timeline. |
+| `uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json --collect` | **Primary verification.** Runs the scraper to collect a sufficient sample (20% of capacity per subcategory, max 100), then scores. Use this in Step 5 to validate the config end-to-end. |
+| `uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json` | Score existing eval output only (no scraper invocation). Use when `products.jsonl` already exists and you just want to re-score. |
+| `uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json --no-history` | Score without updating `eval_history.json` or baseline. Use for remediation re-runs where you don't want to pollute the history timeline. |
 
 ## Notes
 

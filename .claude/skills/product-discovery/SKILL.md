@@ -169,7 +169,7 @@ uv run docs/scraper-generator/{slug}/scraper.py
 
 Run eval:
 ```
-uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json
+uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json
 ```
 
 Output files:

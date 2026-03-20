@@ -47,7 +47,7 @@ flowchart LR
     CRON["Scheduler<br/><i>cron / K8s / Airflow</i>"]
     CRON --> SCRAPER["scraper.py<br/>Extract products"]
     SCRAPER --> PRODUCTS["products.jsonl"]
-    PRODUCTS --> EVAL["eval.py<br/>Score quality"]
+    PRODUCTS --> EVAL["eval_run.py<br/>Score quality"]
     EVAL --> RESULT["eval_result.json"]
     RESULT --> CHECK{"Score?"}
     CHECK -->|"pass (0-30)"| OK(["No action"])
@@ -123,10 +123,10 @@ Replace `{slug}` with the company slug from the pipeline summary (e.g., `ytglove
 
 ```bash
 # Score existing output
-uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json
+uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json
 
-# Collect fresh sample and score
-uv run eval/eval.py docs/eval-generator/{slug}/eval_config.json --collect
+# Collect fresh sample and score (20% per subcategory, max 100)
+uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json --collect
 ```
 
 ### 4. Interpret the results
@@ -145,6 +145,8 @@ Output files use `{n}_{hash}` versioning — files are never overwritten. `{n}` 
 
 | File | Contents |
 |------|----------|
+| `products.jsonl` | Products collected by the eval (separate from scraper-generator output) |
+| `summary.json` | Run metadata from the eval's scraper invocation |
 | `eval_result.json` | Thirteen weighted checks, degradation score (0-100), pass/degraded/fail status |
 | `eval_history.json` | Append-only log of all eval runs for trend detection |
 | `baseline.json` | First-run attribute fill rates for regression detection |
@@ -323,11 +325,10 @@ dark-factory/
     product-classifier/                     #   Stage 1: company classification
     catalog-detector/                       #   Stage 2: catalog assessment
     scraper-generator/                      #   Stage 3: scraper generation (3-agent architecture)
-    eval-generator/                         #   Stage 4: eval config generation
+    eval-generator/                         #   Stage 4: eval config generation + eval script
     product-discovery/                      #   Orchestrator: chains all 4 stages
     product-taxonomy/                       #   Utility: research SKU attribute schemas
     skill-creator-local/                    #   Meta: create/review pipeline skills
-  eval/                                     # Shared eval script (eval.py)
   scripts/                                  # Utility scripts (schema verification, migrations)
   docs/
     product-taxonomy/                       # Canonical taxonomy + SKU schemas (tracked)

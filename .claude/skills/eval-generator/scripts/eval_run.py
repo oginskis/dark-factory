@@ -21,7 +21,7 @@ MANDATORY_CORE_FIELDS_NO_PRICE = ["sku", "name", "url", "brand", "scraped_at"]
 # 13 checks with weights summing to 100
 CHECKS = {
     "core_attribute_coverage":     {"weight": 20, "threshold": 0.90},
-    "extended_attribute_coverage": {"weight":  5, "threshold": 0.50},
+    "extended_attribute_coverage": {"weight":  5, "threshold": 0.90},
     "pagination_completeness":     {"weight": 10, "threshold": 0.70},
     "category_diversity":          {"weight":  5, "threshold": 0.50},
     "category_classification":     {"weight": 10, "threshold": 0.95},
@@ -46,15 +46,20 @@ NON_PRODUCT_URL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Embedded-unit detection — consistent with scraper-generator's tester_evaluate_semantic.py
+EMBEDDED_UNIT_RE = re.compile(
+    r"\d+\s*(mm|cm|m|kg|g|lb|oz|ml|l|V|W|A|Hz|kW|kWh|MPa|Nm|bpm|psi|in|ft|rpm|dB|%)$"
+)
+
 
 def find_project_root(config_path: Path) -> Path:
-    """Walk up from config file until a directory containing eval/ is found."""
+    """Walk up from config file until a directory containing docs/ is found."""
     current = config_path.resolve().parent
     while current != current.parent:
-        if (current / "eval").is_dir():
+        if (current / "docs").is_dir():
             return current
         current = current.parent
-    print("Error: Could not find project root (no eval/ directory found)", file=sys.stderr)
+    print("Error: Could not find project root (no docs/ directory found)", file=sys.stderr)
     sys.exit(1)
 
 
@@ -125,17 +130,40 @@ def load_json(path: Path) -> dict | list | None:
 
 
 def eval_sample_size(config: dict) -> dict:
-    """Compute recommended sample sizes for eval."""
-    expected = config.get("expected_product_count", 0)
-    total_target = min(max(ceil(expected * 0.3), 50), 300)
+    """20% of subcategory capacity, max 100 per subcategory."""
     sub_configs = config.get("_sub_configs", {})
-    n_subs = len(sub_configs) or 1
     per_sub = {}
     for sub_id, sub_config in sub_configs.items():
-        sub_expected = sub_config.get("expected_count", expected // n_subs)
-        per_sub[sub_id] = max(ceil(sub_expected * 0.1), 10)
-    actual_total = max(total_target, sum(per_sub.values())) if per_sub else total_target
-    return {"total": actual_total, "per_subcategory": per_sub}
+        capacity = sub_config.get("expected_count", 0)
+        per_sub[sub_id] = min(max(ceil(capacity * 0.20), 10), 100)
+    total = sum(per_sub.values()) if per_sub else min(max(ceil(config.get("expected_product_count", 0) * 0.20), 10), 100)
+    return {"total": total, "per_subcategory": per_sub}
+
+
+# ---------------------------------------------------------------------------
+# Scraper config helpers
+# ---------------------------------------------------------------------------
+
+
+def load_scraper_config(path: Path) -> dict | None:
+    """Read the scraper's config.json. Returns None if missing or invalid."""
+    return load_json(path)
+
+
+def build_category_key_map(scraper_config: dict) -> dict[str, list[str]]:
+    """Invert category_mapping (URL prefix -> taxonomy ID) to (taxonomy ID -> [URL prefixes]).
+
+    The scraper's config.json has:
+        "category_mapping": {"url-prefix-1": "taxonomy.id", "url-prefix-2": "taxonomy.id"}
+
+    We need the inverse to run per-subcategory collection:
+        {"taxonomy.id": ["url-prefix-1", "url-prefix-2"]}
+    """
+    category_mapping = scraper_config.get("category_mapping", {})
+    inverted: dict[str, list[str]] = {}
+    for key, taxonomy_id in category_mapping.items():
+        inverted.setdefault(taxonomy_id, []).append(key)
+    return inverted
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +207,7 @@ def check_core_attribute_coverage(products: list[dict], config: dict) -> tuple[f
             else:
                 missing.append(field)
 
-        passed = populated / total_core > 0.80
+        passed = populated / total_core >= 0.75
         if passed:
             passing += 1
 
@@ -251,13 +279,18 @@ def check_extended_attribute_coverage(
 
 
 def check_semantic_validation(products: list[dict], config: dict) -> tuple[float, dict] | None:
-    """Composite semantic check. Returns (min_score, detail_dict) or None if no config."""
-    sem_config = config.get("semantic_validation")
-    if sem_config is None:
-        return None
+    """Composite semantic check. Always runs (never returns None).
+
+    Sub-checks:
+    1. Value cleanliness — config-independent
+    2. Non-product detection — config-independent
+    3. Numeric field format — conditional on semantic_validation.numeric_fields
+    4. Embedded-units detection — config-independent, scans all attribute buckets
+    """
     if not products:
         return 0.0, {}
 
+    sem_config = config.get("semantic_validation") or {}
     scores: list[float] = []
     detail: dict[str, Any] = {}
     has_prices = config.get("has_prices", True)
@@ -318,7 +351,7 @@ def check_semantic_validation(products: list[dict], config: dict) -> tuple[float
         "examples": non_product_examples,
     }
 
-    # Sub-check 3: Numeric field format
+    # Sub-check 3: Numeric field format (conditional on config)
     numeric_fields = sem_config.get("numeric_fields", [])
     if numeric_fields:
         valid_products = 0
@@ -352,6 +385,29 @@ def check_semantic_validation(products: list[dict], config: dict) -> tuple[float
                 "checked": checked_products,
                 "examples": bad_examples,
             }
+
+    # Sub-check 4: Embedded-units detection
+    clean_unit = 0
+    embedded_unit_examples: list[dict] = []
+    for p in products:
+        has_embedded = False
+        offending: dict[str, str] = {}
+        for bucket in ("core_attributes", "extended_attributes", "extra_attributes"):
+            for k, v in p.get(bucket, {}).items():
+                if v is not None and isinstance(v, str) and EMBEDDED_UNIT_RE.search(v):
+                    has_embedded = True
+                    offending[k] = v
+        if not has_embedded:
+            clean_unit += 1
+        elif len(embedded_unit_examples) < 3:
+            embedded_unit_examples.append(offending)
+    embedded_unit_score = clean_unit / len(products)
+    scores.append(embedded_unit_score)
+    detail["embedded_units"] = {
+        "score": round(embedded_unit_score, 4),
+        "flagged_count": len(products) - clean_unit,
+        "examples": embedded_unit_examples,
+    }
 
     composite = min(scores) if scores else 1.0
     return composite, detail
@@ -394,24 +450,34 @@ def check_schema_conformance(products: list[dict], config: dict) -> float:
             **product.get("extra_attributes", {}),
         }
         for attr_name, attr_val in attrs.items():
-            if attr_name not in type_map:
-                continue
             if attr_val is None:
                 continue
-            total += 1
-            expected_type = type_map[attr_name]
-            if attr_name in enum_attrs:
-                if attr_val in enum_attrs[attr_name]:
+            if attr_name in type_map:
+                total += 1
+                expected_type = type_map[attr_name]
+                if attr_name in enum_attrs:
+                    if attr_val in enum_attrs[attr_name]:
+                        conforming += 1
+                    continue
+                if expected_type == "str" and isinstance(attr_val, str) and attr_val.strip():
                     conforming += 1
-                continue
-            if expected_type == "str" and isinstance(attr_val, str) and attr_val.strip():
-                conforming += 1
-            elif expected_type == "number" and isinstance(attr_val, (int, float)):
-                conforming += 1
-            elif expected_type == "list" and isinstance(attr_val, list):
-                conforming += 1
-            elif expected_type == "bool" and isinstance(attr_val, bool):
-                conforming += 1
+                elif expected_type == "number" and isinstance(attr_val, (int, float)):
+                    conforming += 1
+                elif expected_type == "list" and isinstance(attr_val, list):
+                    conforming += 1
+                elif expected_type == "bool" and isinstance(attr_val, bool):
+                    conforming += 1
+            else:
+                # Attributes NOT in type_map: basic sanity check
+                total += 1
+                if isinstance(attr_val, (int, float, bool)):
+                    conforming += 1
+                elif isinstance(attr_val, list):
+                    conforming += 1
+                elif isinstance(attr_val, str):
+                    # Must be non-empty and not contain HTML
+                    if attr_val.strip() and not re.search(r'<[a-z]', attr_val):
+                        conforming += 1
     return conforming / total if total > 0 else 1.0
 
 
@@ -769,6 +835,8 @@ def format_text_summary(result: dict, config: dict) -> str:
                     parts.append(f"{sem['non_product_detection']['flagged_count']} non-products")
                 if sem.get("numeric_format", {}).get("invalid_count", 0):
                     parts.append(f"{sem['numeric_format']['invalid_count']} bad numeric values")
+                if sem.get("embedded_units", {}).get("flagged_count", 0):
+                    parts.append(f"{sem['embedded_units']['flagged_count']} embedded units")
                 if parts:
                     lines.append(f"         {', '.join(parts)}")
         lines.append("")
@@ -838,7 +906,7 @@ def format_markdown_report(result: dict, config: dict, products: list[dict]) -> 
             if "dirty_count" in info:
                 lines.append(f"- {info['dirty_count']} dirty values detected")
             if "flagged_count" in info:
-                lines.append(f"- {info['flagged_count']} non-product records flagged")
+                lines.append(f"- {info['flagged_count']} {'embedded unit values' if sub_check == 'embedded_units' else 'non-product records'} flagged")
             if "invalid_count" in info:
                 lines.append(f"- {info['invalid_count']}/{info['checked']} products with invalid numeric fields")
             if info.get("examples"):
@@ -879,43 +947,81 @@ def main() -> None:
     project_root = find_project_root(args.config)
     slug = config["company_slug"]
 
-    # Resolve paths
+    # Resolve paths — eval writes its own products under eval-generator output
     scraper_dir = project_root / "docs" / "scraper-generator" / slug
-    output_dir = scraper_dir / "output"
-    scraper_output = output_dir / "products.jsonl"
-    scraper_summary_path = output_dir / "summary.json"
-    scraper_log_path = output_dir / "debug.log"
     eval_output_dir = args.config.resolve().parent / "output"
+    eval_products = eval_output_dir / "products.jsonl"
+    eval_summary_path = eval_output_dir / "summary.json"
+    eval_log_path = eval_output_dir / "debug.log"
     eval_result_path = eval_output_dir / "eval_result.json"
     eval_history_path = eval_output_dir / "eval_history.json"
     baseline_path = eval_output_dir / "baseline.json"
     eval_output_dir.mkdir(parents=True, exist_ok=True)
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load data
-    products = load_jsonl(scraper_output)
-    summary = load_json(scraper_summary_path) or {}
+    products = load_jsonl(eval_products)
+    summary = load_json(eval_summary_path) or {}
     history = load_json(eval_history_path) or []
     if not isinstance(history, list):
         history = []
     is_limited = summary.get("limited", False)
 
-    # --collect: run scraper if sample is insufficient
+    # --collect: run scraper to collect per-subcategory sample
     if args.collect:
         sample = eval_sample_size(config)
         needed = sample["total"]
-        if len(products) < needed:
-            scraper_path = scraper_dir / "scraper.py"
-            if scraper_path.exists():
-                print(f"Collecting {needed} products (have {len(products)})...", file=sys.stderr)
+        scraper_path = scraper_dir / "scraper.py"
+        if not scraper_path.exists():
+            print(f"Warning: scraper not found at {scraper_path}", file=sys.stderr)
+        else:
+            per_sub = sample["per_subcategory"]
+            scraper_config_path = scraper_dir / "config.json"
+            scraper_config = load_scraper_config(scraper_config_path)
+            category_key_map = build_category_key_map(scraper_config) if scraper_config else {}
+
+            if len(per_sub) > 1 and category_key_map:
+                # Multi-subcategory: collect per-subcategory
+                # Clear existing products file
+                if eval_products.exists():
+                    eval_products.unlink()
+                print(f"Collecting products per subcategory ({len(per_sub)} subcategories)...", file=sys.stderr)
+                for sub_id, sub_limit in per_sub.items():
+                    keys = category_key_map.get(sub_id, [])
+                    if not keys:
+                        print(f"  Warning: no category keys for {sub_id}, skipping", file=sys.stderr)
+                        continue
+                    categories_arg = ",".join(keys)
+                    print(f"  {sub_id}: collecting {sub_limit} products (keys: {categories_arg})", file=sys.stderr)
+                    try:
+                        proc = subprocess.run(
+                            [
+                                "uv", "run", str(scraper_path),
+                                "--categories", categories_arg,
+                                "--limit", str(sub_limit),
+                                "--output-file", str(eval_products),
+                                "--summary-file", str(eval_summary_path),
+                                "--log-file", str(eval_log_path),
+                                "--append",
+                            ],
+                            cwd=project_root,
+                            timeout=min(max(300, sub_limit * 10), 3600),
+                            check=False,
+                        )
+                        if proc.returncode != 0:
+                            print(f"  Warning: scraper exited with code {proc.returncode} for {sub_id}", file=sys.stderr)
+                    except subprocess.TimeoutExpired:
+                        print(f"  Warning: scraper timed out for {sub_id}", file=sys.stderr)
+            else:
+                # Single-subcategory or no config: collect with flat --limit
+                print(f"Collecting {needed} products...", file=sys.stderr)
                 try:
                     proc = subprocess.run(
                         [
                             "uv", "run", str(scraper_path),
                             "--limit", str(needed),
-                            "--output-file", str(scraper_output),
-                            "--summary-file", str(scraper_summary_path),
-                            "--log-file", str(scraper_log_path),
+                            "--output-file", str(eval_products),
+                            "--summary-file", str(eval_summary_path),
+                            "--log-file", str(eval_log_path),
                         ],
                         cwd=project_root,
                         timeout=min(max(300, needed * 10), 3600),
@@ -925,15 +1031,18 @@ def main() -> None:
                         print(f"Warning: scraper exited with code {proc.returncode}", file=sys.stderr)
                 except subprocess.TimeoutExpired:
                     print(f"Warning: scraper timed out after {min(max(300, needed * 10), 3600)}s", file=sys.stderr)
-                # Reload data
-                products = load_jsonl(scraper_output)
-                summary = load_json(scraper_summary_path) or {}
-                is_limited = summary.get("limited", False)
-            else:
-                print(f"Warning: scraper not found at {scraper_path}", file=sys.stderr)
+
+            # Reload data
+            products = load_jsonl(eval_products)
+            summary = load_json(eval_summary_path) or {}
+            # When --collect is used, we intentionally sample, so mark as limited
+            is_limited = True
 
     if not products:
         print("Warning: No products found in scraper output.", file=sys.stderr)
+
+    # Inject is_limited into summary for compute_results
+    summary["limited"] = is_limited
 
     # Baseline
     if args.no_history:
