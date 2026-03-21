@@ -22,8 +22,8 @@ These files must exist before the orchestrator starts. SKILL.md is responsible f
 |------|--------|---------|-------------------------------------|
 | Company report | `/product-classifier` | Step 1, 1b | Site URL, taxonomy IDs, business model |
 | Catalog assessment | `/catalog-detector` | Step 1, 1b | Scraping strategy, URL prefixes, selectors, platform, product count |
-| `generator_input.json` | Prep script (`orchestrator_prepare_generator_input.py`) | Step 1, 2 | Routing tables: core/extended attribute keys, types, units per subcategory |
-| Product taxonomy (`categories.md`) | `/product-taxonomy` | Step 2 | Valid subcategory IDs (to verify schemas exist) |
+| `generator_input.json` | Prep script (`orchestrator_prepare_generator_input.py`) | Step 1 | Routing tables: core/extended attribute keys, types, units per subcategory |
+| Product taxonomy (`categories.md`) | `/product-taxonomy` | Step 1 | Valid subcategory IDs (to validate taxonomy IDs from company report) |
 | Language seed (`labels-{lang}.json`) | Platform knowledgebase | Step 2b | Common label→English translations (non-English sites only, may not exist) |
 
 ### Outputs
@@ -63,8 +63,11 @@ flowchart TD
     INPUTS --->|no| E1(["STOP — need company report, catalog assessment, and generator_input.json"])
     INPUTS --->|yes| STRAT{"Strategy (from catalog assessment)<br/>is html_css, json_api, or pdf?"}
     STRAT --->|no| E2(["STOP — unknown or missing scraping strategy<br/>see unknown_scraping_strategy decision"])
-    STRAT --->|yes| S1b["Step 1b: Build category mapping<br/>Map catalog structure to taxonomy IDs (from company report)<br/>URL prefixes, section markers, or default_category only"]
-    S1b --> S2["Step 2: Check we have SKU schemas<br/>Does generator_input.json cover every subcategory?<br/>Missing → skip that subcategory, log it"]
+    STRAT --->|yes| VALIDATE["Validate taxonomy IDs against categories.md<br/>Invalid ID → STOP (invalid_taxonomy_id)"]
+    VALIDATE --> FILTER["Filter by schema availability<br/>Keep only taxonomy IDs with entries in generator_input.json<br/>Log skipped ones"]
+    FILTER --->|none remain| E3(["STOP — all_subcategories_lack_schemas"])
+    FILTER --->|≥1 remain| S1b["Step 1b: Build category mapping<br/>Map catalog structure to covered taxonomy IDs only<br/>URL prefixes, section markers, or default_category"]
+    S1b --> S2["Step 2: Confirm schema coverage<br/>Assert: category mapping only references subcategories in generator_input.json"]
     S2 --> LANG{"English site?"}
     LANG --->|yes| READY(["Ready for implementation"])
     LANG --->|no| S2b["Step 2b: Build a translation map<br/>Map site labels (from catalog assessment + language seed file)<br/>to attribute keys (from generator_input.json)"]
@@ -124,6 +127,20 @@ Validate the scraping strategy is one of: `html_css`, `json_api`, `pdf`. If the 
 
 Read the pre-processed generator input file (`generator_input.json`). This JSON contains subcategory schemas (`core_attribute_keys`/`extended_attribute_keys` lists, `attribute_types` dict, and `units` dict per subcategory) built from the SKU schemas by `orchestrator_prepare_generator_input.py`. Use these tables directly in the coder dispatch (Step 3) — do not re-read raw SKU schema files.
 
+### Filter subcategories by schema availability
+
+For each taxonomy ID in the company report, check two things in order:
+
+1. **Does the taxonomy ID exist in the product taxonomy categories file?** If not, escalate — see the `invalid_taxonomy_id` decision. A taxonomy ID that doesn't appear in the canonical taxonomy means the company report has bad data (manually edited, or the subcategory was removed after classification).
+
+2. **Does it have an entry in `generator_input.json`'s `subcategory_schemas` dict?** If not, skip it — see the `no_sku_schema` decision. The subcategory is valid but no SKU schema has been created yet.
+
+After filtering:
+
+- **If ALL subcategories are skipped** (no schemas exist for any valid taxonomy ID), stop — see the `all_subcategories_lack_schemas` decision.
+- **If SOME are skipped**, log each skipped subcategory (taxonomy ID + reason "no SKU schema") and continue with the covered set. Record skipped subcategories in the `skipped_subcategories` field of `validation_{n}_{hash}.json`.
+- **Use only the covered set** for all subsequent steps — Step 1b (category mapping), Step 2b (label map), Step 3 (coder dispatch).
+
 The routing tables in `generator_input.json` determine attribute placement in the scraper output:
 
 - Matched **core** key → `core_attributes`
@@ -138,11 +155,13 @@ Use **EXACT key values** from the schema's Key column. For multi-subcategory com
 
 ## Step 1b: Build Category Mapping
 
-Build a mapping so the scraper classifies products into taxonomy IDs at runtime without any LLM. Set `default_category` to the company's primary taxonomy ID (fallback when no other rule matches).
+Build a mapping so the scraper classifies products into taxonomy IDs at runtime without any LLM. Only use subcategories that passed the schema availability filter in Step 1 — never map a URL prefix or section marker to a subcategory without a schema.
 
-For **single-subcategory companies**, the mapping is trivial — `category_mapping` can be empty and all products use `default_category`.
+Set `default_category` to the company's primary taxonomy ID (fallback when no other rule matches). If the primary was filtered out, use the first available subcategory.
 
-For **multi-subcategory companies**, the mapping depends on how the catalog is structured:
+For **single-subcategory companies** (after filtering), the mapping is trivial — `category_mapping` can be empty and all products use `default_category`.
+
+For **multi-subcategory companies** (after filtering), the mapping depends on how the catalog is structured:
 
 ### URL-based navigation (`html_css`, `json_api` with category URLs)
 
@@ -178,11 +197,9 @@ Store the mapping in config (see Step 6).
 
 ---
 
-## Step 2: Verify SKU Schemas
+## Step 2: Confirm Schema Coverage
 
-Check `generator_input.json` for each subcategory taxonomy ID from the company report. Each subcategory must have an entry in the `subcategory_schemas` dict. For single-subcategory companies, one entry. For multi-subcategory companies, one entry per subcategory — the scraper uses the Step 1b category mapping to determine which schema applies per product.
-
-If a subcategory key is missing from `subcategory_schemas`, **skip it** — remove it from the category mapping, log the skipped subcategory, and continue with what's available. The skipped subcategories are reported in the final output (see `validation_{n}_{hash}.json` field `skipped_subcategories`). The SKILL.md wrapper handles the `no_sku_schema` decision before the orchestrator starts.
+Assertion step — verify the filtering done in Step 1 left at least one subcategory with routing tables in `generator_input.json`. The category mapping from Step 1b should only reference subcategories that exist in `subcategory_schemas`. If this invariant is violated, there is a bug in the preparation flow.
 
 ---
 
@@ -329,7 +346,7 @@ For non-English sites, the orchestrator builds the best LABEL_MAP it can in Step
 
 ## Diagnostic Persistence
 
-All output files use `{name}_{n}_{hash}.{ext}` versioning — `n` is iteration, `hash` is content hash. Never overwritten. No unversioned copies.
+All output files use `{name}_{n}_{hash}.{ext}` versioning — `n` is iteration, `hash` is 4 random hex chars. Never overwritten. No unversioned copies.
 
 The orchestrator reads the latest file by sorting on `n` (highest iteration wins).
 
@@ -458,12 +475,26 @@ No `config.json` or `validation_{n}_{hash}.json` on escalation.
 **Escalate when:** Always. Report the unmapped prefix and the full list of subcategories and URL patterns.
 **Escalation payload:** Company slug, the unmapped URL prefix, the list of subcategories, all URL patterns from the catalog assessment.
 
+### Decision: invalid_taxonomy_id
+
+**Context:** A taxonomy ID in the company report does not appear in the product taxonomy categories file. This is a data integrity issue — either the company report was manually edited with a wrong ID, or the subcategory was removed from the taxonomy after classification.
+**Autonomous resolution:** Never.
+**Escalate when:** Always. Report the invalid taxonomy ID and suggest re-running `/product-classifier` to reclassify the company.
+**Escalation payload:** Company slug, the invalid taxonomy ID, the list of valid taxonomy IDs from the product taxonomy categories file.
+
 ### Decision: no_sku_schema
 
-**Context:** No SKU schema file exists for the company's product category.
-**Autonomous resolution:** Verify that the subcategory from the company report exists in the product taxonomy categories file. If it does, the schema simply hasn't been created yet — trigger SKU schema generation for that subcategory. Once the schema is available, return to Step 2 and continue.
-**Escalate when:** The subcategory from the company report does not appear in the product taxonomy categories file. This indicates a taxonomy integrity issue that must be resolved before the pipeline can continue.
-**Escalation payload:** Company slug, the taxonomy ID from the company report, confirmation that the subcategory was not found in the taxonomy.
+**Context:** No SKU schema file exists for one or more of the company's subcategories. This is expected — not every subcategory has a schema yet.
+**Autonomous resolution:** Exclude the subcategory from the covered set in Step 1's filter. It will not be included in the category mapping (Step 1b) or any downstream steps. Log it in `skipped_subcategories`. Do NOT invoke `/product-taxonomy` or attempt to auto-generate the schema.
+**Escalate when:** Never. Skipping is always autonomous.
+**Escalation payload:** N/A
+
+### Decision: all_subcategories_lack_schemas
+
+**Context:** None of the company's subcategory taxonomy IDs have SKU schema files. The scraper cannot be generated because there are no attribute routing tables to guide extraction.
+**Autonomous resolution:** Never.
+**Escalate when:** Always. Report all missing subcategories and their taxonomy IDs.
+**Escalation payload:** Company slug, list of all taxonomy IDs from the company report, confirmation that none have SKU schemas. Suggest running `/product-taxonomy {subcategory name}` for the primary subcategory to unblock the pipeline.
 
 ### Decision: probe_extraction_failed
 

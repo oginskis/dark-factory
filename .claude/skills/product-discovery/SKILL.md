@@ -80,13 +80,13 @@ This stage generates a standalone Python scraper based on the catalog assessment
 
 **Stop the pipeline if:**
 - No catalog assessment exists for the company (defensive — Stage 2 ensures this)
-- The company's subcategory is not found in the product taxonomy categories file (taxonomy integrity issue — should not happen if Stage 1 validated against the taxonomy)
-- A URL prefix cannot be mapped to any taxonomy subcategory (unmapped_url_prefix escalation)
-- Non-English label coverage stays below 70% after 3 extension attempts (label_coverage_insufficient escalation)
-- Probe extraction fails after 3 fix-retest cycles (extraction logic cannot match the live site)
-- The scraper fails testing after 3 fix-retest cycles (includes attribute fill rate failures — ≥30% of products must have non-empty core_attributes)
+- **All subcategories lack SKU schemas** (`all_subcategories_lack_schemas` escalation — no schemas exist for any of the company's taxonomy IDs, so no scraper can be generated)
+- A taxonomy ID from the company report is not in `categories.md` (`invalid_taxonomy_id` escalation)
+- A URL prefix cannot be mapped to any taxonomy subcategory (`unmapped_url_prefix` escalation)
+- Probe extraction fails after exhausting the fix budget (`probe_extraction_failed` escalation)
+- The scraper fails testing after exhausting the fix budget, including attribute coverage failures (`scraper_test_failed` or `not_enough_attributes_to_extract` escalation)
 
-If no SKU schema exists but the subcategory is valid, the scraper-generator will automatically invoke `/product-taxonomy` to generate it before continuing. **Before concluding a schema is missing, always list `docs/product-taxonomy/sku-schemas/` and search for the subcategory name** — never guess the filename from a partial slug.
+**SKU schema enforcement:** Subcategories without existing SKU schemas are skipped — the scraper-generator will NOT auto-generate schemas. It skips schema-less subcategories and only generates code for subcategories with available schemas. Skipped subcategories are reported in the pipeline summary. If ALL subcategories lack schemas, the pipeline stops at Stage 3 with an `all_subcategories_lack_schemas` escalation. **Before concluding a schema is missing, always list `docs/product-taxonomy/sku-schemas/` and search for the subcategory name** — never guess the filename from a partial slug.
 
 ## Stage 4: Eval Generator
 
@@ -116,7 +116,7 @@ When all four stages complete successfully, present a structured summary to the 
 ### Catalog
 - **Catalog found:** {yes/no}
 - **Platform:** {platform}
-- **Scraping strategy:** {static_html / structured_data / pdf_pricelist}
+- **Scraping strategy:** {html_css / json_api / pdf}
 - **Estimated products:** {count}
 - **Anti-bot:** {none / light / moderate / severe}
 - **Entry points:**
@@ -132,6 +132,15 @@ When all four stages complete successfully, present a structured summary to the 
 ### Eval
 - **Checks:** 13 weighted checks configured
 - **Status from test run:** {pass / degraded / fail} (score: {N})
+
+### Skipped Subcategories (no SKU schema)
+{If any subcategories from the company report were skipped because no SKU schema exists, list them here:}
+
+| Taxonomy ID | Display Name | Action to Add Coverage |
+|---|---|---|
+| {taxonomy_id} | {display name} | Run `/product-taxonomy {display name}` to generate the schema, then re-run `/scraper-generator {slug}` |
+
+{If no subcategories were skipped, write "All subcategories have SKU schemas — none skipped." Do not omit this section.}
 
 ### Notes
 {Bulleted list of operational caveats and important observations that affect how the scraper output should be interpreted. Include any of the following that apply:}
@@ -172,9 +181,9 @@ Run eval:
 uv run .claude/skills/eval-generator/scripts/eval_run.py docs/eval-generator/{slug}/eval_config.json
 ```
 
-Output files:
-- `docs/scraper-generator/{slug}/output/products.jsonl`
-- `docs/scraper-generator/{slug}/output/summary.json`
+Output files (glob for latest):
+- `docs/scraper-generator/{slug}/output/products_*_*.jsonl`
+- `docs/scraper-generator/{slug}/output/summary_*_*.json`
 - `docs/eval-generator/{slug}/output/eval_result.json`
 ```
 

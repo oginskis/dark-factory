@@ -92,6 +92,7 @@ This file is edited manually — the `product-taxonomy` skill reads from it but 
 - Transformers & Switchgear `energy.transformers_switchgear`
 - Fuel Cells `energy.fuel_cells`
 - Electric Vehicle Charging Equipment `energy.ev_charging`
+- Inverters, Microinverters & Power Converters `energy.inverters_power_converters`
 - Oil & Gas Field Equipment (Drill Bits, Wellheads, Valves) `energy.oil_gas_field_equipment`
 
 ## Automotive & Vehicles
@@ -183,6 +184,7 @@ This file is edited manually — the `product-taxonomy` skill reads from it but 
 - Ceramic Tiles & Sanitary Ware `construction.ceramic_tiles_sanitary`
 - Refractory Products & Technical Ceramics `construction.refractory_technical_ceramics`
 - Abrasives `construction.abrasives`
+- Compaction Equipment (Plate Compactors, Rammers) `construction.compaction_equipment`
 - Building Hardware & Ironmongery (Handles, Hinges, Locks) `construction.building_hardware_ironmongery`
 
 ## Wood Products & Lumber
@@ -246,6 +248,7 @@ This file is edited manually — the `product-taxonomy` skill reads from it but 
 - Diapers & Incontinence Products `consumer.diapers_incontinence`
 - Baby Care Products (Non-Food) `consumer.baby_care`
 - Pet Food & Pet Care Products `consumer.pet_food_pet_care`
+- Pet Accessories (Leashes, Collars, Toys) `consumer.pet_accessories`
 - Office & School Supplies (Pens, Notebooks, Binders) `consumer.office_school_supplies`
 - Art & Craft Supplies `consumer.art_craft_supplies`
 
@@ -292,4 +295,6 @@ This file is edited manually — the `product-taxonomy` skill reads from it but 
 - Fall Protection Equipment (Harnesses, Lanyards) `safety.fall_protection`
 - Hearing Protection (Earplugs, Earmuffs) `safety.hearing_protection`
 - Safety Gloves & Hand Protection `safety.gloves_hand_protection`
+- Welding Protection (Helmets, Blankets, Screens) `safety.welding_protection`
+- Cooling & Heat Stress Products `safety.cooling_heat_stress`
 - Fire Extinguishers & Suppression Equipment `safety.fire_extinguishers_suppression`
